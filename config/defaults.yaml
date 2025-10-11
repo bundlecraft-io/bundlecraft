@@ -1,0 +1,12 @@
+# Default values applied globally unless overridden
+
+pem:
+  include_subject_comments: true
+
+verify:
+  fail_on_expired: true
+  warn_days_before_expiry: 30
+
+format_overrides: {}
+
+package: false

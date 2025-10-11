@@ -1,0 +1,11 @@
+__pycache__/
+venv/
+build/
+test-*/
+
+*.pyc
+*.jks
+*.p12
+*.der
+*.json
+*.hash

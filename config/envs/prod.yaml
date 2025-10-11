@@ -1,0 +1,8 @@
+bundle_targets:
+  - internal
+publish_targets:
+  - type: fileshare
+    path: "\\\\fileshare\\pki\\truststores"
+format_overrides:
+  jks:
+    keystore_password: changeit
