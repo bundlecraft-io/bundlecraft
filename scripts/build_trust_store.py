@@ -239,35 +239,90 @@ def main(env, bundle, package, verify_only):
     fmt_overrides = env_cfg.get("format_overrides") or {}
     convert_to_formats(pem_out, build_root, extra_formats, fmt_overrides)
 
+    # --- OPTIONAL PACKAGING (must happen before manifest) ---
+    if package:
+        import tarfile
+        archive_path = build_root / "package.tar.gz"
+        with tarfile.open(archive_path, "w:gz") as tar:
+            tar.add(build_root, arcname=".")
+        click.secho(f"[INFO] Packaged archive: {archive_path}", fg="green")
+
     # -----------------------
-    # Manifest
+    # Final deterministic manifest + checksums
     # -----------------------
+    from datetime import datetime, timezone
+
     expiry_summary = {
         "total": len(pem_blocks),
         "expired": len(errs),
         "expiring_soon": len(warns),
         "valid": len(pem_blocks) - len(errs) - len(warns),
-        "warn_days_before_expiry": warn_days
+        "warn_days_before_expiry": warn_days,
     }
 
-    manifest = {
+    manifest_path = build_root / "manifest.json"
+    checksum_path = build_root / "checksums.sha256"
+
+    # Collect all files that currently exist in the build dir
+    all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+
+    # Files recorded inside manifest["files"]:
+    #   - include everything EXCEPT manifest.json
+    files_for_manifest = [n for n in all_files if n != "manifest.json"]
+
+    # Build manifest["files"] entries (manifest.json excluded)
+    file_entries = [
+        {"path": n, "sha256": sha256_file(build_root / n)}
+        for n in files_for_manifest
+    ]
+
+    manifest_obj = {
         "bundle": bundle,
         "environment": env,
-        "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "sources": [str(p.relative_to(ROOT)).replace("\\", "/") for p in include_paths],
-        "outputs": sorted([p.name for p in build_root.glob("*") if p.is_file()]),
+        "outputs": files_for_manifest,  # includes package.tar.gz if present
         "verify": {"fail_on_expired": fail_on_expired},
         "expiry_summary": expiry_summary,
+        "files": file_entries,
     }
 
-    write_json(build_root / "manifest.json", manifest)
-    click.secho(f"[INFO] Wrote manifest: {build_root / 'manifest.json'}", fg="green")
+    # Write manifest exactly once (deterministic order)
+    manifest_json = json.dumps(manifest_obj, indent=2, sort_keys=True)
+    manifest_path.write_text(manifest_json + "\n", encoding="utf-8")
+    click.secho(f"[INFO] Wrote manifest: {manifest_path}", fg="green")
+
+    # checksums.sha256 includes EVERY file, INCLUDING manifest.json
+    checksum_lines = [f"{sha256_file(build_root / n)}  {n}" for n in all_files]
+    checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+    click.secho(f"[INFO] Wrote checksums: {checksum_path}", fg="green")
+
+    click.secho("[SUCCESS] Build completed successfully.", fg="green")
+
+    # Compute fresh checksums including manifest.json itself
+    all_files = sorted([
+        f.name for f in build_root.glob("*") if f.is_file()
+    ])
+    checksum_lines = [f"{sha256_file(build_root / f)}  {f}" for f in all_files]
+    checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+    click.secho(f"[INFO] Wrote checksums: {checksum_path}", fg="green")
 
     # -----------------------
-    # Checksums
+    # Embed hash data into manifest (for verifier)
     # -----------------------
-    checksums = build_checksums(build_root)
-    click.secho(f"[INFO] Wrote checksums: {checksums}", fg="green")
+    file_entries = []
+    for f in sorted(build_root.glob("*")):
+        if f.is_file():
+            file_entries.append({
+                "path": f.name,
+                "sha256": sha256_file(f)
+            })
+
+    # Reload manifest JSON, inject "files" array
+    mdata = json.loads(manifest_path.read_text(encoding="utf-8"))
+    mdata["files"] = file_entries
+    manifest_path.write_text(json.dumps(mdata, indent=2), encoding="utf-8")
+    click.secho(f"[INFO] Updated manifest with file hashes.", fg="green")
 
     # -----------------------
     # Package (optional)

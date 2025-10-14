@@ -3,41 +3,32 @@
 verifiers.py
 Verification utilities for PKI-CA-Trust.
 
-verify_bundle():
-  • Validates PEM blocks for expiry
-  • Ensures generated P7B/P12 are non-empty
-  • Compares certificate counts across PEM, P7B, P12, JKS
+Capabilities:
+    • verify_bundle() – Verify PEMs or built trust bundles
+    • verify_manifest() – Validate manifest.json and checksums.sha256 integrity
+    • _check_output_files() – Detect empty/missing output files
+    • _compare_output_counts() – Compare certificate counts across formats
 
 Requires:
-  - openssl
-  - keytool (for JKS counting)
+    - openssl
+    - keytool (for JKS counting)
 """
 
 import os
 import sys
+import json
+import hashlib
 import subprocess
 import datetime as dt
 from pathlib import Path
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
-
 # ---------------------------------------------------------------------
 # Core verifier
 # ---------------------------------------------------------------------
 
 def verify_bundle(target: Path, warn_days: int = 30, fail_on_expired: bool = True) -> int:
-    """
-    Verify PEM certificates or built trust bundles.
-
-    Args:
-        target (Path): PEM file, directory of PEMs, or build folder
-        warn_days (int): warn if cert expires within N days
-        fail_on_expired (bool): treat expired certs as fatal
-
-    Returns:
-        int: exit code (0 = ok, 1 = warnings, 5 = fatal)
-    """
     if not target.exists():
         print(f"[ERROR] Target not found: {target}", file=sys.stderr)
         return 5
@@ -80,7 +71,6 @@ def verify_bundle(target: Path, warn_days: int = 30, fail_on_expired: bool = Tru
                 errors += 1
                 print(f"[ERROR] Parse error in {pem.name}: {e}")
 
-    # --- summary ---
     print(f"\n[SUMMARY] Verified {total} certificate(s):")
     print(f"          Expired = {expired}, Expiring Soon = {expiring}, Errors = {errors}")
 
@@ -89,9 +79,8 @@ def verify_bundle(target: Path, warn_days: int = 30, fail_on_expired: bool = Tru
         return 5
     if expiring > 0:
         print("[RESULT] ⚠️  Certificates expiring soon.")
-        # not fatal; return 1 at end if no other failures
+        return 1
 
-    # --- Sanity check for generated outputs ---
     if target.is_dir():
         if not _check_output_files(target):
             print("[RESULT] ❌ Detected empty or invalid output files.")
@@ -104,6 +93,82 @@ def verify_bundle(target: Path, warn_days: int = 30, fail_on_expired: bool = Tru
     print("[RESULT] ✅ All certificates valid.")
     return 0
 
+# ---------------------------------------------------------------------
+# Manifest verification
+# ---------------------------------------------------------------------
+
+def verify_manifest(manifest_path: Path) -> bool:
+    base_dir = manifest_path.parent
+    manifest_file = manifest_path
+    checksum_file = base_dir / "checksums.sha256"
+
+    if not manifest_file.exists():
+        print(f"[ERROR] Manifest file missing: {manifest_file}")
+        return False
+
+    try:
+        manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"[ERROR] Failed to parse manifest: {e}")
+        return False
+
+    files = manifest.get("files", [])
+    if not files:
+        print(f"[WARN] No 'files' field found in manifest.")
+        return False
+
+    success = True
+    for entry in files:
+        relpath = entry.get("path")
+        expected_hash = entry.get("sha256")
+        if not relpath or not expected_hash:
+            print(f"[WARN] Malformed entry in manifest: {entry}")
+            continue
+
+        # Skip manifest.json itself
+        if Path(relpath).name == "manifest.json":
+            print(f"[INFO] Skipping manifest file: {relpath}")
+            continue
+
+        target_file = base_dir / relpath
+        if not target_file.exists():
+            print(f"[ERROR] Missing file: {target_file}")
+            success = False
+            continue
+
+        actual_hash = _sha256_file(target_file)
+        if actual_hash != expected_hash:
+            print(f"[ERROR] Hash mismatch for {relpath}")
+            print(f"        Expected: {expected_hash}")
+            print(f"        Actual:   {actual_hash}")
+            success = False
+        else:
+            print(f"[INFO] Verified: {relpath}")
+
+    if checksum_file.exists():
+        for line in checksum_file.read_text(encoding="utf-8").splitlines():
+            if "  " not in line:
+                continue
+            expected_hash, relpath = line.split("  ", 1)
+            target_file = base_dir / relpath
+            if target_file.exists():
+                actual_hash = _sha256_file(target_file)
+                if actual_hash != expected_hash:
+                    print(f"[ERROR] Checksum mismatch for {relpath}")
+                    success = False
+
+    if success:
+        print("[RESULT] ✅ Manifest verification successful.")
+    else:
+        print("[RESULT] ❌ Manifest verification failed.")
+    return success
+
+def _sha256_file(file_path: Path) -> str:
+    h = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 # ---------------------------------------------------------------------
 # Helpers
@@ -123,9 +188,7 @@ def _split_pem_blocks(text: str) -> list[str]:
             buf.append(line)
     return blocks
 
-
 def _check_output_files(build_path: Path) -> bool:
-    """Check for empty or missing P7B/P12 outputs."""
     valid = True
     for ext in ("*.p7b", "*.p12"):
         for f in build_path.glob(ext):
@@ -134,13 +197,7 @@ def _check_output_files(build_path: Path) -> bool:
                 valid = False
     return valid
 
-
-# ---------------------------------------------------------------------
-# Consistency: compare number of certs across outputs
-# ---------------------------------------------------------------------
-
 def _compare_output_counts(build_path: Path):
-    """Compare the number of certs in PEM, P7B, P12, and JKS outputs."""
     counts = {}
     for pattern, label in [
         ("*.pem", "PEM"),
@@ -151,7 +208,6 @@ def _compare_output_counts(build_path: Path):
         files = list(build_path.glob(pattern))
         if not files:
             continue
-        # Use the first match for each format in this build folder
         f = files[0]
         counts[label] = _count_certs_in_file(f)
 
@@ -168,53 +224,31 @@ def _compare_output_counts(build_path: Path):
         else:
             print(f"[INFO] {fmt} count OK: {count}")
 
-
 def _count_certs_in_file(file_path: Path) -> int:
-    """Return the number of certificates contained in a given output file."""
     ext = file_path.suffix.lower()
     try:
         if ext == ".pem":
             text = file_path.read_text(encoding="utf-8", errors="ignore")
             return text.count("-----BEGIN CERTIFICATE-----")
-
         if ext == ".p7b":
-            # DER P7B → text via openssl
             cmd = ["openssl", "pkcs7", "-print_certs", "-in", str(file_path), "-inform", "DER"]
             res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            # Count BEGIN CERTIFICATE or 'subject=' lines
             out = res.stdout
-            n = out.count("-----BEGIN CERTIFICATE-----")
-            if n == 0:
-                n = out.count("subject=")
+            n = out.count("-----BEGIN CERTIFICATE-----") or out.count("subject=")
             return n
-
         if ext == ".p12":
-            # Print ALL certs (no -clcerts), no keys
             cmd = ["openssl", "pkcs12", "-in", str(file_path), "-nokeys", "-passin", "pass:changeit"]
             res = subprocess.run(cmd, capture_output=True, text=True, check=True)
             out = res.stdout
-            # Count either PEM blocks or subject lines
-            n = out.count("-----BEGIN CERTIFICATE-----")
-            if n == 0:
-                n = out.count("subject=")
+            n = out.count("-----BEGIN CERTIFICATE-----") or out.count("subject=")
             return n
-
         if ext == ".jks":
             storepass = os.environ.get("TRUST_JKS_PASSWORD", "changeit")
-            cmd = ["keytool", "-list", "-keystore", str(file_path), "-storepass", storepass]
+            cmd = ["keytool", "-list", "-rfc", "-keystore", str(file_path), "-storepass", storepass]
             res = subprocess.run(cmd, capture_output=True, text=True, check=True)
             out = res.stdout
-            # Robust: try "Alias name:" first; fallback to "Your keystore contains X entries"
-            n = out.count("Alias name:")
-            if n == 0:
-                # Try to parse "... contains N entries"
-                import re
-                m = re.search(r"contains\s+(\d+)\s+entries", out, flags=re.I)
-                if m:
-                    n = int(m.group(1))
-            return n
+            return out.count("-----BEGIN CERTIFICATE-----")
     except Exception as e:
         print(f"[WARN] Could not count certs in {file_path}: {e}")
         return 0
-
     return 0

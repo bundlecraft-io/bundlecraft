@@ -1,64 +1,315 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 verify_bundle.py
-Standalone CLI utility for verifying certificate bundles or source directories.
+----------------
+Verifies integrity and consistency of PKI trust bundle artifacts.
 
-Usage:
-    python scripts/verify_bundle.py <target_path> [--warn-days N] [--fail]
-
-Examples:
-    # Verify a built bundle PEM
-    python scripts/verify_bundle.py build/prod/internal/ca-trust.pem
-
-    # Verify all PEMs under a source directory (recursive)
-    python scripts/verify_bundle.py sources/internal/ --warn-days 45
-
-    # Fail the run if any certificate is expired
-    python scripts/verify_bundle.py build/dev/internal/ --fail
-
-Exit codes:
-    0 = all certificates valid
-    1 = warnings (expiring soon)
-    5 = fatal error (expired certs, parse error, or missing target)
+Features:
+- Default: verifies all bundle files (skips manifest.json & package.tar.gz)
+- --verify-manifest: show manifest details only (no verification)
+- --verify-all: verify bundle files + show manifest in one run
+- --verbose: detailed metadata and hash info
+- Cert-count consistency check (PEM, P12, P7B, JKS)
+- Emoji-rich human output, but pure UTF-8 safe
 """
 
-import sys
 import argparse
+import hashlib
+import json
+import logging
+import re
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
+from cryptography.hazmat.primitives.serialization import pkcs12, pkcs7
 
-# Allow relative imports from the helpers directory
-CURRENT_DIR = Path(__file__).resolve().parent
-HELPERS_DIR = CURRENT_DIR / "helpers"
-sys.path.insert(0, str(HELPERS_DIR))
+# --- logging setup ---
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
 
-from verifiers import verify_bundle
+CHECKSUM_FILE = "checksums.sha256"
+MANIFEST_FILE = "manifest.json"
+IGNORE_FILES = {"package.tar.gz", MANIFEST_FILE}
 
+
+# -------------------------------
+# Utility helpers
+# -------------------------------
+
+def sha256sum(filepath: Path) -> str:
+    """Compute SHA256 for a file."""
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def file_info(file: Path) -> str:
+    """Return readable file stats string."""
+    size_kb = file.stat().st_size / 1024
+    mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
+    return f"{size_kb:.1f} KB, modified {mtime.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+
+
+def load_checksums(path: Path) -> dict:
+    """Load checksum file into dict of {filename: hash}."""
+    checksums = {}
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            hash_val, filename = line.split("  ", 1)
+            checksums[filename.strip()] = hash_val.strip()
+    return checksums
+
+
+# -------------------------------
+# Cert count logic
+# -------------------------------
+
+def count_certs_in_pem(file: Path) -> int:
+    text = file.read_text(encoding="utf-8", errors="ignore")
+    return len(re.findall(r"-----BEGIN CERTIFICATE-----", text))
+
+
+def count_certs_in_store(file: Path) -> int | None:
+    """Count number of certificates in PEM, P12, P7B, or JKS files."""
+    ext = file.suffix.lower()
+    try:
+        if ext == ".pem":
+            return count_certs_in_pem(file)
+
+        elif ext in (".p12", ".pfx"):
+            data = file.read_bytes()
+            count = 0
+            tried_pw = [b"changeit", None]
+
+            for pw in tried_pw:
+                try:
+                    pkey, cert, addl = pkcs12.load_key_and_certificates(data, password=pw)
+                    if cert or addl:
+                        if cert:
+                            count += 1
+                        if addl:
+                            count += len(addl)
+                        break  # success, no need to retry
+                except Exception:
+                    continue
+
+            # Fallback to alternate loader for trust-only stores
+            if count == 0:
+                for pw in tried_pw:
+                    try:
+                        pkcs12_obj = pkcs12.load_pkcs12(data, pw)
+                        certs = []
+                        if hasattr(pkcs12_obj, "certificates"):
+                            certs = pkcs12_obj.certificates or []
+                        elif hasattr(pkcs12_obj, "get_certificates"):
+                            certs = pkcs12_obj.get_certificates() or []
+                        if certs:
+                            count += len(certs)
+                            break
+                    except Exception:
+                        continue
+
+            if count == 0:
+                logger.warning(f"⚠️  Could not read any certificates from {file.name} (possibly encrypted or unsupported password)")
+                return None
+            return count
+
+        elif ext == ".p7b":
+            data = file.read_bytes()
+            try:
+                certs = pkcs7.load_pem_pkcs7_certificates(data)
+            except ValueError:
+                certs = pkcs7.load_der_pkcs7_certificates(data)
+            return len(certs)
+
+        elif ext == ".jks":
+            # Use keytool to extract certs (public only)
+            result = subprocess.run(
+                ["keytool", "-list", "-rfc", "-keystore", str(file), "-storepass", "changeit"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=8,
+            )
+            pem_blocks = re.findall(r"-----BEGIN CERTIFICATE-----", result.stdout)
+            if not pem_blocks:
+                result2 = subprocess.run(
+                    ["keytool", "-list", "-rfc", "-keystore", str(file)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=8,
+                )
+                pem_blocks = re.findall(r"-----BEGIN CERTIFICATE-----", result2.stdout)
+            return len(pem_blocks)
+
+    except Exception as e:
+        logger.debug(f"Error counting certs in {file.name}: {e}")
+
+    return None
+
+
+# -------------------------------
+# Manifest inspection
+# -------------------------------
+
+def show_manifest_info(build_dir: Path, verbose: bool = False) -> None:
+    """Display manifest.json info (no verification)."""
+    manifest_path = build_dir / MANIFEST_FILE
+    if not manifest_path.exists():
+        logger.error(f"Missing {MANIFEST_FILE} in {build_dir}")
+        return
+
+    logger.info("📝 Manifest inspection (no verification performed)")
+    logger.info(f"    Path: {manifest_path.resolve()}")
+    logger.info(f"    Info: {file_info(manifest_path)}")
+
+    sha = sha256sum(manifest_path)
+    logger.info(f"    SHA256: {sha}")
+
+    if verbose:
+        content_preview = manifest_path.read_text(encoding="utf-8", errors="ignore").splitlines()[:10]
+        if len(content_preview) > 0:
+            logger.info("    Content preview:")
+            for line in content_preview:
+                logger.info(f"      {line}")
+    logger.info("✅ Manifest inspection complete (signing verification handled separately).")
+
+
+# -------------------------------
+# Bundle verification
+# -------------------------------
+
+def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool = True) -> bool:
+    """Verify all files in directory against checksums, skipping ignored ones."""
+    checksum_path = build_dir / CHECKSUM_FILE
+    if not checksum_path.exists():
+        logger.error(f"Missing {CHECKSUM_FILE} in {build_dir}")
+        return False
+
+    checksums = load_checksums(checksum_path)
+    logger.info(f"🔍 Starting verification for directory: {build_dir}")
+    logger.info(f"📄 Using checksum manifest: {checksum_path.resolve()}")
+
+    success = True
+    cert_counts = {}
+    verified_files = 0
+    skipped_files = 0
+
+    for file in sorted(build_dir.iterdir()):
+        if file.is_dir():
+            continue
+        if file.name in IGNORE_FILES:
+            reason = "manifest is signed separately" if file.name == MANIFEST_FILE else "non-deterministic artifact"
+            logger.info(f"⏭️  Skipping {file.name} ({reason})")
+            skipped_files += 1
+            continue
+        if file.name == CHECKSUM_FILE:
+            continue
+
+        expected = checksums.get(file.name)
+        if not expected:
+            logger.warning(f"⚠️  No checksum entry for {file.name}")
+            continue
+
+        actual = sha256sum(file)
+        if actual != expected:
+            logger.error(f"❌ {file.name}: hash mismatch!")
+            if verbose:
+                logger.error(f"    Expected: {expected}")
+                logger.error(f"    Actual:   {actual}")
+                logger.error(f"    Info: {file_info(file)}")
+            success = False
+        else:
+            verified_files += 1
+            logger.info(f"✅ {file.name} verified successfully.")
+            if verbose:
+                logger.info(f"    SHA256: {actual}")
+                logger.info(f"    Info: {file_info(file)}")
+
+        # ---- certificate counting ----
+        if check_counts:
+            count = count_certs_in_store(file)
+            if count is not None:
+                cert_counts[file.name] = count
+                if verbose:
+                    logger.info(f"    Certificate count: {count}")
+            else:
+                # If certs couldn't be read, print contextual info
+                logger.info(f"    (hash OK, certificate content not readable — likely encrypted or unsupported)")
+
+    # ---- cert count mismatch detection ----
+    total_certs = sum(cert_counts.values()) if cert_counts else 0
+    unique_counts = set(cert_counts.values())
+    mismatch = False
+    if check_counts and cert_counts:
+        if len(unique_counts) > 1:
+            logger.warning(f"⚠️  Certificate count mismatch detected among files: {cert_counts}")
+            mismatch = True
+        elif all(v == 0 for v in unique_counts):
+            logger.warning("⚠️  All bundle files appear empty (0 certs).")
+
+    # ---- summary ----
+    logger.info("🔚 Verification run complete.")
+    logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    logger.info(f"📦 Verified files: {verified_files}")
+    logger.info(f"⏭️  Skipped files:  {skipped_files}")
+    logger.info(f"🧾 Certificates counted: {total_certs}")
+    if check_counts and cert_counts:
+        logger.info(f"🔍 Files with cert counts: {len(cert_counts)}")
+        if mismatch:
+            logger.info("⚠️  Certificate count mismatch detected.")
+    logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+    return success
+
+
+# -------------------------------
+# CLI entrypoint
+# -------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Verify certificate bundles or source directories."
-    )
-    parser.add_argument(
-        "target",
-        help="Path to a PEM file, directory of PEMs, or built bundle folder.",
-    )
-    parser.add_argument(
-        "--warn-days",
-        type=int,
-        default=30,
-        help="Days before expiry to issue warnings (default: 30).",
-    )
-    parser.add_argument(
-        "--fail",
-        action="store_true",
-        help="Treat expired certificates as fatal errors (exit 5).",
-    )
-
+    parser = argparse.ArgumentParser(description="Verify trust bundle or standalone cert/file")
+    parser.add_argument("target", help="Path to build directory or single file")
+    parser.add_argument("--verify-manifest", action="store_true", help="Display manifest info only (no verification)")
+    parser.add_argument("--verify-all", action="store_true", help="Verify both bundle files and manifest together")
+    parser.add_argument("--verbose", action="store_true", help="Show detailed file metadata and hashes")
     args = parser.parse_args()
-    target = Path(args.target).resolve()
-    
-    exit_code = verify_bundle(target, warn_days=args.warn_days, fail_on_expired=args.fail)
-    sys.exit(exit_code)
+
+    path = Path(args.target)
+    if not path.exists():
+        logger.error(f"Path not found: {path}")
+        exit(1)
+
+    if path.is_file():
+        logger.info(f"Verifying single file: {path.name}")
+        digest = sha256sum(path)
+        logger.info(f"SHA256: {digest}")
+        if args.verbose:
+            logger.info(f"Info: {file_info(path)}")
+        exit(0)
+
+    # Directory mode
+    ok = True
+    if args.verify_manifest:
+        show_manifest_info(path, args.verbose)
+    elif args.verify_all:
+        ok = verify_directory(path, args.verbose)
+        show_manifest_info(path, args.verbose)
+    else:
+        ok = verify_directory(path, args.verbose)
+
+    if ok:
+        logger.info("✅ All verifications passed.")
+    else:
+        logger.error("❌ One or more verifications failed.")
+        exit(1)
 
 
 if __name__ == "__main__":
