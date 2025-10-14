@@ -19,10 +19,15 @@ jobs:
       - name: 🔍 Detect available bundles and environments
         id: detect
         run: |
-          bundles=$(find config/bundles -type f -name "*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
-          envs=$(find config/envs -type f -name "*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
+          # Detect bundles, ignoring any that start with "example"
+          bundles=$(find config/bundles -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
+          
+          # Detect environments, ignoring example files too
+          envs=$(find config/envs -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
+          
           echo "Detected bundles: $bundles"
-          echo "Detected envs: $envs"
+          echo "Detected environments: $envs"
+          
           echo "bundles=$bundles" >> $GITHUB_OUTPUT
           echo "envs=$envs" >> $GITHUB_OUTPUT
 
@@ -63,7 +68,7 @@ jobs:
           tree build/ || find build/
           echo "================================="
 
-      - name: 📦 Upload build artifacts
+      - name: 📦 Upload build artifacts (per bundle/env)
         uses: actions/upload-artifact@v4
         with:
           name: trust-store-${{ matrix.env }}-${{ matrix.bundle }}
