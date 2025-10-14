@@ -1,0 +1,78 @@
+name: 🏗️ Build Trust Store Bundles
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      bundles: ${{ steps.detect.outputs.bundles }}
+      envs: ${{ steps.detect.outputs.envs }}
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Detect available bundles and environments
+        id: detect
+        run: |
+          bundles=$(find config/bundles -type f -name "*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
+          envs=$(find config/envs -type f -name "*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
+          echo "Detected bundles: $bundles"
+          echo "Detected envs: $envs"
+          echo "bundles=$bundles" >> $GITHUB_OUTPUT
+          echo "envs=$envs" >> $GITHUB_OUTPUT
+
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        bundle: ${{ fromJson(needs.discover.outputs.bundles) }}
+        env: ${{ fromJson(needs.discover.outputs.envs) }}
+
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🔨 Build bundle
+        run: |
+          echo "Building bundle: ${{ matrix.bundle }} in environment: ${{ matrix.env }}"
+          ./scripts/build_trust_store.py \
+            --env ${{ matrix.env }} \
+            --bundle ${{ matrix.bundle }} \
+            --package
+
+      - name: 🔎 List build directory contents
+        run: |
+          echo "=== build directory structure ==="
+          tree build/ || find build/
+          echo "================================="
+
+      - name: 📦 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trust-store-${{ matrix.env }}-${{ matrix.bundle }}
+          path: build/${{ matrix.env }}/${{ matrix.bundle }}/
+
+      - name: 🗂️ Upload complete build directory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-directory-${{ matrix.env }}-${{ matrix.bundle }}
+          path: build/
+          retention-days: 1
