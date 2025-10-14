@@ -1,0 +1,74 @@
+# =====================================================================
+# Example environment configuration for PKI-CA-Trust
+# Location: config/envs/example.yaml
+#
+# Defines environment-specific build options, overrides, and secrets.
+# Each file under config/envs/ represents one environment context
+# (e.g., dev, prod, dmz, staging) that controls *how* bundles are built.
+# =====================================================================
+
+# ---------------------------------------------------------------------
+# Human-readable metadata (optional)
+# ---------------------------------------------------------------------
+name: Example Environment          # Display name for this environment (shown in manifests/logs)
+description: >
+  Example configuration illustrating all supported keys and overrides.
+  This file defines environment-wide behavior like passwords, formats,
+  and validation policies used when building trust bundles.
+
+# ---------------------------------------------------------------------
+# Output and directory behavior
+# ---------------------------------------------------------------------
+build_path: build/example/         # Override default output path (default: build/<env>/<bundle>/)
+
+package: false                     # Whether to produce a .tar.gz package of the build output
+                                   # Can be overridden per bundle or via CLI --package flag
+
+# ---------------------------------------------------------------------
+# Global verification policy overrides
+# ---------------------------------------------------------------------
+verify:
+  fail_on_expired: true            # Abort build if any expired certificate is found
+  warn_days_before_expiry: 30      # Warn if a cert expires within this many days
+
+# ---------------------------------------------------------------------
+# Global output format defaults
+# ---------------------------------------------------------------------
+output_formats:                    # Default formats if a bundle doesn't specify its own list
+  - pem                            # Canonical PEM (always recommended)
+  - p7b                            # DER PKCS#7 (.p7b)
+  - jks                            # Java KeyStore (.jks)
+  - p12                            # PKCS#12 / PFX (.p12)
+
+# ---------------------------------------------------------------------
+# Format-specific overrides (optional)
+# These control per-format behavior or environment secrets.
+# ---------------------------------------------------------------------
+format_overrides:
+  jks:
+    storepass_env: TRUST_JKS_PASSWORD     # Env var name containing the JKS store password
+    alias_format: "{subject.CN}-{serial}" # Optional alias template for keytool imports
+                                          # Available placeholders: {subject.CN}, {serial}
+  pkcs12:
+    password_env: TRUST_P12_PASSWORD      # Env var name containing PKCS#12 export password
+  pem:
+    include_subject_comments: true        # Add "# Subject:" comment lines above each PEM block
+  p7b:
+    include_chain: true                   # Whether to include full chain in .p7b (if supported)
+                                          # (This is a future option; harmless if unused.)
+
+# ---------------------------------------------------------------------
+# Environment-wide default filters or rules (optional)
+# ---------------------------------------------------------------------
+filters:
+  unique_by_fingerprint: true      # Deduplicate identical certs by SHA256 fingerprint (default true)
+  not_expired_only: true           # Exclude expired certs (redundant if fail_on_expired = true)
+  ca_certs_only: true              # Keep only CA certificates (BasicConstraints: CA=TRUE)
+
+# ---------------------------------------------------------------------
+# Reserved fields (for future expansion)
+# ---------------------------------------------------------------------
+metadata:
+  contact: security-team@example.com  # Optional contact for this environment
+  policy_version: 1.0                 # Internal policy schema version tracking
+  created_by: automation              # Can be "manual" or "automation"

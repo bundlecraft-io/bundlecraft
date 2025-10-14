@@ -15,18 +15,27 @@ import sys, os, json, tarfile, time, datetime as dt
 from pathlib import Path
 import click
 
+# ---------------------------------------------------------------------
+# Path setup
+# ---------------------------------------------------------------------
 CURRENT_DIR = Path(__file__).resolve().parent
 HELPERS_DIR = CURRENT_DIR / "helpers"
 sys.path.insert(0, str(HELPERS_DIR))
+
+# ---------------------------------------------------------------------
+# Helper imports
+# ---------------------------------------------------------------------
 from utils import load_yaml, ensure_dir, write_json, sha256_file, list_files
 from converters import convert_to_formats
-from verify_certs import verify_bundle
+from verifiers import verify_bundle  # ← updated import name
 
+# ---------------------------------------------------------------------
+# Path constants
+# ---------------------------------------------------------------------
 ROOT = CURRENT_DIR.parent
 CONFIG_DIR = ROOT / "config"
 SOURCES_DIR = ROOT / "sources"
 BUILD_DIR = ROOT / "build"
-
 
 # -------------------------------
 # Helper functions

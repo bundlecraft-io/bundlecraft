@@ -10,6 +10,7 @@ output_formats:
   - pem
   - jks
   - p7b
+  - p12
 
 # --- New options ---
 pem:
