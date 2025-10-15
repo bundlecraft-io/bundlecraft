@@ -21,13 +21,10 @@ jobs:
         run: |
           # Detect bundles, ignoring any that start with "example"
           bundles=$(find config/bundles -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
-          
           # Detect environments, ignoring example files too
           envs=$(find config/envs -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
-          
           echo "Detected bundles: $bundles"
           echo "Detected environments: $envs"
-          
           echo "bundles=$bundles" >> $GITHUB_OUTPUT
           echo "envs=$envs" >> $GITHUB_OUTPUT
 
@@ -53,34 +50,68 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          
-      - name: 🧾 Make build_trust_store.py executable
+
+      - name: 🧾 Ensure build script executable
         run: chmod +x ./scripts/build_trust_store.py
-        
+
       - name: 🔨 Build bundle
         run: |
           echo "Building bundle: ${{ matrix.bundle }} in environment: ${{ matrix.env }}"
-          ./scripts/build_trust_store.py \
+          python ./scripts/build_trust_store.py \
             --env ${{ matrix.env }} \
             --bundle ${{ matrix.bundle }} \
-            --package
+            --package \
+            --output-root pki-ca-trust
 
-      - name: 🔎 List build directory contents
+      - name: 🔎 List directory contents
         run: |
-          echo "=== build directory structure ==="
-          tree build/ || find build/
-          echo "================================="
+          echo "=== pki-ca-trust directory structure ==="
+          tree pki-ca-trust/ || find pki-ca-trust/
+          echo "======================================="
 
-      - name: 📦 Upload build artifacts (per bundle/env)
+      - name: 📦 Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
           name: trust-store-${{ matrix.env }}-${{ matrix.bundle }}
-          path: build/${{ matrix.env }}/${{ matrix.bundle }}/
+          path: pki-ca-trust/${{ matrix.env }}/${{ matrix.bundle }}/
 
-      - name: 🗂️ Upload complete build directory
-        if: always()
+  collect:
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: pki-ca-trust/
+
+      - name: 🗜️ Combine all builds
+        run: |
+          echo "=== Combined pki-ca-trust structure ==="
+          tree pki-ca-trust/ || find pki-ca-trust/
+          echo "======================================="
+
+      - name: 🧩 Create tarball and checksum
+        run: |
+          cd pki-ca-trust
+          tar -czf ../truststore_bundle.tar.gz .
+          cd ..
+          sha256sum truststore_bundle.tar.gz > truststore_bundle.sha256
+          echo "Created tarball and checksum:"
+          sha256sum truststore_bundle.tar.gz
+
+      - name: 📦 Upload combined directory
         uses: actions/upload-artifact@v4
         with:
-          name: build-directory-${{ matrix.env }}-${{ matrix.bundle }}
-          path: build/
-          retention-days: 1
+          name: all-builds
+          path: pki-ca-trust/
+          retention-days: 14
+
+      - name: 📦 Upload combined tarball + checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: truststore-bundle
+          path: |
+            truststore_bundle.tar.gz
+            truststore_bundle.sha256
+          retention-days: 14
