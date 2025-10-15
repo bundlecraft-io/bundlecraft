@@ -215,47 +215,41 @@ jobs:
           done
 
   # =========================================================
-  #  STAGE 5: PUBLISH to GitHub Pages 🌐
+  #  STAGE 5: PUBLISH GitHub Release 📦
   # =========================================================
-  publish-pages:
+  publish-release:
     needs: verify
     runs-on: ubuntu-latest
-    if: success()  # only publish if verify succeeded
+    if: success()
     permissions:
-      contents: read
-      pages: write       # allow deployment to Pages
-      id-token: write    # needed for OIDC authentication
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
+      contents: write   # required to create releases
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 📥 Download verified trust store directory
+      - name: 📥 Download release artifacts
         uses: actions/download-artifact@v4
         with:
-          name: all-builds
-          path: pki-ca-trust/
+          name: truststore-bundle
+          path: release/
 
-      - name: 🔍 List files to be published
+      - name: 🧮 Generate release tag and name
+        id: version
         run: |
-          echo "=== Files ready for publishing to GitHub Pages ==="
-          find pki-ca-trust -type f | sort
-          echo "================================================="
+          DATE=$(date -u +"%Y.%m.%d-%H%M")
+          echo "tag=truststore-v${DATE}" >> $GITHUB_OUTPUT
+          echo "name=Truststore Build - ${DATE}" >> $GITHUB_OUTPUT
 
-      # Configure Pages environment
-      - name: ⚙️ Setup GitHub Pages
-        uses: actions/configure-pages@v4
-
-      # Upload the pki-ca-trust directory as the Pages artifact
-      - name: 🚀 Upload site content
-        uses: actions/upload-pages-artifact@v3
+      - name: 🚀 Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          path: pki-ca-trust/
-
-      # Deploy the uploaded artifact to GitHub Pages
-      - name: 🌐 Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
+          body: |
+            🔒 **PKI CA Trust Store Update**
+            - Generated automatically from verified pipeline run #${{ github.run_number }}
+            - Contains all environments and bundles
+            - See attached artifacts for details.
+          files: |
+            release/truststore_bundle.tar.gz
+            release/truststore_bundle.sha256
