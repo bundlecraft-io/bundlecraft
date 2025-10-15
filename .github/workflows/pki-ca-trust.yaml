@@ -94,12 +94,16 @@ jobs:
 
       - name: 🗜️ Combine builds and create tarball
         run: |
-          echo "=== Combined build structure ==="
-          tree build/ || find build/
-          echo "================================"
+          echo "=== Contents of build/ after download ==="
+          find build -maxdepth 3 -type d || true
+          echo "========================================"
 
           mkdir -p pki-ca-trust
-          cp -r build/* pki-ca-trust/
+          cp -r build/* pki-ca-trust/ || true
+
+          echo "=== pki-ca-trust directory after copy ==="
+          find pki-ca-trust -maxdepth 3 -type d || true
+          echo "========================================"
 
           # Package full directory with top-level pki-ca-trust/
           tar -czf truststore_bundle.tar.gz pki-ca-trust/
@@ -153,30 +157,41 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      
-      - name: 🧾 Ensure verify script executable
-        run: chmod +x ./scripts/verify_bundle.py
 
-      - name: 🔍 Verify combined directory (recursive)
+      - name: 🔍 Verify combined directory (with diagnostics)
         run: |
-          echo "Verifying each trust store under pki-ca-trust/"
-          find pki-ca-trust -mindepth 2 -maxdepth 2 -type d | while read dir; do
+          echo "=== Directory structure before verify ==="
+          find pki-ca-trust -maxdepth 3 -type d || true
+          echo "========================================"
+
+          dirs=$(find pki-ca-trust -type d -mindepth 2 -maxdepth 2)
+          if [ -z "$dirs" ]; then
+            echo "⚠️  No bundle directories found under pki-ca-trust/. Check collect stage output."
+            exit 1
+          fi
+
+          for dir in $dirs; do
             echo "🔍 Verifying $dir"
             python ./scripts/verify_bundle.py "$dir" --verbose
           done
 
-      - name: 🗜️ Extract and verify tarball
+      - name: 🗜️ Extract and verify tarball (with diagnostics)
         run: |
           cd verify-tarball
           echo "Extracting truststore_bundle.tar.gz..."
           tar -xzf truststore_bundle.tar.gz
           echo "=== Extracted contents ==="
-          tree pki-ca-trust/ || find pki-ca-trust/
+          find . -maxdepth 3 -type d || true
           echo "=========================="
           cd ..
 
-          echo "Verifying tarball contents..."
-          find verify-tarball/pki-ca-trust -mindepth 2 -maxdepth 2 -type d | while read dir; do
+          dirs=$(find verify-tarball/pki-ca-trust -type d -mindepth 2 -maxdepth 2 2>/dev/null)
+          if [ -z "$dirs" ]; then
+            echo "⚠️  No bundle directories found in extracted tarball."
+            exit 1
+          fi
+
+          for dir in $dirs; do
             echo "🔍 Verifying $dir"
             python ./scripts/verify_bundle.py "$dir" --verbose
           done
