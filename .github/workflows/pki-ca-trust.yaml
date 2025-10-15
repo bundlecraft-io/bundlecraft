@@ -271,11 +271,9 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      - name: 🪪 Sign release tag and artifact
+      - name: 🪪 Sign artifact
         if: ${{ steps.gpg-check.outputs.available == 'true' }}
         run: |
-          git tag -s ${{ steps.version.outputs.tag }} -m "Signed PKI CA Trust Store Release"
-          git push origin ${{ steps.version.outputs.tag }}
           gpg --armor --detach-sign release/truststore_bundle.tar.gz
 
       - name: 🚀 Create GitHub Release
