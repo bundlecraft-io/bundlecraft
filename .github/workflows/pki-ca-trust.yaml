@@ -1,0 +1,191 @@
+name: 🧱 PKI CA Trust Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  BUILD_NAME: pki-ca-trust-${{ github.run_number }}-${{ github.run_id }}
+
+jobs:
+
+  # =========================================================
+  #  STAGE 1: DISCOVER - Find all bundles and environments
+  # =========================================================
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      bundles: ${{ steps.detect.outputs.bundles }}
+      envs: ${{ steps.detect.outputs.envs }}
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Detect available bundles and environments
+        id: detect
+        run: |
+          bundles=$(find config/bundles -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
+          envs=$(find config/envs -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
+          echo "Detected bundles: $bundles"
+          echo "Detected environments: $envs"
+          echo "bundles=$bundles" >> $GITHUB_OUTPUT
+          echo "envs=$envs" >> $GITHUB_OUTPUT
+
+  # =========================================================
+  #  STAGE 2: BUILD - Build all bundles across environments
+  # =========================================================
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        bundle: ${{ fromJson(needs.discover.outputs.bundles) }}
+        env: ${{ fromJson(needs.discover.outputs.envs) }}
+
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🧾 Ensure build script executable
+        run: chmod +x ./scripts/build_trust_store.py
+
+      - name: 🔨 Build bundle
+        run: |
+          echo "Building bundle: ${{ matrix.bundle }} in environment: ${{ matrix.env }}"
+          python ./scripts/build_trust_store.py \
+            --env ${{ matrix.env }} \
+            --bundle ${{ matrix.bundle }} \
+            --package
+
+      - name: 🧱 Show directory structure
+        run: |
+          echo "=== build directory structure ==="
+          tree build/ || find build/
+          echo "================================="
+
+      - name: 📦 Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trust-store-${{ matrix.env }}-${{ matrix.bundle }}
+          path: build/${{ matrix.env }}/${{ matrix.bundle }}/
+
+  # =========================================================
+  #  STAGE 3: COLLECT - Merge all build outputs into one bundle
+  # =========================================================
+  collect:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: build/
+
+      - name: 🗜️ Combine builds and create tarball
+        run: |
+          echo "=== Combined build structure ==="
+          tree build/ || find build/
+          echo "================================"
+
+          mkdir -p pki-ca-trust
+          cp -r build/* pki-ca-trust/
+
+          cd pki-ca-trust
+          tar -czf ../truststore_bundle.tar.gz .
+          cd ..
+          sha256sum truststore_bundle.tar.gz > truststore_bundle.sha256
+
+      - name: 📦 Upload combined directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-builds
+          path: pki-ca-trust/
+
+      - name: 📦 Upload tarball + checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: truststore-bundle
+          path: |
+            truststore_bundle.tar.gz
+            truststore_bundle.sha256
+
+  # =========================================================
+  #  STAGE 4: VERIFY - Validate all outputs
+  # =========================================================
+  verify:
+    needs: collect
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download all-builds artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: all-builds
+          path: pki-ca-trust/
+
+      - name: 📥 Download tarball artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: truststore-bundle
+          path: verify-tarball/
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🧾 Ensure verify script executable
+        run: chmod +x ./scripts/verify_bundle.py
+
+      - name: 🔍 Verify combined directory
+        run: |
+          echo "Verifying full combined trust store tree"
+          python ./scripts/verify_bundle.py pki-ca-trust/ --verbose
+
+      - name: 🗜️ Extract and verify tarball
+        run: |
+          cd verify-tarball
+          tar -xzf truststore_bundle.tar.gz
+          echo "=== Extracted contents ==="
+          tree pki-ca-trust/ || find pki-ca-trust/
+          echo "=========================="
+          cd ..
+
+          echo "Verifying tarball contents..."
+          python ./scripts/verify_bundle.py verify-tarball/pki-ca-trust/ --verbose
+
+  # =========================================================
+  #  STAGE 5: PUBLISH (stub for later)
+  # =========================================================
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🚧 Placeholder for future deployment
+        run: |
+          echo "Publishing stage placeholder"
+          echo "This is where we'll deploy to GitHub Pages, Artifactory, etc."
