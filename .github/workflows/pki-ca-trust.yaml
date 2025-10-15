@@ -234,11 +234,15 @@ jobs:
   publish-release:
     needs: verify
     runs-on: ubuntu-latest
+    if: success()
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download release artifacts
+        uses: actions/download-artifact@v4
         with:
           name: truststore-bundle
           path: release/
@@ -250,16 +254,65 @@ jobs:
           echo "tag=truststore-v${DATE}" >> $GITHUB_OUTPUT
           echo "name=Truststore Build - ${DATE}" >> $GITHUB_OUTPUT
 
+      # --- Optional GPG Signing (skipped if no secrets) ---
+      - name: 🔏 Import GPG key
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE || '' }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+
+      - name: 🪪 Sign release tag and artifact
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        run: |
+          git tag -s ${{ steps.version.outputs.tag }} -m "Signed PKI CA Trust Store Release"
+          git push origin ${{ steps.version.outputs.tag }}
+          gpg --armor --detach-sign release/truststore_bundle.tar.gz
+          echo "✅ Created GPG signature: truststore_bundle.tar.gz.asc"
+      # -----------------------------------------------------
+
       - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            🔒 PKI CA Trust Store Release
-            - Build #${{ github.run_number }}  •  Branch `${{ github.ref_name }}`
-            - Commit: `${{ github.sha }}`
-            - Triggered by: @${{ github.actor }}
+            🔒 **PKI CA Trust Store Release**
+            - **Build:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - **Branch:** `${{ github.ref_name }}`
+            - **Commit:** `${{ github.sha }}`
+            - **Triggered by:** @${{ github.actor }}
+            - **Signing:** ${{ secrets.GPG_PRIVATE_KEY != '' && 'Enabled (GPG signature attached below)' || 'Not enabled' }}
+
+            ---
+
+            ### 🧾 Verification Instructions
+
+            If signing is enabled, a detached signature file \(`truststore_bundle.tar.gz.asc`\) accompanies this release.
+
+            To verify the integrity and authenticity of this trust store:
+            ```bash
+            # 1. Import the project's public key
+            curl -O https://raw.githubusercontent.com/KunaiX/pki-ca-trust/main/docs/public-gpg-key.asc
+            gpg --import public-gpg-key.asc
+
+            # 2. Verify the release signature
+            gpg --verify truststore_bundle.tar.gz.asc truststore_bundle.tar.gz
+            ```
+
+            You should see:
+            ```
+            gpg: Good signature from "PKI CA Trust CI <ci@yourorg.local>"
+            ```
+
+            If you do **not** see this message, the artifact may have been modified or unsigned.
+
+            ---
+
+            This framework supports external CI/CD integrations.
+            See documentation for adding your own certs and enabling optional GPG signing.
           files: |
             release/truststore_bundle.tar.gz
             release/truststore_bundle.sha256
