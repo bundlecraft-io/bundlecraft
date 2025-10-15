@@ -1,5 +1,5 @@
 name: 🧱 PKI CA Trust Pipeline
-run-name: Run ${{ github.run_number }} - By ${{ github.actor }} - On ${{ github.ref_name }}
+run-name:  🧱 PKI CA Trust Pipeline Run ${{ github.run_number }} On Branch ${{ github.ref_name }}
 
 on:
   push:
@@ -254,15 +254,25 @@ jobs:
           echo "tag=truststore-v${DATE}" >> $GITHUB_OUTPUT
           echo "name=Truststore Build - ${DATE}" >> $GITHUB_OUTPUT
 
+      - name: 🔍 Check if GPG key is available from GitHub Secrets store
+        id: gpg-check
+        shell: bash
+        run: |
+          if [ "${{ secrets.GPG_PRIVATE_KEY }}" != '' ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: 🔏 Import GPG key for signing
-        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        if: ${{ steps.gpg-check.outputs.available == 'true' }}
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: 🪪 Sign release tag and artifact
-        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        if: ${{ steps.gpg-check.outputs.available == 'true' }}
         run: |
           git tag -s ${{ steps.version.outputs.tag }} -m "Signed PKI CA Trust Store Release"
           git push origin ${{ steps.version.outputs.tag }}
@@ -279,7 +289,7 @@ jobs:
             - **Branch:** `${{ github.ref_name }}`
             - **Commit:** `${{ github.sha }}`
             - **Triggered by:** @${{ github.actor }}`
-            - **Signing:** ${{ secrets.GPG_PRIVATE_KEY != '' && 'Enabled (signature attached)' || 'Disabled' }}
+            - **Signing:** ${{ steps.gpg-check.outputs.available == 'true' && 'Enabled (signature attached)' || 'Disabled' }}
 
             ---
             ### 🧾 Verification Instructions
