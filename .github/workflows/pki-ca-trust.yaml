@@ -1,5 +1,5 @@
 name: 🧱 PKI CA Trust Pipeline
-run-name: Run ${{ github.run_number }} | By ${{ github.actor }} | On ${{ github.ref_name }} | Commit ${{ github.sha }}
+run-name: Run ${{ github.run_number }} - By ${{ github.actor }} - On ${{ github.ref_name }}
 
 on:
   push:
@@ -215,17 +215,47 @@ jobs:
           done
 
   # =========================================================
-  #  STAGE 5: PUBLISH (stub for later)
+  #  STAGE 5: PUBLISH to GitHub Pages 🌐
   # =========================================================
-  publish:
+  publish-pages:
     needs: verify
     runs-on: ubuntu-latest
-    if: success()
+    if: success()  # only publish if verify succeeded
+    permissions:
+      contents: read
+      pages: write       # allow deployment to Pages
+      id-token: write    # needed for OIDC authentication
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🚧 Placeholder for future deployment
+      - name: 📥 Download verified trust store directory
+        uses: actions/download-artifact@v4
+        with:
+          name: all-builds
+          path: pki-ca-trust/
+
+      - name: 🔍 List files to be published
         run: |
-          echo "Publishing stage placeholder"
-          echo "This is where we'll deploy to GitHub Pages, Artifactory, etc."
+          echo "=== Files ready for publishing to GitHub Pages ==="
+          find pki-ca-trust -type f | sort
+          echo "================================================="
+
+      # Configure Pages environment
+      - name: ⚙️ Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      # Upload the pki-ca-trust directory as the Pages artifact
+      - name: 🚀 Upload site content
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pki-ca-trust/
+
+      # Deploy the uploaded artifact to GitHub Pages
+      - name: 🌐 Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
