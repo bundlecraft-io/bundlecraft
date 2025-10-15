@@ -92,23 +92,41 @@ jobs:
         with:
           path: build/
 
-      - name: 🗜️ Combine builds and create tarball
+      - name: 🗜️ Rehydrate to pki-ca-trust/<env>/<bundle> and package
         run: |
-          echo "=== Contents of build/ after download ==="
+          set -euo pipefail
+          echo "=== Contents of build/ after artifact download ==="
           find build -maxdepth 3 -type d || true
-          echo "========================================"
+          echo "=================================================="
 
+          # Rebuild canonical tree: pki-ca-trust/<env>/<bundle> from artifact names like trust-store-<env>-<bundle>
+          rm -rf pki-ca-trust
           mkdir -p pki-ca-trust
-          cp -r build/* pki-ca-trust/ || true
 
-          echo "=== pki-ca-trust directory after copy ==="
+          shopt -s nullglob dotglob
+          for artifact_dir in build/*; do
+            base="$(basename "$artifact_dir")"
+            # Expect names like trust-store-prod-internal
+            if [[ "$base" =~ ^trust-store-([^-/]+)-(.+)$ ]]; then
+              env="${BASH_REMATCH[1]}"
+              bundle="${BASH_REMATCH[2]}"
+              dest="pki-ca-trust/${env}/${bundle}"
+              mkdir -p "$dest"
+              cp -R "${artifact_dir}/"* "$dest"/ || true
+              echo "Rehydrated: $base -> $dest"
+            else
+              echo "Skipping unexpected artifact dir name: $base"
+            fi
+          done
+          shopt -u nullglob dotglob
+
+          echo "=== pki-ca-trust (rehydrated) ==="
           find pki-ca-trust -maxdepth 3 -type d || true
-          echo "========================================"
+          echo "================================="
 
-          # Package full directory with top-level pki-ca-trust/
+          # Create tarball with top-level pki-ca-trust/
           tar -czf truststore_bundle.tar.gz pki-ca-trust/
           sha256sum truststore_bundle.tar.gz > truststore_bundle.sha256
-
           echo "✅ Created tarball and checksum:"
           sha256sum truststore_bundle.tar.gz
 
