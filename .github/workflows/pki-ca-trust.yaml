@@ -1,13 +1,11 @@
 name: 🧱 PKI CA Trust Pipeline
+run-name: Run ${{ github.run_number }} | By ${{ github.actor }} | On branch ${{ github.ref_name }} | Commit ${{ github.sha }}
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
-
-env:
-  BUILD_NAME: pki-ca-trust-${{ github.run_number }}-${{ github.run_id }}
 
 jobs:
 
@@ -157,10 +155,13 @@ jobs:
       - name: 🧾 Ensure verify script executable
         run: chmod +x ./scripts/verify_bundle.py
 
-      - name: 🔍 Verify combined directory
+      - name: 🔍 Verify combined directory (recursive)
         run: |
-          echo "Verifying full combined trust store tree"
-          python ./scripts/verify_bundle.py pki-ca-trust/ --verbose
+          echo "Verifying each trust store under pki-ca-trust/"
+          find pki-ca-trust -type d -mindepth 2 -maxdepth 2 | while read dir; do
+            echo "🔍 Verifying $dir"
+            python ./scripts/verify_bundle.py "$dir" --verbose
+          done
 
       - name: 🗜️ Extract and verify tarball
         run: |
