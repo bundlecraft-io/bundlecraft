@@ -252,7 +252,7 @@ jobs:
         run: |
           DATE=$(date -u +"%Y.%m.%d-%H%M")
           echo "tag=truststore-v${DATE}" >> $GITHUB_OUTPUT
-          echo "name=Truststore Build - ${DATE}" >> $GITHUB_OUTPUT
+          echo "name=PKI CA Trust Store Build - ${DATE}" >> $GITHUB_OUTPUT
 
       - name: 🔍 Check if GPG key is available from GitHub Secrets store
         id: gpg-check
