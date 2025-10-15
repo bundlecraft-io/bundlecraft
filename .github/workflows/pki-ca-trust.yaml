@@ -1,5 +1,5 @@
 name: 🧱 PKI CA Trust Pipeline
-run-name: PKI CA Trust Pipeline - ${{ github.ref_name }} - Run #${{ github.run_number }}
+run-name: 'PKI CA Trust Pipeline - ${{ github.ref_name }} - Run #${{ github.run_number }}'
 
 on:
   push:
