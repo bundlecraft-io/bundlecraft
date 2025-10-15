@@ -234,15 +234,11 @@ jobs:
   publish-release:
     needs: verify
     runs-on: ubuntu-latest
-    if: success()
     permissions:
-      contents: write   # required to create releases
+      contents: write
     steps:
-      - name: 🧾 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 📥 Download release artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           name: truststore-bundle
           path: release/
@@ -254,36 +250,16 @@ jobs:
           echo "tag=truststore-v${DATE}" >> $GITHUB_OUTPUT
           echo "name=Truststore Build - ${DATE}" >> $GITHUB_OUTPUT
 
-      - name: 🔏 Import GPG key for signing
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-
-      - name: 🪪 Sign Git tag
-        run: |
-          git tag -s ${{ steps.version.outputs.tag }} -m "Signed release for PKI CA Trust Store build #${{ github.run_number }}"
-          git push origin ${{ steps.version.outputs.tag }}
-
-      - name: 🔏 Sign truststore bundle (ASCII-armored)
-        run: |
-          gpg --armor --detach-sign release/truststore_bundle.tar.gz
-          echo "✅ Signed truststore_bundle.tar.gz.asc created."
-
       - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            🔒 **PKI CA Trust Store Update**
-            - Run: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            - Branch: `${{ github.ref_name }}`
-            - Commit: ${{ github.sha }}
+            🔒 PKI CA Trust Store Release
+            - Build #${{ github.run_number }}  •  Branch `${{ github.ref_name }}`
+            - Commit: `${{ github.sha }}`
             - Triggered by: @${{ github.actor }}
-            - Signed and verified with GPG.
           files: |
             release/truststore_bundle.tar.gz
             release/truststore_bundle.sha256
