@@ -7,42 +7,30 @@ on:
       - completed
 
 jobs:
-  discover:
+  verify:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    outputs:
-      bundles: ${{ steps.detect.outputs.bundles }}
-      envs: ${{ steps.detect.outputs.envs }}
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🔍 Detect bundles and environments
-        id: detect
-        run: |
-          bundles=$(find config/bundles -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
-          envs=$(find config/envs -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
-          echo "bundles=$bundles" >> $GITHUB_OUTPUT
-          echo "envs=$envs" >> $GITHUB_OUTPUT
-
-  verify:
-    needs: discover
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        bundle: ${{ fromJson(needs.discover.outputs.bundles) }}
-        env: ${{ fromJson(needs.discover.outputs.envs) }}
-
-    steps:
-      - name: 🧾 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 📥 Download bundle artifact
-        uses: actions/download-artifact@v4
+      - name: 📥 Download combined artifact (all builds)
+        uses: dawidd6/action-download-artifact@v3
         with:
-          name: trust-store-${{ matrix.env }}-${{ matrix.bundle }}
-          path: pki-ca-trust/${{ matrix.env }}/${{ matrix.bundle }}/
+          workflow: "build.yml"             # name or file of the workflow to fetch from
+          workflow_conclusion: success
+          name: all-builds                  # artifact name created in build.yml
+          path: pki-ca-trust/
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📥 Download tarball artifact
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: "build.yml"
+          workflow_conclusion: success
+          name: truststore-bundle
+          path: verify-tarball/
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🐍 Set up Python
         uses: actions/setup-python@v5
@@ -57,67 +45,12 @@ jobs:
       - name: 🧾 Ensure verify script executable
         run: chmod +x ./scripts/verify_bundle.py
 
-      - name: 🔍 Verify bundle
-        run: |
-          echo "Verifying bundle: ${{ matrix.bundle }} (env: ${{ matrix.env }})"
-          python ./scripts/verify_bundle.py \
-            pki-ca-trust/${{ matrix.env }}/${{ matrix.bundle }}/ \
-            --verify-all --verbose
-
-  verify-all:
-    needs: verify
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: 📥 Download combined artifact (directory)
-        uses: actions/download-artifact@v4
-        with:
-          name: all-builds
-          path: pki-ca-trust/
-
-      - name: 🧾 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: 📦 Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 🔎 Verify unified directory
+      - name: 🔍 Verify unified directory
         run: |
           echo "Verifying full combined trust store tree (directory)"
           python ./scripts/verify_bundle.py pki-ca-trust/ --verbose
 
-  verify-tarball:
-    needs: verify-all
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: 📥 Download tarball artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: truststore-bundle
-          path: verify-tarball/
-
-      - name: 🧾 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: 📦 Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 🗜️ Extract tarball
+      - name: 🗜️ Extract and verify tarball
         run: |
           cd verify-tarball
           echo "Extracting truststore_bundle.tar.gz..."
@@ -128,7 +61,5 @@ jobs:
           echo "=========================="
           cd ..
 
-      - name: 🔍 Verify extracted tarball
-        run: |
-          echo "Verifying truststore_bundle.tar.gz contents"
+          echo "Verifying extracted tarball contents..."
           python ./scripts/verify_bundle.py verify-tarball/pki-ca-trust/ --verbose
