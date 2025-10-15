@@ -6,6 +6,11 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch:  # manual trigger
+
+concurrency:
+  group: ${{ github.ref_name }}
+  cancel-in-progress: true   # ensures only one pipeline per branch at a time
 
 jobs:
 
@@ -182,7 +187,7 @@ jobs:
           find pki-ca-trust -maxdepth 3 -type d || true
           echo "========================================"
 
-          dirs=$(find pki-ca-trust -type d -mindepth 2 -maxdepth 2)
+          dirs=$(find pki-ca-trust -mindepth 2 -maxdepth 2 -type d)
           if [ -z "$dirs" ]; then
             echo "⚠️  No bundle directories found under pki-ca-trust/. Check collect stage output."
             exit 1
@@ -203,7 +208,7 @@ jobs:
           echo "=========================="
           cd ..
 
-          dirs=$(find verify-tarball/pki-ca-trust -type d -mindepth 2 -maxdepth 2 2>/dev/null)
+          dirs=$(find verify-tarball/pki-ca-trust -mindepth 2 -maxdepth 2 -type d 2>/dev/null)
           if [ -z "$dirs" ]; then
             echo "⚠️  No bundle directories found in extracted tarball."
             exit 1
@@ -213,6 +218,15 @@ jobs:
             echo "🔍 Verifying $dir"
             python ./scripts/verify_bundle.py "$dir" --verbose
           done
+
+      - name: 📊 Summarize verified bundles
+        if: success()
+        run: |
+          echo "=== ✅ Verification Summary ==="
+          count=$(find pki-ca-trust -type f -name 'checksums.sha256' | wc -l)
+          echo "Verified $count bundles:"
+          find pki-ca-trust -type f -name 'checksums.sha256' -exec dirname {} \; | sort
+          echo "==============================="
 
   # =========================================================
   #  STAGE 5: PUBLISH GitHub Release 📦
@@ -240,6 +254,24 @@ jobs:
           echo "tag=truststore-v${DATE}" >> $GITHUB_OUTPUT
           echo "name=Truststore Build - ${DATE}" >> $GITHUB_OUTPUT
 
+      - name: 🔏 Import GPG key for signing
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+
+      - name: 🪪 Sign Git tag
+        run: |
+          git tag -s ${{ steps.version.outputs.tag }} -m "Signed release for PKI CA Trust Store build #${{ github.run_number }}"
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: 🔏 Sign truststore bundle (ASCII-armored)
+        run: |
+          gpg --armor --detach-sign release/truststore_bundle.tar.gz
+          echo "✅ Signed truststore_bundle.tar.gz.asc created."
+
       - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -247,9 +279,12 @@ jobs:
           name: ${{ steps.version.outputs.name }}
           body: |
             🔒 **PKI CA Trust Store Update**
-            - Generated automatically from verified pipeline run #${{ github.run_number }}
-            - Contains all environments and bundles
-            - See attached artifacts for details.
+            - Run: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - Branch: `${{ github.ref_name }}`
+            - Commit: ${{ github.sha }}
+            - Triggered by: @${{ github.actor }}
+            - Signed and verified with GPG.
           files: |
             release/truststore_bundle.tar.gz
             release/truststore_bundle.sha256
+            release/truststore_bundle.tar.gz.asc
