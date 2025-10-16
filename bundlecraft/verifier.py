@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 verifier.py
 ----------------
@@ -15,14 +14,14 @@ Features:
 """
 
 import hashlib
-import json
 import logging
 import re
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
 import click
-from cryptography.hazmat.primitives.serialization import pkcs12, pkcs7
+from cryptography.hazmat.primitives.serialization import pkcs7, pkcs12
 
 # --- logging setup ---
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -43,13 +42,13 @@ def sha256sum(filepath: Path) -> str:
 
 def file_info(file: Path) -> str:
     size_kb = file.stat().st_size / 1024
-    mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
+    mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=UTC)
     return f"{size_kb:.1f} KB, modified {mtime.strftime('%Y-%m-%d %H:%M:%S UTC')}"
 
 
 def load_checksums(path: Path) -> dict:
     checksums = {}
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
@@ -75,7 +74,9 @@ def count_certs_in_store(file: Path) -> int | None:
             tried_pw = [b"changeit", None]
             for pw in tried_pw:
                 try:
-                    pkey, cert, addl = pkcs12.load_key_and_certificates(data, password=pw)
+                    pkey, cert, addl = pkcs12.load_key_and_certificates(
+                        data, password=pw
+                    )
                     if cert or addl:
                         if cert:
                             count += 1
@@ -111,7 +112,15 @@ def count_certs_in_store(file: Path) -> int | None:
             return len(certs)
         elif ext == ".jks":
             result = subprocess.run(
-                ["keytool", "-list", "-rfc", "-keystore", str(file), "-storepass", "changeit"],
+                [
+                    "keytool",
+                    "-list",
+                    "-rfc",
+                    "-keystore",
+                    str(file),
+                    "-storepass",
+                    "changeit",
+                ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -144,7 +153,9 @@ def show_manifest_info(build_dir: Path, verbose: bool = False) -> None:
     sha = sha256sum(manifest_path)
     logger.info(f"    SHA256: {sha}")
     if verbose:
-        content_preview = manifest_path.read_text(encoding="utf-8", errors="ignore").splitlines()[:10]
+        content_preview = manifest_path.read_text(
+            encoding="utf-8", errors="ignore"
+        ).splitlines()[:10]
         if len(content_preview) > 0:
             logger.info("    Content preview:")
             for line in content_preview:
@@ -152,7 +163,9 @@ def show_manifest_info(build_dir: Path, verbose: bool = False) -> None:
     logger.info("✅ Manifest inspection complete.")
 
 
-def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool = True) -> bool:
+def verify_directory(
+    build_dir: Path, verbose: bool = False, check_counts: bool = True
+) -> bool:
     checksum_path = build_dir / CHECKSUM_FILE
     if not checksum_path.exists():
         logger.error(f"Missing {CHECKSUM_FILE} in {build_dir}")
@@ -170,7 +183,11 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
         if file.is_dir():
             continue
         if file.name in IGNORE_FILES:
-            reason = "manifest is signed separately" if file.name == MANIFEST_FILE else "non-deterministic artifact"
+            reason = (
+                "manifest is signed separately"
+                if file.name == MANIFEST_FILE
+                else "non-deterministic artifact"
+            )
             logger.info(f"⏭️  Skipping {file.name} ({reason})")
             skipped_files += 1
             continue
@@ -204,7 +221,7 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
                 if verbose:
                     logger.info(f"    Certificate count: {count}")
             else:
-                logger.info(f"    (hash OK, certificate content not readable)")
+                logger.info("    (hash OK, certificate content not readable)")
 
     total_certs = sum(cert_counts.values()) if cert_counts else 0
     unique_counts = set(cert_counts.values())
@@ -231,14 +248,30 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--target", required=True, type=click.Path(exists=True), help="Path to build directory or file")
-@click.option("--verify-manifest", is_flag=True, help="Display manifest info only (no verification)")
-@click.option("--verify-all", is_flag=True, help="Verify both bundle files and manifest together")
+@click.option(
+    "--target",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to build directory or file",
+)
+@click.option(
+    "--verify-manifest",
+    is_flag=True,
+    help="Display manifest info only (no verification)",
+)
+@click.option(
+    "--verify-all", is_flag=True, help="Verify both bundle files and manifest together"
+)
 @click.option("--verbose", is_flag=True, help="Show detailed file metadata and hashes")
-@click.option("--output-root", type=str, default="dist", help="Root directory for build outputs (default: ./dist)")
+@click.option(
+    "--output-root",
+    type=str,
+    default="dist",
+    help="Root directory for build outputs (default: ./dist)",
+)
 def main(target, verify_manifest, verify_all, verbose, output_root):
     """Verify the integrity and consistency of built trust bundles."""
-    click.secho(f"\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
+    click.secho("\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
     path = Path(target)
     if path.is_file():
         logger.info(f"Verifying single file: {path.name}")

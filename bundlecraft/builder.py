@@ -11,9 +11,17 @@ Enhancements:
 """
 
 from __future__ import annotations
-import sys, json, tarfile, datetime as dt
+
+import datetime as dt
+import json
+import sys
+import tarfile
 from pathlib import Path
+
 import click
+from convert_utils import convert_to_formats
+from utils import ensure_dir, list_files, load_yaml, sha256_file
+from verify_utils import verifier  # ← updated import name
 
 # ---------------------------------------------------------------------
 # Path setup
@@ -25,9 +33,6 @@ sys.path.insert(0, str(HELPERS_DIR))
 # ---------------------------------------------------------------------
 # Helper imports
 # ---------------------------------------------------------------------
-from utils import load_yaml, ensure_dir, sha256_file, list_files
-from convert_utils import convert_to_formats
-from verify_utils import verifier  # ← updated import name
 
 # ---------------------------------------------------------------------
 # Path constants
@@ -40,6 +45,7 @@ BUILD_DIR = ROOT / "dist"
 # -------------------------------
 # Helper functions
 # -------------------------------
+
 
 def read_pem_chunks(paths):
     start, end = "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"
@@ -62,7 +68,10 @@ def read_pem_chunks(paths):
 
 def dedupe_ordered(pem_blocks):
     """Deduplicate PEM blocks by SHA256 fingerprint."""
-    import base64, hashlib, re
+    import base64
+    import hashlib
+    import re
+
     seen, out = set(), []
     b64re = re.compile(
         r"-----BEGIN CERTIFICATE-----\s*([A-Za-z0-9+/=\s]+)-----END CERTIFICATE-----",
@@ -84,6 +93,7 @@ def write_canonical_pem(dst: Path, pem_blocks, include_subject_comments: bool):
     """Write PEM with optional '# Subject:' lines."""
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
+
     ensure_dir(dst.parent)
     lines = []
     for blk in pem_blocks:
@@ -121,23 +131,45 @@ def package_tar(build_path: Path) -> Path:
 # Core Build Function
 # -------------------------------
 
+
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("--env", required=True, help="Environment name (e.g., dev, prod, dmz)")
 @click.option("--bundle", required=True, help="Bundle name (e.g., internal, external)")
-@click.option("--package", is_flag=True, help="Also create a .tar.gz of the build folder")
-@click.option("--verify-only", is_flag=True, help="Only verify certificates; skip build")
-@click.option("--output-root", type=str, default="dist", help="Root directory for build outputs (default: ./dist)")
+@click.option(
+    "--package", is_flag=True, help="Also create a .tar.gz of the build folder"
+)
+@click.option(
+    "--verify-only", is_flag=True, help="Only verify certificates; skip build"
+)
+@click.option(
+    "--output-root",
+    type=str,
+    default="dist",
+    help="Root directory for build outputs (default: ./dist)",
+)
 def main(env, bundle, package, verify_only, output_root):
     """Build or verify trust bundles based on configuration."""
-    click.secho(f"\n🔐 BundleCraft CA Trust Store Builder\n--------------------------------------", fg="cyan")
+    click.secho(
+        "\n🔐 BundleCraft CA Trust Store Builder\n--------------------------------------",
+        fg="cyan",
+    )
 
-    defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False) or {}
+    # defaults is currently unused, to be refactored when the config structure is revalidated
+    # defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False) or {}
     env_cfg = load_yaml(CONFIG_DIR / "envs" / f"{env}.yaml", required=True)
     bundle_cfg = load_yaml(CONFIG_DIR / "bundles" / f"{bundle}.yaml", required=True)
 
     verify_cfg = bundle_cfg.get("verify", True)
-    fail_on_expired = verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
-    warn_days = verify_cfg.get("warn_days_before_expiry", 30) if isinstance(verify_cfg, dict) else 30
+    fail_on_expired = (
+        verify_cfg.get("fail_on_expired", True)
+        if isinstance(verify_cfg, dict)
+        else True
+    )
+    warn_days = (
+        verify_cfg.get("warn_days_before_expiry", 30)
+        if isinstance(verify_cfg, dict)
+        else 30
+    )
 
     pem_cfg = bundle_cfg.get("pem", {})
     include_subject_comments = pem_cfg.get("include_subject_comments", True)
@@ -161,7 +193,8 @@ def main(env, bundle, package, verify_only, output_root):
         else:
             click.secho(f"[WARN] Include path not found: {item}", fg="yellow")
     include_paths = [
-        p for p in include_paths
+        p
+        for p in include_paths
         if str(p.relative_to(ROOT)).replace("\\", "/") not in exclude_items
     ]
 
@@ -183,8 +216,11 @@ def main(env, bundle, package, verify_only, output_root):
             click.secho(f"[INFO] Verifying existing PEM bundle: {pem_path}", fg="blue")
             code = verifier(pem_path, warn_days, fail_on_expired)
         else:
-            click.secho(f"[INFO] No built bundle found; verifying sources directly.", fg="blue")
+            click.secho(
+                "[INFO] No built bundle found; verifying sources directly.", fg="blue"
+            )
             import tempfile
+
             tmp_pem = Path(tempfile.gettempdir()) / "verify-temp.pem"
             tmp_pem.write_text("".join(pem_blocks), encoding="utf-8")
             code = verifier(tmp_pem, warn_days, fail_on_expired)
@@ -196,13 +232,16 @@ def main(env, bundle, package, verify_only, output_root):
     # -----------------------
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
-    now = dt.datetime.now(dt.timezone.utc)
+
+    now = dt.datetime.now(dt.UTC)
     soon_cutoff = now + dt.timedelta(days=warn_days)
     errs, warns = [], []
 
     for i, blk in enumerate(pem_blocks, 1):
         try:
-            cert = x509.load_pem_x509_certificate(blk.encode("utf-8"), default_backend())
+            cert = x509.load_pem_x509_certificate(
+                blk.encode("utf-8"), default_backend()
+            )
             subject = cert.subject.rfc4514_string()
             exp = cert.not_valid_after_utc
             if exp < now:
@@ -218,12 +257,17 @@ def main(env, bundle, package, verify_only, output_root):
         click.secho(f"[WARN] {w}", fg="yellow")
 
     if errs:
-        click.secho(f"[SUMMARY] {len(errs)} expired or invalid certificates detected.", fg="red")
+        click.secho(
+            f"[SUMMARY] {len(errs)} expired or invalid certificates detected.", fg="red"
+        )
         if fail_on_expired:
             click.secho("[ERROR] Build aborted due to expired certificates.", fg="red")
             sys.exit(5)
     if warns:
-        click.secho(f"[SUMMARY] {len(warns)} certificates expiring within {warn_days} days.", fg="yellow")
+        click.secho(
+            f"[SUMMARY] {len(warns)} certificates expiring within {warn_days} days.",
+            fg="yellow",
+        )
     if not errs and not warns:
         click.secho("[INFO] All certificates are valid and healthy.", fg="green")
 
@@ -244,6 +288,7 @@ def main(env, bundle, package, verify_only, output_root):
     # --- OPTIONAL PACKAGING (must happen before manifest) ---
     if package:
         import tarfile
+
         archive_path = build_root / "package.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
             tar.add(build_root, arcname=".")
@@ -252,7 +297,7 @@ def main(env, bundle, package, verify_only, output_root):
     # -----------------------
     # Final deterministic manifest + checksums
     # -----------------------
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     expiry_summary = {
         "total": len(pem_blocks),
@@ -274,14 +319,13 @@ def main(env, bundle, package, verify_only, output_root):
 
     # Build manifest["files"] entries (manifest.json excluded)
     file_entries = [
-        {"path": n, "sha256": sha256_file(build_root / n)}
-        for n in files_for_manifest
+        {"path": n, "sha256": sha256_file(build_root / n)} for n in files_for_manifest
     ]
 
     manifest_obj = {
         "bundle": bundle,
         "environment": env,
-        "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp_utc": datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "sources": [str(p.relative_to(ROOT)).replace("\\", "/") for p in include_paths],
         "outputs": files_for_manifest,  # includes package.tar.gz if present
         "verify": {"fail_on_expired": fail_on_expired},
@@ -302,9 +346,7 @@ def main(env, bundle, package, verify_only, output_root):
     click.secho("[SUCCESS] Build completed successfully.", fg="green")
 
     # Compute fresh checksums including manifest.json itself
-    all_files = sorted([
-        f.name for f in build_root.glob("*") if f.is_file()
-    ])
+    all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
     checksum_lines = [f"{sha256_file(build_root / f)}  {f}" for f in all_files]
     checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
     click.secho(f"[INFO] Wrote checksums: {checksum_path}", fg="green")
@@ -315,16 +357,13 @@ def main(env, bundle, package, verify_only, output_root):
     file_entries = []
     for f in sorted(build_root.glob("*")):
         if f.is_file():
-            file_entries.append({
-                "path": f.name,
-                "sha256": sha256_file(f)
-            })
+            file_entries.append({"path": f.name, "sha256": sha256_file(f)})
 
     # Reload manifest JSON, inject "files" array
     mdata = json.loads(manifest_path.read_text(encoding="utf-8"))
     mdata["files"] = file_entries
     manifest_path.write_text(json.dumps(mdata, indent=2), encoding="utf-8")
-    click.secho(f"[INFO] Updated manifest with file hashes.", fg="green")
+    click.secho("[INFO] Updated manifest with file hashes.", fg="green")
 
     # -----------------------
     # Package (optional)

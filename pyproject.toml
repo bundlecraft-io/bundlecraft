@@ -15,7 +15,7 @@ dependencies = [
 dev = [
 "pytest>=8.0.0",
 "black>=24.0.0",
-"flake8>=7.0.0",
+"ruff>=0.14.0",
 "build>=1.2.2",
 "twine>=5.0.0",
 ]
@@ -29,3 +29,32 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["bundlecraft*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+fix = true
+unsafe-fixes = false
+
+# Exclude common non-source directories
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "venv",
+    ".venv",
+    "testing",
+]
+
+# Enable all the core linting rules plus a few extras for code quality
+lint.select = [
+    "E",  # pycodestyle errors
+    "F",  # pyflakes
+    "B",  # flake8-bugbear
+    "I",  # import sorting
+    "UP", # pyupgrade (modernize syntax)
+]
+
+# Ignore noise that conflicts with Black
+lint.ignore = ["E501"]  # line length handled by Black

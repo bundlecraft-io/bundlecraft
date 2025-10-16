@@ -11,22 +11,43 @@ Notes:
 
 import sys
 from pathlib import Path
+
 import click
+from convert_utils import convert_to_formats
 
 CURRENT_DIR = Path(__file__).resolve().parent
 HELPERS_DIR = CURRENT_DIR / "helpers"
 sys.path.insert(0, str(HELPERS_DIR))
 
-from convert_utils import convert_to_formats
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--pem-file", required=True, type=click.Path(exists=True), help="Path to input PEM bundle.")
-@click.option("--output-dir", required=True, type=click.Path(), help="Directory for converted formats.")
-@click.option("--formats", multiple=True, default=["p7b", "jks", "p12"], help="Output formats to produce (default: p7b jks p12).")
-@click.option("--output-root", type=str, default="dist", help="Root directory for build outputs (default: ./dist)")
+@click.option(
+    "--pem-file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to input PEM bundle.",
+)
+@click.option(
+    "--output-dir",
+    required=True,
+    type=click.Path(),
+    help="Directory for converted formats.",
+)
+@click.option(
+    "--formats",
+    multiple=True,
+    default=["p7b", "jks", "p12"],
+    help="Output formats to produce (default: p7b jks p12).",
+)
+@click.option(
+    "--output-root",
+    type=str,
+    default="dist",
+    help="Root directory for build outputs (default: ./dist)",
+)
 def main(pem_file, output_dir, formats, output_root):
     """Convert PEM certificate bundles into alternate formats."""
-    click.secho(f"\n🔐 BundleCraft Converter\n---------------------------", fg="cyan")
+    click.secho("\n🔐 BundleCraft Converter\n---------------------------", fg="cyan")
 
     pem_path = Path(pem_file).resolve()
     out_dir = Path(output_dir).resolve()

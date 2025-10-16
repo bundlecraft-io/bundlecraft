@@ -14,19 +14,21 @@ Requires:
     - keytool (for JKS counting)
 """
 
-import os
-import sys
-import json
-import hashlib
-import subprocess
 import datetime as dt
+import hashlib
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
+
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
 # ---------------------------------------------------------------------
 # Core verifier
 # ---------------------------------------------------------------------
+
 
 def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) -> int:
     if not target.exists():
@@ -46,7 +48,7 @@ def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) ->
         print(f"[WARN] No PEM files found in {target}")
         return 0
 
-    now = dt.datetime.now(dt.timezone.utc)
+    now = dt.datetime.now(dt.UTC)
     soon_cutoff = now + dt.timedelta(days=warn_days)
     total, expired, expiring, errors = 0, 0, 0, 0
 
@@ -58,7 +60,9 @@ def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) ->
             try:
                 cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
                 subj = cert.subject.rfc4514_string()
-                exp = getattr(cert, "not_valid_after_utc", None) or cert.not_valid_after.replace(tzinfo=dt.timezone.utc)
+                exp = getattr(
+                    cert, "not_valid_after_utc", None
+                ) or cert.not_valid_after.replace(tzinfo=dt.UTC)
 
                 if exp < now:
                     expired += 1
@@ -66,13 +70,17 @@ def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) ->
                 elif exp < soon_cutoff:
                     expiring += 1
                     days = (exp - now).days
-                    print(f"[WARN] Expiring soon: {subj} ({days} days left) [{pem.name}]")
+                    print(
+                        f"[WARN] Expiring soon: {subj} ({days} days left) [{pem.name}]"
+                    )
             except Exception as e:
                 errors += 1
                 print(f"[ERROR] Parse error in {pem.name}: {e}")
 
     print(f"\n[SUMMARY] Verified {total} certificate(s):")
-    print(f"          Expired = {expired}, Expiring Soon = {expiring}, Errors = {errors}")
+    print(
+        f"          Expired = {expired}, Expiring Soon = {expiring}, Errors = {errors}"
+    )
 
     if errors or (expired and fail_on_expired):
         print("[RESULT] ❌ Verification failed.")
@@ -93,9 +101,11 @@ def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) ->
     print("[RESULT] ✅ All certificates valid.")
     return 0
 
+
 # ---------------------------------------------------------------------
 # Manifest verification
 # ---------------------------------------------------------------------
+
 
 def verify_manifest(manifest_path: Path) -> bool:
     base_dir = manifest_path.parent
@@ -114,7 +124,7 @@ def verify_manifest(manifest_path: Path) -> bool:
 
     files = manifest.get("files", [])
     if not files:
-        print(f"[WARN] No 'files' field found in manifest.")
+        print("[WARN] No 'files' field found in manifest.")
         return False
 
     success = True
@@ -163,6 +173,7 @@ def verify_manifest(manifest_path: Path) -> bool:
         print("[RESULT] ❌ Manifest verification failed.")
     return success
 
+
 def _sha256_file(file_path: Path) -> str:
     h = hashlib.sha256()
     with open(file_path, "rb") as f:
@@ -170,9 +181,11 @@ def _sha256_file(file_path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
+
 
 def _split_pem_blocks(text: str) -> list[str]:
     start, end = "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"
@@ -188,6 +201,7 @@ def _split_pem_blocks(text: str) -> list[str]:
             buf.append(line)
     return blocks
 
+
 def _check_output_files(build_path: Path) -> bool:
     valid = True
     for ext in ("*.p7b", "*.p12"):
@@ -196,6 +210,7 @@ def _check_output_files(build_path: Path) -> bool:
                 print(f"[ERROR] Empty or missing output file: {f}")
                 valid = False
     return valid
+
 
 def _compare_output_counts(build_path: Path):
     counts = {}
@@ -224,6 +239,7 @@ def _compare_output_counts(build_path: Path):
         else:
             print(f"[INFO] {fmt} count OK: {count}")
 
+
 def _count_certs_in_file(file_path: Path) -> int:
     ext = file_path.suffix.lower()
     try:
@@ -231,20 +247,44 @@ def _count_certs_in_file(file_path: Path) -> int:
             text = file_path.read_text(encoding="utf-8", errors="ignore")
             return text.count("-----BEGIN CERTIFICATE-----")
         if ext == ".p7b":
-            cmd = ["openssl", "pkcs7", "-print_certs", "-in", str(file_path), "-inform", "DER"]
+            cmd = [
+                "openssl",
+                "pkcs7",
+                "-print_certs",
+                "-in",
+                str(file_path),
+                "-inform",
+                "DER",
+            ]
             res = subprocess.run(cmd, capture_output=True, text=True, check=True)
             out = res.stdout
             n = out.count("-----BEGIN CERTIFICATE-----") or out.count("subject=")
             return n
         if ext == ".p12":
-            cmd = ["openssl", "pkcs12", "-in", str(file_path), "-nokeys", "-passin", "pass:changeit"]
+            cmd = [
+                "openssl",
+                "pkcs12",
+                "-in",
+                str(file_path),
+                "-nokeys",
+                "-passin",
+                "pass:changeit",
+            ]
             res = subprocess.run(cmd, capture_output=True, text=True, check=True)
             out = res.stdout
             n = out.count("-----BEGIN CERTIFICATE-----") or out.count("subject=")
             return n
         if ext == ".jks":
             storepass = os.environ.get("TRUST_JKS_PASSWORD", "changeit")
-            cmd = ["keytool", "-list", "-rfc", "-keystore", str(file_path), "-storepass", storepass]
+            cmd = [
+                "keytool",
+                "-list",
+                "-rfc",
+                "-keystore",
+                str(file_path),
+                "-storepass",
+                storepass,
+            ]
             res = subprocess.run(cmd, capture_output=True, text=True, check=True)
             out = res.stdout
             return out.count("-----BEGIN CERTIFICATE-----")

@@ -17,10 +17,10 @@ import os
 import subprocess
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------
 # Main entrypoint
 # ---------------------------------------------------------------------
+
 
 def convert_to_formats(
     pem_path: Path,
@@ -55,6 +55,7 @@ def convert_to_formats(
 # Conversion helpers
 # ---------------------------------------------------------------------
 
+
 def create_p7b(pem_path: Path, build_root: Path):
     """
     Convert PEM → PKCS#7 (.p7b, DER) including ALL certs.
@@ -78,11 +79,15 @@ def create_p7b(pem_path: Path, build_root: Path):
         tmp.write("".join(blocks))
         tmp.flush()
         cmd = [
-            "openssl", "crl2pkcs7",
+            "openssl",
+            "crl2pkcs7",
             "-nocrl",
-            "-certfile", tmp.name,      # ← key change
-            "-out", str(out_path),
-            "-outform", "DER",
+            "-certfile",
+            tmp.name,  # ← key change
+            "-out",
+            str(out_path),
+            "-outform",
+            "DER",
         ]
         subprocess.run(cmd, check=True)
     print(f"[INFO] Created P7B: {out_path}")
@@ -93,9 +98,10 @@ def create_jks(pem_path: Path, build_root: Path, overrides: dict):
     Create a Java KeyStore (JKS) from a PEM bundle.
     Imports each certificate individually with alias naming controlled by alias_format.
     """
+    import tempfile
+
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
-    import tempfile
 
     alias_format = overrides.get("alias_format", "{subject.CN}-{serial}")
     storepass_env = overrides.get("storepass_env", "TRUST_JKS_PASSWORD")
@@ -122,12 +128,17 @@ def create_jks(pem_path: Path, build_root: Path, overrides: dict):
                 tmp_pem.write_text(blk, encoding="utf-8")
 
                 cmd = [
-                    "keytool", "-importcert",
+                    "keytool",
+                    "-importcert",
                     "-noprompt",
-                    "-alias", alias,
-                    "-file", str(tmp_pem),
-                    "-keystore", str(out_path),
-                    "-storepass", storepass,
+                    "-alias",
+                    alias,
+                    "-file",
+                    str(tmp_pem),
+                    "-keystore",
+                    str(out_path),
+                    "-storepass",
+                    storepass,
                 ]
                 subprocess.run(cmd, check=True)
                 print(f"[INFO] Imported cert {idx}: {alias}")
@@ -143,10 +154,10 @@ def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict):
 
     Use: -in (first cert) + -certfile (rest) to include entire set.
     """
-    from cryptography import x509
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.backends import default_backend
     import tempfile
+
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
 
     alias_format = overrides.get("alias_format", "{subject.CN}-{serial}")
     password_env = overrides.get("password_env", "TRUST_P12_PASSWORD")
@@ -177,19 +188,27 @@ def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict):
             rest_file.write_text("".join(rest_pems), encoding="utf-8")
 
         # Alias from the first cert
-        first_cert = x509.load_pem_x509_certificate(first_pem.encode(), default_backend())
+        first_cert = x509.load_pem_x509_certificate(
+            first_pem.encode(), default_backend()
+        )
         cn = _get_cn(first_cert)
         serial = f"{first_cert.serial_number:X}"
         alias = _format_alias(alias_format, cn, serial)
         alias = _sanitize_alias(alias)
 
         cmd = [
-            "openssl", "pkcs12", "-export",
+            "openssl",
+            "pkcs12",
+            "-export",
             "-nokeys",
-            "-in", str(first_file),
-            "-out", str(out_path),
-            "-passout", f"pass:{password}",
-            "-name", alias,
+            "-in",
+            str(first_file),
+            "-out",
+            str(out_path),
+            "-passout",
+            f"pass:{password}",
+            "-name",
+            alias,
         ]
         if rest_file:
             cmd[6:6] = ["-certfile", str(rest_file)]  # insert before -out
@@ -202,6 +221,7 @@ def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict):
 # ---------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------
+
 
 def _split_pem_blocks(text: str) -> list[str]:
     start, end = "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"
@@ -231,17 +251,15 @@ def _get_cn(cert) -> str:
 
 def _sanitize_alias(alias: str) -> str:
     """Make alias keytool/openssl safe."""
-    return "".join(c if c.isalnum() or c in ("-", "_", ".") else "_" for c in alias)[:80]
+    return "".join(c if c.isalnum() or c in ("-", "_", ".") else "_" for c in alias)[
+        :80
+    ]
 
 
 def _format_alias(template: str, cn: str, serial: str) -> str:
     """Replace {subject.CN} and {serial} placeholders safely."""
     cn = cn or "Unknown_CN"
     try:
-        return (
-            template
-            .replace("{subject.CN}", cn)
-            .replace("{serial}", serial)
-        )
+        return template.replace("{subject.CN}", cn).replace("{serial}", serial)
     except Exception:
         return f"{cn}-{serial}"

@@ -129,15 +129,32 @@ twine upload dist/*
 ## 🧾 Coding Standards
 
 * Follow [PEP 8](https://peps.python.org/pep-0008/).
-* Use **black** for formatting and **flake8** for linting.
+* Use **black** for formatting and **ruff** for linting.
 * Prefer explicit, consistent Click options across subcommands.
 * Keep logging readable and deterministic; consider `--quiet`/`--json` flags in future versions.
 
-### Formatting & Linting
+### Code Style & Linting
+
+BundleCraft uses Black and Ruff to enforce a consistent, modern Python style across the project.
+
+**Format your code**
 
 ```bash
 black .
-flake8
+```
+This automatically formats all .py files according to PEP 8 conventions and BundleCraft’s 88-character line length.
+
+**Lint your code**
+
+```bash
+ruff check .
+```
+
+This runs static analysis to catch unused imports, bad patterns, and other issues.
+You can automatically fix most problems with:
+
+```bash
+ruff check . --fix
 ```
 
 ---

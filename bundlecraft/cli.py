@@ -13,10 +13,11 @@ Subcommands:
 """
 
 import click
+
 from bundlecraft import __version__
 from bundlecraft.builder import main as build_main
-from bundlecraft.verifier import main as verify_main
 from bundlecraft.converter import main as convert_main
+from bundlecraft.verifier import main as verify_main
 
 
 @click.group(

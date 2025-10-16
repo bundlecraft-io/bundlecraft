@@ -1,9 +1,12 @@
 from __future__ import annotations
-import hashlib, json, os
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
 
-def load_yaml(path: Path, required: bool = True) -> Dict[str, Any] | None:
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+
+def load_yaml(path: Path, required: bool = True) -> dict[str, Any] | None:
     if not path.exists():
         if required:
             raise FileNotFoundError(f"Missing YAML file: {path}")
@@ -11,16 +14,21 @@ def load_yaml(path: Path, required: bool = True) -> Dict[str, Any] | None:
     try:
         import yaml  # PyYAML
     except ImportError as e:
-        raise RuntimeError("PyYAML is required. Install with: pip install pyyaml") from e
+        raise RuntimeError(
+            "PyYAML is required. Install with: pip install pyyaml"
+        ) from e
     with path.open("r", encoding="utf-8") as fh:
         return yaml.safe_load(fh) or {}
+
 
 def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
-def write_json(path: Path, data: Dict[str, Any]) -> None:
+
+def write_json(path: Path, data: dict[str, Any]) -> None:
     with path.open("w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2, sort_keys=True)
+
 
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -29,8 +37,9 @@ def sha256_file(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
-def list_files(folder: Path, suffixes: Tuple[str, ...]) -> List[Path]:
-    out: List[Path] = []
+
+def list_files(folder: Path, suffixes: tuple[str, ...]) -> list[Path]:
+    out: list[Path] = []
     for s in suffixes:
         out.extend(folder.rglob(f"*{s}"))
     return out
