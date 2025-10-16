@@ -65,7 +65,6 @@ jobs:
       - name: 🔐 Install BundleCraft Python CLI
         run: |
           python -m pip install -e .
-          bundlecraft --version
 
       - name: 🔨 Build bundle
         run: |
@@ -186,7 +185,6 @@ jobs:
       - name: 🔐 Install BundleCraft Python CLI
         run: |
           python -m pip install -e .
-          bundlecraft --version
 
       - name: 🔍 Verify combined directory (with diagnostics)
         run: |
