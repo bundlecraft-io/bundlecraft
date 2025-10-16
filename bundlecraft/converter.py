@@ -13,11 +13,8 @@ import sys
 from pathlib import Path
 
 import click
-from convert_utils import convert_to_formats
 
-CURRENT_DIR = Path(__file__).resolve().parent
-HELPERS_DIR = CURRENT_DIR / "helpers"
-sys.path.insert(0, str(HELPERS_DIR))
+from bundlecraft.helpers.convert_utils import convert_to_formats
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})

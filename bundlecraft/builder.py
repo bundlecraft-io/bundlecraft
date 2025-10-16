@@ -19,9 +19,10 @@ import tarfile
 from pathlib import Path
 
 import click
-from convert_utils import convert_to_formats
-from utils import ensure_dir, list_files, load_yaml, sha256_file
-from verify_utils import verifier  # ← updated import name
+
+from bundlecraft.helpers.convert_utils import convert_to_formats
+from bundlecraft.helpers.utils import ensure_dir, list_files, load_yaml, sha256_file
+from bundlecraft.helpers.verify_utils import verifier
 
 # ---------------------------------------------------------------------
 # Path setup
@@ -233,7 +234,7 @@ def main(env, bundle, package, verify_only, output_root):
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
 
-    now = dt.datetime.now(dt.UTC)
+    now = dt.datetime.now(dt.timezone.utc)
     soon_cutoff = now + dt.timedelta(days=warn_days)
     errs, warns = [], []
 
@@ -243,7 +244,9 @@ def main(env, bundle, package, verify_only, output_root):
                 blk.encode("utf-8"), default_backend()
             )
             subject = cert.subject.rfc4514_string()
-            exp = cert.not_valid_after_utc
+            exp = getattr(cert, "not_valid_after_utc", None)
+            if exp is not None and exp.tzinfo is None:
+                exp = exp.replace(tzinfo=dt.timezone.utc)
             if exp < now:
                 errs.append(f"Expired: {subject} (expired {exp.date()})")
             elif exp < soon_cutoff:
@@ -325,7 +328,7 @@ def main(env, bundle, package, verify_only, output_root):
     manifest_obj = {
         "bundle": bundle,
         "environment": env,
-        "timestamp_utc": datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "timestamp_utc": datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "sources": [str(p.relative_to(ROOT)).replace("\\", "/") for p in include_paths],
         "outputs": files_for_manifest,  # includes package.tar.gz if present
         "verify": {"fail_on_expired": fail_on_expired},

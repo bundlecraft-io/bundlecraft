@@ -3,7 +3,7 @@ __pycache__/
 venv/
 build/
 dist/
-test*/
+testing/
 
 # Dist
 *.egg-info/

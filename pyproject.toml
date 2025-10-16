@@ -9,52 +9,55 @@ dependencies = [
   "click>=8.0",
   "cryptography>=42.0",
   "pyOpenSSL>=23.0",
+  "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
 dev = [
 "pytest>=8.0.0",
+"pytest-cov>=4.1.0",
+"pytest-mock>=3.11.1",
 "black>=24.0.0",
 "ruff>=0.14.0",
 "build>=1.2.2",
 "twine>=5.0.0",
+"pre-commit>=3.7.0",
+"yamllint>=1.35.0",
+"yamlfix>=1.17.0",
 ]
 
 [project.scripts]
 bundlecraft = "bundlecraft.cli:cli"
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+py-modules = []
+
 [tool.setuptools.packages.find]
+where = ["."]
 include = ["bundlecraft*"]
+namespaces = false
 
 [tool.ruff]
-target-version = "py311"
-line-length = 88
-fix = true
-unsafe-fixes = false
+target-version = "py310"
+line-length = 100
 
-# Exclude common non-source directories
-exclude = [
-    ".git",
-    "__pycache__",
-    "build",
-    "dist",
-    "venv",
-    ".venv",
-    "testing",
+[tool.ruff.lint]
+select = [
+  "E",  # pycodestyle errors
+  "F",  # pyflakes
+  "B",  # flake8-bugbear
+  "I",  # import sorting
+  "UP", # pyupgrade (modernize syntax)
+]
+ignore = [
+  "E501", # line length handled by formatter
 ]
 
-# Enable all the core linting rules plus a few extras for code quality
-lint.select = [
-    "E",  # pycodestyle errors
-    "F",  # pyflakes
-    "B",  # flake8-bugbear
-    "I",  # import sorting
-    "UP", # pyupgrade (modernize syntax)
-]
+[tool.black]
+target-version = ["py310"]
+line-length = 100
 
-# Ignore noise that conflicts with Black
-lint.ignore = ["E501"]  # line length handled by Black

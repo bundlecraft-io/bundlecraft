@@ -17,7 +17,7 @@ import hashlib
 import logging
 import re
 import subprocess
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -42,7 +42,7 @@ def sha256sum(filepath: Path) -> str:
 
 def file_info(file: Path) -> str:
     size_kb = file.stat().st_size / 1024
-    mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=UTC)
+    mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
     return f"{size_kb:.1f} KB, modified {mtime.strftime('%Y-%m-%d %H:%M:%S UTC')}"
 
 

@@ -48,7 +48,7 @@ def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) ->
         print(f"[WARN] No PEM files found in {target}")
         return 0
 
-    now = dt.datetime.now(dt.UTC)
+    now = dt.datetime.now(dt.timezone.utc)
     soon_cutoff = now + dt.timedelta(days=warn_days)
     total, expired, expiring, errors = 0, 0, 0, 0
 
@@ -60,9 +60,9 @@ def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) ->
             try:
                 cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
                 subj = cert.subject.rfc4514_string()
-                exp = getattr(
-                    cert, "not_valid_after_utc", None
-                ) or cert.not_valid_after.replace(tzinfo=dt.UTC)
+                exp = getattr(cert, "not_valid_after_utc", None)
+                if exp is not None and exp.tzinfo is None:
+                    exp = exp.replace(tzinfo=dt.timezone.utc)
 
                 if exp < now:
                     expired += 1
