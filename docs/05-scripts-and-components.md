@@ -6,7 +6,7 @@ This document describes each core script, its purpose, and how they interact in 
 
 ---
 
-## 🧱 build_trust_store.py
+## 🧱 builder.py
 
 **Purpose:**  
 Central build engine that produces **ready-to-distribute trust packages**.
@@ -16,15 +16,15 @@ Central build engine that produces **ready-to-distribute trust packages**.
 - Loads and validates certificate sources
 - Merges certificates into canonical PEM
 - Converts to multiple formats (PEM, JKS, PKCS#7, etc.)
-- Imports from `helpers.converters`
+- Imports from `helpers.convert_utils`
 - Generates `manifest.json` and `checksums.sha256`
 - Optionally packages bundle as `.tar.gz`
 - Hands off to Distribution for publishing
-- Admins can still run `python scripts/convert_format.py` manually
+- Admins can still run `python scripts/converter.py` manually
 
 **Example Usage:**
 ```bash
-python scripts/build_trust_store.py --env prod --bundle internal
+python scripts/builder.py --env prod --bundle internal
 ```
 
 **Output Example:**
@@ -38,20 +38,20 @@ python scripts/build_trust_store.py --env prod --bundle internal
  └── package.tar.gz
 ```
 
-## 🔄 convert_format.py (CLI Wrapper)
+## 🔄 converter.py (CLI Wrapper)
 
 **Purpose:**  
 Provides a user-facing command-line interface for certificate bundle format conversion.
 
 **Responsibilities:**
 - Parses CLI arguments (`--input`, `--format`, `--output`, etc.)
-- Calls the core functions from `helpers.converters`
+- Calls the core functions from `helpers.convert_utils`
 - Displays progress, logging, and output paths
 - Can be used standalone or from CI/CD pipelines
 
 **Example Usage:**
 ```bash
-python scripts/convert_format.py \
+python scripts/converter.py \
   --input build/prod/internal/ca-trust.pem \
   --format jks \
   --output build/prod/internal/ca-trust.jks \
@@ -67,7 +67,7 @@ python scripts/convert_format.py \
 [INFO] Wrote: build/prod/internal/ca-trust.jks
 ```
 
-## 🧩 helpers/converters.py (Core Logic)
+## 🧩 helpers/convert_utils.py (Core Logic)
 
 **Purpose:**  
 Implements reusable conversion functions that can be imported by any script.
@@ -81,7 +81,7 @@ Implements reusable conversion functions that can be imported by any script.
 
 **Example Usage:**
 ```python
-from helpers.converters import convert_to_jks
+from helpers.convert_utils import convert_to_jks
 
 convert_to_jks(
     input_pem="build/prod/internal/ca-trust.pem",

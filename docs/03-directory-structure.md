@@ -49,12 +49,12 @@ pki-ca-trust/
 │           └── readme.md
 │
 ├── scripts/ 
-│   ├── build_trust_store.py        # main build orchestrator
+│   ├── builder.py        # main build orchestrator
 │   ├── verify_certs.py          # validation logic
 │   ├── distribute_artifacts.py     # publishing logic
-│   ├── convert_format.py           # CLI entry point for conversions
+│   ├── converter.py           # CLI entry point for conversions
 └── helpers/
-|   ├── converters.py           # conversion functions (PEM→JKS, P7B, DER)
+|   ├── convert_utils.py           # conversion functions (PEM→JKS, P7B, DER)
 |   └── utils.py                # generic helpers (logging, checksum, etc. later)
 └── docs/                   # Documentation (this folder)
     ├── 00-overview.md

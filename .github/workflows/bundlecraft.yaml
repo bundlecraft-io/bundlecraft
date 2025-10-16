@@ -1,5 +1,5 @@
-name: 🧱 PKI CA Trust Pipeline
-run-name: 'PKI CA Trust Pipeline - ${{ github.ref_name }} - Run #${{ github.run_number }}'
+name: 🔐 BundleCraft CA Trust Pipeline
+run-name: 'BundleCraft CA Trust Pipeline - ${{ github.ref_name }} - Run #${{ github.run_number }}'
 
 on:
   push:
@@ -62,13 +62,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 🧾 Ensure build script executable
-        run: chmod +x ./scripts/build_trust_store.py
+      - name: 🔐 Install BundleCraft Python CLI
+        run: |
+          python -m pip install -e .
+          bundlecraft --version
 
       - name: 🔨 Build bundle
         run: |
           echo "Building bundle: ${{ matrix.bundle }} in environment: ${{ matrix.env }}"
-          python ./scripts/build_trust_store.py \
+          bundlecraft build \
             --env ${{ matrix.env }} \
             --bundle ${{ matrix.bundle }} \
             --package
@@ -181,6 +183,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: 🔐 Install BundleCraft Python CLI
+        run: |
+          python -m pip install -e .
+          bundlecraft --version
+
       - name: 🔍 Verify combined directory (with diagnostics)
         run: |
           echo "=== Directory structure before verify ==="
@@ -195,7 +202,7 @@ jobs:
 
           for dir in $dirs; do
             echo "🔍 Verifying $dir"
-            python ./scripts/verify_bundle.py "$dir" --verbose
+            bundlecraft verify --target "$dir" --verbose
           done
 
       - name: 🗜️ Extract and verify tarball (with diagnostics)
@@ -216,7 +223,7 @@ jobs:
 
           for dir in $dirs; do
             echo "🔍 Verifying $dir"
-            python ./scripts/verify_bundle.py "$dir" --verbose
+            bundlecraft verify --target "$dir" --verbose
           done
 
       - name: 📊 Summarize verified bundles
@@ -252,7 +259,7 @@ jobs:
         run: |
           DATE=$(date -u +"%Y.%m.%d-%H%M")
           echo "tag=truststore-v${DATE}" >> $GITHUB_OUTPUT
-          echo "name=PKI CA Trust Store Build - ${DATE}" >> $GITHUB_OUTPUT
+          echo "name=BundleCraft CA Trust Store Build - ${DATE}" >> $GITHUB_OUTPUT
 
       - name: 🔍 Check if GPG key is available from GitHub Secrets store
         id: gpg-check

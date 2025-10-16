@@ -64,7 +64,7 @@ This modular approach ensures that configuration, build logic, and publication a
                 │
                 ▼
 ┌────────────────────────────────┐
-│     build_trust_store.py       │
+│     builder.py       │
 │  - Reads YAML/JSON configs     │
 │  - Collects & validates certs  │
 │  - Merges and converts formats │

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-verify_bundle.py
+verifier.py
 ----------------
 Verifies integrity and consistency of PKI trust bundle artifacts.
 
@@ -14,7 +14,6 @@ Features:
 - Emoji-rich human output, but pure UTF-8 safe
 """
 
-import argparse
 import hashlib
 import json
 import logging
@@ -22,6 +21,7 @@ import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+import click
 from cryptography.hazmat.primitives.serialization import pkcs12, pkcs7
 
 # --- logging setup ---
@@ -33,12 +33,7 @@ MANIFEST_FILE = "manifest.json"
 IGNORE_FILES = {"package.tar.gz", MANIFEST_FILE}
 
 
-# -------------------------------
-# Utility helpers
-# -------------------------------
-
 def sha256sum(filepath: Path) -> str:
-    """Compute SHA256 for a file."""
     h = hashlib.sha256()
     with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
@@ -47,14 +42,12 @@ def sha256sum(filepath: Path) -> str:
 
 
 def file_info(file: Path) -> str:
-    """Return readable file stats string."""
     size_kb = file.stat().st_size / 1024
     mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
     return f"{size_kb:.1f} KB, modified {mtime.strftime('%Y-%m-%d %H:%M:%S UTC')}"
 
 
 def load_checksums(path: Path) -> dict:
-    """Load checksum file into dict of {filename: hash}."""
     checksums = {}
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
@@ -66,27 +59,20 @@ def load_checksums(path: Path) -> dict:
     return checksums
 
 
-# -------------------------------
-# Cert count logic
-# -------------------------------
-
 def count_certs_in_pem(file: Path) -> int:
     text = file.read_text(encoding="utf-8", errors="ignore")
     return len(re.findall(r"-----BEGIN CERTIFICATE-----", text))
 
 
 def count_certs_in_store(file: Path) -> int | None:
-    """Count number of certificates in PEM, P12, P7B, or JKS files."""
     ext = file.suffix.lower()
     try:
         if ext == ".pem":
             return count_certs_in_pem(file)
-
         elif ext in (".p12", ".pfx"):
             data = file.read_bytes()
             count = 0
             tried_pw = [b"changeit", None]
-
             for pw in tried_pw:
                 try:
                     pkey, cert, addl = pkcs12.load_key_and_certificates(data, password=pw)
@@ -95,11 +81,9 @@ def count_certs_in_store(file: Path) -> int | None:
                             count += 1
                         if addl:
                             count += len(addl)
-                        break  # success, no need to retry
+                        break
                 except Exception:
                     continue
-
-            # Fallback to alternate loader for trust-only stores
             if count == 0:
                 for pw in tried_pw:
                     try:
@@ -114,12 +98,10 @@ def count_certs_in_store(file: Path) -> int | None:
                             break
                     except Exception:
                         continue
-
             if count == 0:
-                logger.warning(f"⚠️  Could not read any certificates from {file.name} (possibly encrypted or unsupported password)")
+                logger.warning(f"⚠️  Could not read any certificates from {file.name}")
                 return None
             return count
-
         elif ext == ".p7b":
             data = file.read_bytes()
             try:
@@ -127,9 +109,7 @@ def count_certs_in_store(file: Path) -> int | None:
             except ValueError:
                 certs = pkcs7.load_der_pkcs7_certificates(data)
             return len(certs)
-
         elif ext == ".jks":
-            # Use keytool to extract certs (public only)
             result = subprocess.run(
                 ["keytool", "-list", "-rfc", "-keystore", str(file), "-storepass", "changeit"],
                 stdout=subprocess.PIPE,
@@ -148,51 +128,35 @@ def count_certs_in_store(file: Path) -> int | None:
                 )
                 pem_blocks = re.findall(r"-----BEGIN CERTIFICATE-----", result2.stdout)
             return len(pem_blocks)
-
     except Exception as e:
         logger.debug(f"Error counting certs in {file.name}: {e}")
-
     return None
 
 
-# -------------------------------
-# Manifest inspection
-# -------------------------------
-
 def show_manifest_info(build_dir: Path, verbose: bool = False) -> None:
-    """Display manifest.json info (no verification)."""
     manifest_path = build_dir / MANIFEST_FILE
     if not manifest_path.exists():
         logger.error(f"Missing {MANIFEST_FILE} in {build_dir}")
         return
-
     logger.info("📝 Manifest inspection (no verification performed)")
     logger.info(f"    Path: {manifest_path.resolve()}")
     logger.info(f"    Info: {file_info(manifest_path)}")
-
     sha = sha256sum(manifest_path)
     logger.info(f"    SHA256: {sha}")
-
     if verbose:
         content_preview = manifest_path.read_text(encoding="utf-8", errors="ignore").splitlines()[:10]
         if len(content_preview) > 0:
             logger.info("    Content preview:")
             for line in content_preview:
                 logger.info(f"      {line}")
-    logger.info("✅ Manifest inspection complete (signing verification handled separately).")
+    logger.info("✅ Manifest inspection complete.")
 
-
-# -------------------------------
-# Bundle verification
-# -------------------------------
 
 def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool = True) -> bool:
-    """Verify all files in directory against checksums, skipping ignored ones."""
     checksum_path = build_dir / CHECKSUM_FILE
     if not checksum_path.exists():
         logger.error(f"Missing {CHECKSUM_FILE} in {build_dir}")
         return False
-
     checksums = load_checksums(checksum_path)
     logger.info(f"🔍 Starting verification for directory: {build_dir}")
     logger.info(f"📄 Using checksum manifest: {checksum_path.resolve()}")
@@ -233,7 +197,6 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
                 logger.info(f"    SHA256: {actual}")
                 logger.info(f"    Info: {file_info(file)}")
 
-        # ---- certificate counting ----
         if check_counts:
             count = count_certs_in_store(file)
             if count is not None:
@@ -241,21 +204,18 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
                 if verbose:
                     logger.info(f"    Certificate count: {count}")
             else:
-                # If certs couldn't be read, print contextual info
-                logger.info(f"    (hash OK, certificate content not readable — likely encrypted or unsupported)")
+                logger.info(f"    (hash OK, certificate content not readable)")
 
-    # ---- cert count mismatch detection ----
     total_certs = sum(cert_counts.values()) if cert_counts else 0
     unique_counts = set(cert_counts.values())
     mismatch = False
     if check_counts and cert_counts:
         if len(unique_counts) > 1:
-            logger.warning(f"⚠️  Certificate count mismatch detected among files: {cert_counts}")
+            logger.warning(f"⚠️  Certificate count mismatch detected: {cert_counts}")
             mismatch = True
         elif all(v == 0 for v in unique_counts):
             logger.warning("⚠️  All bundle files appear empty (0 certs).")
 
-    # ---- summary ----
     logger.info("🔚 Verification run complete.")
     logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     logger.info(f"📦 Verified files: {verified_files}")
@@ -270,40 +230,32 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
     return success
 
 
-# -------------------------------
-# CLI entrypoint
-# -------------------------------
-
-def main():
-    parser = argparse.ArgumentParser(description="Verify trust bundle or standalone cert/file")
-    parser.add_argument("target", help="Path to build directory or single file")
-    parser.add_argument("--verify-manifest", action="store_true", help="Display manifest info only (no verification)")
-    parser.add_argument("--verify-all", action="store_true", help="Verify both bundle files and manifest together")
-    parser.add_argument("--verbose", action="store_true", help="Show detailed file metadata and hashes")
-    args = parser.parse_args()
-
-    path = Path(args.target)
-    if not path.exists():
-        logger.error(f"Path not found: {path}")
-        exit(1)
-
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.option("--target", required=True, type=click.Path(exists=True), help="Path to build directory or file")
+@click.option("--verify-manifest", is_flag=True, help="Display manifest info only (no verification)")
+@click.option("--verify-all", is_flag=True, help="Verify both bundle files and manifest together")
+@click.option("--verbose", is_flag=True, help="Show detailed file metadata and hashes")
+@click.option("--output-root", type=str, default="build", help="Root directory for build outputs (default: ./build)")
+def main(target, verify_manifest, verify_all, verbose, output_root):
+    """Verify the integrity and consistency of built trust bundles."""
+    click.secho(f"\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
+    path = Path(target)
     if path.is_file():
         logger.info(f"Verifying single file: {path.name}")
         digest = sha256sum(path)
         logger.info(f"SHA256: {digest}")
-        if args.verbose:
+        if verbose:
             logger.info(f"Info: {file_info(path)}")
-        exit(0)
+        return
 
-    # Directory mode
     ok = True
-    if args.verify_manifest:
-        show_manifest_info(path, args.verbose)
-    elif args.verify_all:
-        ok = verify_directory(path, args.verbose)
-        show_manifest_info(path, args.verbose)
+    if verify_manifest:
+        show_manifest_info(path, verbose)
+    elif verify_all:
+        ok = verify_directory(path, verbose)
+        show_manifest_info(path, verbose)
     else:
-        ok = verify_directory(path, args.verbose)
+        ok = verify_directory(path, verbose)
 
     if ok:
         logger.info("✅ All verifications passed.")

@@ -5,7 +5,7 @@
 The main interface is a single Click-based command:
 
 ```bash
-python scripts/build_trust_store.py [OPTIONS]
+python scripts/builder.py [OPTIONS]
 ```
 ```
 Option	Description
@@ -19,11 +19,11 @@ Option	Description
 ## Examples
 Build and package
 ```bash
-python scripts/build_trust_store.py --env prod --bundle internal --package
+python scripts/builder.py --env prod --bundle internal --package
 ```
 Verify bundle only
 ```bash
-python scripts/build_trust_store.py --env prod --bundle internal --verify-only
+python scripts/builder.py --env prod --bundle internal --verify-only
 ```
 ## Exit Codes
 ```
@@ -38,7 +38,7 @@ Code	Meaning
 steps:
   - name: Verify trust store
     run: |
-      python scripts/build_trust_store.py --env prod --bundle internal --verify-only
+      python scripts/builder.py --env prod --bundle internal --verify-only
 ```
 
 Use non-zero exit codes to gate pipelines when untrusted certificates are detected.

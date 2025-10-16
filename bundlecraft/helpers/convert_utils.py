@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-converters.py
+convert_utils.py
 Handles format conversions for PKI-CA-Trust bundles.
 
 Supports:

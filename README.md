@@ -1,9 +1,19 @@
-# 🏛️ PKI CA Trust — Centralized Certificate Trust Store Management
+# 🔐 BundleCraft — Modern PKI Trust Store Builder
 
 ## Overview
 
-**PKI-CA-Trust** is a configuration-as-code system for building, verifying, and distributing multi-format certificate **trust bundles** across environments.  
-It automates the ingestion of versioned certificate sources (roots, intermediates, vendor bundles) and produces reproducible outputs for OS, Java, and application platforms.
+![GitHub license](https://img.shields.io/github/license/KunaiX/bundlecraft)
+![GitHub release](https://img.shields.io/github/v/release/KunaiX/bundlecraft)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/KunaiX/bundlecraft/bundlecraft.yml)
+
+---
+
+## Overview
+
+**BundleCraft** is a modern, configuration-as-code system for **building, verifying, and distributing multi-format certificate trust bundles** across environments.  
+It automates the ingestion of versioned certificate sources (roots, intermediates, vendor bundles) and produces reproducible, auditable outputs for OS, Java, and application platforms.
+
+> **In short:** BundleCraft lets you define *how trust is built* — not just *what to trust*.
 
 **Key Outputs Each Build:**
 - Canonical **PEM** bundle (with annotated subjects, deduplication)
@@ -23,7 +33,7 @@ It automates the ingestion of versioned certificate sources (roots, intermediate
 - **Portable tooling:** Python + OpenSSL + Java keytool
 - **Manifest and checksum generation:** for auditing and release integrity
 - **GPG signing integration** (optional, for release artifacts)
-- **CI/CD ready:** Designed for GitHub Actions, supports concurrency and artifact management
+- **CI/CD ready:** Designed for (but not exclusive to) GitHub Actions, supports concurrency and artifact management
 - **Flexible bundle and environment definitions**: Easily add new trust bundles or environments
 
 ---
@@ -36,20 +46,12 @@ It automates the ingestion of versioned certificate sources (roots, intermediate
 │   ├── defaults.yaml
 │   ├── envs/
 │   └── bundles/
-├── scripts/                # Python scripts for build, verify, convert, helpers
-│   ├── build_trust_store.py
-│   ├── verify_bundle.py
-│   ├── convert_format.py
-│   └── helpers/
-│       ├── converters.py
-│       ├── verifiers.py
-│       ├── utils.py
-│       └── __init__.py
+├── bundlecraft/            # Python scripts for build, verify, convert, helpers
 ├── build/                  # Generated outputs (per environment/bundle)
 ├── docs/                   # Project documentation
 ├── .github/
 │   └── workflows/
-│       └── pki-ca-trust.yaml  # CI/CD pipeline for builds, verification, releases
+│       └── bundlecraft.yaml  # CI/CD pipeline for builds, verification, releases
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
 └── LICENSE                 # MIT License
@@ -59,7 +61,7 @@ It automates the ingestion of versioned certificate sources (roots, intermediate
 
 ## 🏗️ How It Works — Build Pipeline
 
-PKI-CA-Trust uses a **layered configuration model**:
+BundleCraft uses a **layered configuration model**:
 
 1. **Defaults** (`config/defaults.yaml`):  
    Global settings (verification, filters, formats)
@@ -70,18 +72,16 @@ PKI-CA-Trust uses a **layered configuration model**:
 3. **Bundle** (`config/bundles/<bundle>.yaml`):  
    Content definition (certificate sources to include/exclude)
 
-**Example Build Flow:**
+**Build Flow:**
 
-- Discover all bundles and environments in config folders
-- For each (env, bundle) pair:
-  - Merge configs: defaults ← env ← bundle
-  - Deduplicate, filter, and verify certificates
-  - Write annotated canonical PEM
-  - Convert to P7B, JKS, P12 (using OpenSSL/keytool)
-  - Generate manifest and checksums for outputs
-  - Package build into tarball if configured
-  - Verify all outputs and cross-format consistency
-  - Optionally sign and publish release artifacts
+- Merge config layers: defaults ← env ← bundle
+- Deduplicate, verify, and annotate certs
+- Generate canonical PEM bundle
+- Convert to JKS, P7B, P12
+- Generate `manifest.json` and `checksums.sha256`
+- Package build into `.tar.gz` tarball if configured
+- Verify all outputs and cross-format consistency
+- Optionally sign and publish release artifacts
 
 ---
 
@@ -153,15 +153,16 @@ These can be overridden by environment or bundle configs.
 
 ### 1. Install Prerequisites
 
-**Python dependencies:**
-```bash
-python3 -m pip install -r requirements.txt
-```
-
 **System dependencies:**
 ```bash
 # Required for conversions and verification
 sudo apt-get install openssl openjdk-17-jre-headless  # (for keytool)
+```
+**Python dependencies:**
+```bash
+python -m pip install -r requirements.txt
+# Install this repository as an editable package to expose the `bundlecraft` CLI
+python -m pip install -e .
 ```
 
 ### 2. Prepare Certificate Sources
@@ -172,7 +173,7 @@ sudo apt-get install openssl openjdk-17-jre-headless  # (for keytool)
 ### 3. Build a Bundle
 
 ```bash
-python scripts/build_trust_store.py --env prod --bundle internal
+bundlecraft build --env prod --bundle internal
 ```
 - Produces artifacts in `build/prod/internal/`:
   ```
@@ -188,7 +189,7 @@ python scripts/build_trust_store.py --env prod --bundle internal
 ### 4. Verify Outputs
 
 ```bash
-python scripts/verify_bundle.py build/prod/internal/
+bundlecraft verify --target build/prod/internal --verbose --verify-all
 ```
 - Checks:
   - Expiry and soon-to-expire certificates
@@ -203,7 +204,7 @@ python scripts/verify_bundle.py build/prod/internal/
 ### 5. Convert PEM Ad-Hoc (if needed)
 
 ```bash
-python scripts/convert_format.py build/prod/internal/ca-trust.pem build/prod/internal/ jks p12
+bundlecraft convert --pem-file sources/internal/rootCA.pem --output-dir ./ --formats p7b,jks,p12
 # Defaults to p7b, jks, p12 if formats not specified
 ```
 
@@ -220,16 +221,17 @@ python scripts/convert_format.py build/prod/internal/ca-trust.pem build/prod/int
 - **Subject Annotation:** PEM includes `# Subject:` comments for traceability
 - **Manifest & Checksums:** Every build records outputs with SHA256 in both JSON and text formats
 - **Cross-format Verification:** Cert counts and file integrity checked for PEM, P7B, JKS, P12
+- **Optional GPG signing:** secure release integrity for distributed bundles in GitHub workflow
 
 ---
 
 ## 🧰 Scripts Reference
 
-| Script | Purpose | Example Usage |
+|Script|Purpose|Example Usage|
 |---|---|---|
-| `build_trust_store.py` | Build trust bundles from configs, write all outputs | `python scripts/build_trust_store.py --env prod --bundle internal` |
-| `verify_bundle.py` | Verify PEMs or built bundle directories (expiry + integrity) | `python scripts/verify_bundle.py build/prod/internal/` |
-| `convert_format.py` | Convert canonical PEM to P7B/JKS/P12 (ad-hoc) | `python scripts/convert_format.py build/prod/internal/ca-trust.pem build/prod/internal/ jks p12` |
+| `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --env prod --bundle internal` |
+| `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify build/prod/internal/` |
+| `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert canonical PEM to P7B/JKS/P12 (ad-hoc) | `bundlecraft convert build/prod/internal/ca-trust.pem build/prod/internal/ jks p12` |
 
 For more detailed usage and options, see [`scripts/README.md`](scripts/README.md).
 
@@ -237,7 +239,7 @@ For more detailed usage and options, see [`scripts/README.md`](scripts/README.md
 
 ## 🏭 CI/CD Pipeline
 
-The included [GitHub Actions workflow](.github/workflows/pki-ca-trust.yaml) automates:
+The included [GitHub Actions workflow](.github/workflows/bundlecraft.yaml) automates:
 
 - **Build & Verification** for all bundles/environments on push/PR/manual dispatch
 - **Artifact Uploads** for all intermediate and final products
@@ -279,7 +281,6 @@ You can dispatch builds from the Actions tab for custom scenarios.
 ## 🔮 Roadmap & Future Enhancements
 
 - Chain validation (issuer/subject path building)
-- Unified `trustctl` CLI wrapper
 - Test suite + CI templates
 - Dynamic certificate fetching from committed trusted sources (i.e. KeyFactor collection, Mozilla public bundle, etc) upon build
 
@@ -291,7 +292,7 @@ You can dispatch builds from the Actions tab for custom scenarios.
 - **GPG signing** is supported if a key is provided via GitHub Secrets.
 - **Verification instructions** are included in release notes:
   ```bash
-  curl -O https://raw.githubusercontent.com/KunaiX/pki-ca-trust/main/docs/public-gpg-key.asc
+  curl -O https://raw.githubusercontent.com/KunaiX/bundlecraft/main/docs/public-gpg-key.asc
   gpg --import public-gpg-key.asc
   gpg --verify truststore_bundle.tar.gz.asc truststore_bundle.tar.gz
   ```
@@ -300,8 +301,8 @@ You can dispatch builds from the Actions tab for custom scenarios.
 
 ## 🧪 Development Tips
 
-- Run `verify_bundle.py` after each build to validate outputs and manifest.
-- Use `convert_format.py` directly for ad-hoc conversions or tests.
+- Run `verifier.py` after each build to validate outputs and manifest.
+- Use `converter.py` directly for ad-hoc conversions or tests.
 - To debug OpenSSL or keytool output, temporarily add `check=False` to subprocess calls.
 - Passwords default to `"changeit"` for local testing; override via environment variables in CI.
 
@@ -324,8 +325,6 @@ MIT © 2025 - [KunaiX](https://github.com/KunaiX)
 ## 🏷️ Tags & Metadata
 
 - **Category:** PKI, Certificate Management, DevOps, Security Automation
-- **Status:** Stable, actively maintained
-- **Contact:** `pki-team@example.com` (see config metadata)
 
 ---
 
@@ -347,5 +346,5 @@ Special thanks to all the security and infrastructure teams out there, whose col
 
 ## 📣 Questions?
 
-Open an [issue](https://github.com/KunaiX/pki-ca-trust/issues)  
-or reach out via [GitHub Discussions](https://github.com/KunaiX/pki-ca-trust/discussions)
+Open an [issue](https://github.com/KunaiX/bundlecraft/issues)  
+or reach out via [GitHub Discussions](https://github.com/KunaiX/bundlecraft/discussions)

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-verifiers.py
+verify_utils.py
 Verification utilities for PKI-CA-Trust.
 
 Capabilities:
-    • verify_bundle() – Verify PEMs or built trust bundles
+    • verifier() – Verify PEMs or built trust bundles
     • verify_manifest() – Validate manifest.json and checksums.sha256 integrity
     • _check_output_files() – Detect empty/missing output files
     • _compare_output_counts() – Compare certificate counts across formats
@@ -28,7 +28,7 @@ from cryptography.hazmat.backends import default_backend
 # Core verifier
 # ---------------------------------------------------------------------
 
-def verify_bundle(target: Path, warn_days: int = 30, fail_on_expired: bool = True) -> int:
+def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) -> int:
     if not target.exists():
         print(f"[ERROR] Target not found: {target}", file=sys.stderr)
         return 5

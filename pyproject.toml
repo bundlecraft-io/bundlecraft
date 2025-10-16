@@ -1,0 +1,22 @@
+[project]
+name = "bundlecraft"
+version = "0.1.0"
+description = "Unified CLI for building, verifying, and converting CA trust bundles."
+authors = [{ name = "Chris Pich" }]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.3.0",
+    "cryptography>=42.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+bundlecraft = "bundlecraft.cli:cli"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["bundlecraft*"]

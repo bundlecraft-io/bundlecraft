@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-build_trust_store.py
+builder.py
 Central build engine that produces ready-to-distribute trust bundles.
 
 Enhancements:
@@ -11,7 +11,7 @@ Enhancements:
 """
 
 from __future__ import annotations
-import sys, os, json, tarfile, time, datetime as dt
+import sys, json, tarfile, datetime as dt
 from pathlib import Path
 import click
 
@@ -25,9 +25,9 @@ sys.path.insert(0, str(HELPERS_DIR))
 # ---------------------------------------------------------------------
 # Helper imports
 # ---------------------------------------------------------------------
-from utils import load_yaml, ensure_dir, write_json, sha256_file, list_files
-from converters import convert_to_formats
-from verifiers import verify_bundle  # ← updated import name
+from utils import load_yaml, ensure_dir, sha256_file, list_files
+from convert_utils import convert_to_formats
+from verify_utils import verifier  # ← updated import name
 
 # ---------------------------------------------------------------------
 # Path constants
@@ -129,7 +129,7 @@ def package_tar(build_path: Path) -> Path:
 @click.option("--output-root", type=str, default="build", help="Root directory for build outputs (default: ./build)")
 def main(env, bundle, package, verify_only, output_root):
     """Build or verify trust bundles based on configuration."""
-    click.secho(f"\n🔐 PKI CA Trust Builder\n----------------------", fg="cyan")
+    click.secho(f"\n🔐 BundleCraft CA Trust Store Builder\n--------------------------------------", fg="cyan")
 
     defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False) or {}
     env_cfg = load_yaml(CONFIG_DIR / "envs" / f"{env}.yaml", required=True)
@@ -181,13 +181,13 @@ def main(env, bundle, package, verify_only, output_root):
         pem_path = build_root / "ca-trust.pem"
         if pem_path.exists():
             click.secho(f"[INFO] Verifying existing PEM bundle: {pem_path}", fg="blue")
-            code = verify_bundle(pem_path, warn_days, fail_on_expired)
+            code = verifier(pem_path, warn_days, fail_on_expired)
         else:
             click.secho(f"[INFO] No built bundle found; verifying sources directly.", fg="blue")
             import tempfile
             tmp_pem = Path(tempfile.gettempdir()) / "verify-temp.pem"
             tmp_pem.write_text("".join(pem_blocks), encoding="utf-8")
-            code = verify_bundle(tmp_pem, warn_days, fail_on_expired)
+            code = verifier(tmp_pem, warn_days, fail_on_expired)
             tmp_pem.unlink(missing_ok=True)
         sys.exit(code)
 

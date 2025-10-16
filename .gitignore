@@ -1,11 +1,19 @@
+# The usual suspects
 __pycache__/
 venv/
 build/
 test*/
 
+# Dist
+*.egg-info/
 *.pyc
+
+# Never Save Non PEM certificates
+*.crt
+*.cer
 *.jks
 *.p12
 *.der
 *.json
 *.hash
+*.p7b
