@@ -2,20 +2,29 @@
 name = "bundlecraft"
 version = "0.1.0"
 description = "Unified CLI for building, verifying, and converting CA trust bundles."
-authors = [{ name = "Chris Pich" }]
 readme = "README.md"
 requires-python = ">=3.9"
+authors = [{ name = "Chris Pich" }]
 dependencies = [
-    "click>=8.3.0",
-    "cryptography>=42.0",
-    "pyyaml>=6.0",
+  "click>=8.0",
+  "cryptography>=42.0",
+  "pyOpenSSL>=23.0",
+]
+
+[project.optional-dependencies]
+dev = [
+"pytest>=8.0.0",
+"black>=24.0.0",
+"flake8>=7.0.0",
+"build>=1.2.2",
+"twine>=5.0.0",
 ]
 
 [project.scripts]
 bundlecraft = "bundlecraft.cli:cli"
 
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

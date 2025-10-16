@@ -1,3 +1,11 @@
+# Core dependencies
 PyYAML>=6.0
 cryptography>=42.0
 click>=8.3.0
+
+# Development and testing
+build>=1.2.2
+twine>=5.0.0
+pytest>=8.0.0
+black>=24.0.0
+flake8>=7.0.0

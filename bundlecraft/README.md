@@ -76,7 +76,7 @@ bundlecraft build --env <environment> --bundle <bundle_name> [OPTIONS]
 | `--bundle`      | Bundle name (e.g., `internal`, `external`). Required.    |
 | `--package`     | Also create a `.tar.gz` archive of the build folder.     |
 | `--verify-only` | Skip build; verify certificates only.                    |
-| `--output-root` | Root directory for build outputs (default: `./build`).   |
+| `--output-root` | Root directory for build outputs (default: `./dist`).   |
 
 **Outputs:**
 
@@ -117,7 +117,7 @@ bundlecraft verify --target <build_dir_or_file> [OPTIONS]
 | `--verify-manifest` | Display manifest info only (no verification).                |
 | `--verify-all`      | Verify all bundle files and display manifest in one run.     |
 | `--verbose`         | Show detailed file metadata, hashes, and certificate counts. |
-| `--output-root`     | Root directory for build outputs (default: `./build`).       |
+| `--output-root`     | Root directory for build outputs (default: `./dist`).       |
 
 **Verification Features:**
 
@@ -130,10 +130,10 @@ bundlecraft verify --target <build_dir_or_file> [OPTIONS]
 
 ```bash
 # Verify an entire bundle
-tbundlecraft verify --target build/prod/internal
+tbundlecraft verify --target dist/prod/internal
 
 # Verify everything with full detail
-tbundlecraft verify --target build/prod/internal --verify-all --verbose
+tbundlecraft verify --target dist/prod/internal --verify-all --verbose
 ```
 
 ---
@@ -155,16 +155,16 @@ bundlecraft convert --pem-file <input_pem> --output-dir <output_path> [OPTIONS]
 | `--pem-file`    | Input PEM file containing one or more certificates. Required.         |
 | `--output-dir`  | Directory to write converted formats. Required.                       |
 | `--formats`     | Output formats to produce (default: `p7b jks p12`). Multiple allowed. |
-| `--output-root` | Root directory for build outputs (default: `./build`).                |
+| `--output-root` | Root directory for build outputs (default: `./dist`).                |
 
 **Examples:**
 
 ```bash
 # Convert to all default formats
-bundlecraft convert --pem-file build/prod/internal/ca-trust.pem --output-dir build/prod/internal/
+bundlecraft convert --pem-file dist/prod/internal/ca-trust.pem --output-dir dist/prod/internal/
 
 # Convert to only JKS and P7B
-bundlecraft convert --pem-file build/dev/internal/ca-trust.pem --output-dir build/dev/internal/ --formats jks --formats p7b
+bundlecraft convert --pem-file dist/dev/internal/ca-trust.pem --output-dir dist/dev/internal/ --formats jks --formats p7b
 ```
 
 **Notes:**
@@ -188,8 +188,8 @@ bundlecraft [COMMAND] [OPTIONS]
 
 ```bash
 bundlecraft build --env prod --bundle internal
-bundlecraft verify --target build/prod/internal --verify-all
-bundlecraft convert --pem-file build/prod/internal/ca-trust.pem --output-dir build/prod/internal/
+bundlecraft verify --target dist/prod/internal --verify-all
+bundlecraft convert --pem-file dist/prod/internal/ca-trust.pem --output-dir dist/prod/internal/
 ```
 
 **Help:**
@@ -245,8 +245,8 @@ Local validation (editable mode):
 
 ```bash
 bundlecraft build --env dev --bundle internal
-bundlecraft verify --target build/dev/internal
-bundlecraft convert --pem-file build/dev/internal/ca-trust.pem --output-dir build/dev/internal/
+bundlecraft verify --target dist/dev/internal
+bundlecraft convert --pem-file dist/dev/internal/ca-trust.pem --output-dir dist/dev/internal/
 ```
 
 Automated CI/CD (non-editable install):
@@ -254,7 +254,7 @@ Automated CI/CD (non-editable install):
 ```bash
 pip install .
 bundlecraft build --env prod --bundle internal
-bundlecraft verify --target build/prod/internal --verify-all
+bundlecraft verify --target dist/prod/internal --verify-all
 ```
 
 ---

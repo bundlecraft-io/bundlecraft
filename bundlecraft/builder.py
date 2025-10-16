@@ -35,7 +35,7 @@ from verify_utils import verifier  # ← updated import name
 ROOT = CURRENT_DIR.parent
 CONFIG_DIR = ROOT / "config"
 SOURCES_DIR = ROOT / "sources"
-BUILD_DIR = ROOT / "build"
+BUILD_DIR = ROOT / "dist"
 
 # -------------------------------
 # Helper functions
@@ -126,7 +126,7 @@ def package_tar(build_path: Path) -> Path:
 @click.option("--bundle", required=True, help="Bundle name (e.g., internal, external)")
 @click.option("--package", is_flag=True, help="Also create a .tar.gz of the build folder")
 @click.option("--verify-only", is_flag=True, help="Only verify certificates; skip build")
-@click.option("--output-root", type=str, default="build", help="Root directory for build outputs (default: ./build)")
+@click.option("--output-root", type=str, default="dist", help="Root directory for build outputs (default: ./dist)")
 def main(env, bundle, package, verify_only, output_root):
     """Build or verify trust bundles based on configuration."""
     click.secho(f"\n🔐 BundleCraft CA Trust Store Builder\n--------------------------------------", fg="cyan")

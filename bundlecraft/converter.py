@@ -23,7 +23,7 @@ from convert_utils import convert_to_formats
 @click.option("--pem-file", required=True, type=click.Path(exists=True), help="Path to input PEM bundle.")
 @click.option("--output-dir", required=True, type=click.Path(), help="Directory for converted formats.")
 @click.option("--formats", multiple=True, default=["p7b", "jks", "p12"], help="Output formats to produce (default: p7b jks p12).")
-@click.option("--output-root", type=str, default="build", help="Root directory for build outputs (default: ./build)")
+@click.option("--output-root", type=str, default="dist", help="Root directory for build outputs (default: ./dist)")
 def main(pem_file, output_dir, formats, output_root):
     """Convert PEM certificate bundles into alternate formats."""
     click.secho(f"\n🔐 BundleCraft Converter\n---------------------------", fg="cyan")

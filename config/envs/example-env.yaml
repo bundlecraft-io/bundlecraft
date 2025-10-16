@@ -19,7 +19,7 @@ description: >
 # ---------------------------------------------------------------------
 # Output and directory behavior
 # ---------------------------------------------------------------------
-build_path: build/example/         # Override default output path (default: build/<env>/<bundle>/)
+build_path: dist/example/         # Override default output path (default: dist/<env>/<bundle>/)
 
 package: false                     # Whether to produce a .tar.gz package of the build output
                                    # Can be overridden per bundle or via CLI --package flag

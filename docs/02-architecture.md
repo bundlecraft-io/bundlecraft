@@ -42,7 +42,7 @@ The system follows a **three-layer model**, defining how trust stores are source
 * Merges certificates into canonical PEM form.
 * Converts to multiple formats (PEM, JKS, PKCS#7, DER, etc.).
 * Generates manifests, checksums, and optional tar packages.
-* Produces fully ready-to-consume artifacts in `/build/{env}/{bundle}/`.
+* Produces fully ready-to-consume artifacts in `/dist/{env}/{bundle}/`.
 
 ### Layer 3 — Trust Distribution
 
@@ -73,7 +73,7 @@ This modular approach ensures that configuration, build logic, and publication a
                 │
                 ▼
 ┌────────────────────────────────┐
-│     build/{env}/{bundle}/      │
+│     dist/{env}/{bundle}/      │
 │   ├── ca-trust.pem             │
 │   ├── ca-trust.jks             │
 │   ├── ca-trust.p7b             │

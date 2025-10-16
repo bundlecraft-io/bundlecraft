@@ -47,7 +47,7 @@ It automates the ingestion of versioned certificate sources (roots, intermediate
 │   ├── envs/
 │   └── bundles/
 ├── bundlecraft/            # Python scripts for build, verify, convert, helpers
-├── build/                  # Generated outputs (per environment/bundle)
+├── dist/                   # Generated outputs (per environment/bundle)
 ├── docs/                   # Project documentation
 ├── .github/
 │   └── workflows/
@@ -117,7 +117,7 @@ Defines **how** bundles are built in a specific context, including secrets, outp
 
 ```yaml
 name: Example Environment
-build_path: build/example/
+build_path: dist/example/
 package: false
 verify:
   fail_on_expired: true
@@ -175,7 +175,7 @@ python -m pip install -e .
 ```bash
 bundlecraft build --env prod --bundle internal
 ```
-- Produces artifacts in `build/prod/internal/`:
+- Produces artifacts in `dist/prod/internal/`:
   ```
   ca-trust.pem
   ca-trust.p7b
@@ -189,7 +189,7 @@ bundlecraft build --env prod --bundle internal
 ### 4. Verify Outputs
 
 ```bash
-bundlecraft verify --target build/prod/internal --verbose --verify-all
+bundlecraft verify --target dist/prod/internal --verbose --verify-all
 ```
 - Checks:
   - Expiry and soon-to-expire certificates
@@ -230,8 +230,8 @@ bundlecraft convert --pem-file sources/internal/rootCA.pem --output-dir ./ --for
 |Script|Purpose|Example Usage|
 |---|---|---|
 | `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --env prod --bundle internal` |
-| `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify build/prod/internal/` |
-| `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert canonical PEM to P7B/JKS/P12 (ad-hoc) | `bundlecraft convert build/prod/internal/ca-trust.pem build/prod/internal/ jks p12` |
+| `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify dist/prod/internal/` |
+| `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert canonical PEM to P7B/JKS/P12 (ad-hoc) | `bundlecraft convert dist/prod/internal/ca-trust.pem dist/prod/internal/ jks p12` |
 
 For more detailed usage and options, see [`scripts/README.md`](scripts/README.md).
 

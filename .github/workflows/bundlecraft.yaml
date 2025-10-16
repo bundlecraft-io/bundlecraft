@@ -76,15 +76,15 @@ jobs:
 
       - name: 🧱 Show directory structure
         run: |
-          echo "=== build directory structure ==="
-          tree build/ || find build/
+          echo "=== dist directory structure ==="
+          tree dist/ || find dist/
           echo "================================="
 
-      - name: 📦 Upload build artifact
+      - name: 📦 Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
           name: trust-store-${{ matrix.env }}-${{ matrix.bundle }}
-          path: build/${{ matrix.env }}/${{ matrix.bundle }}/
+          path: dist/${{ matrix.env }}/${{ matrix.bundle }}/
 
   # =========================================================
   #  STAGE 3: COLLECT - Merge all build outputs into one bundle
@@ -96,13 +96,13 @@ jobs:
       - name: 📥 Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: build/
+          path: dist/
 
       - name: 🗜️ Rehydrate to pki-ca-trust/<env>/<bundle> and package
         run: |
           set -euo pipefail
-          echo "=== Contents of build/ after artifact download ==="
-          find build -maxdepth 3 -type d || true
+          echo "=== Contents of dist/ after artifact download ==="
+          find dist -maxdepth 3 -type d || true
           echo "=================================================="
 
           # Rebuild canonical tree: pki-ca-trust/<env>/<bundle> from artifact names like trust-store-<env>-<bundle>
@@ -110,7 +110,7 @@ jobs:
           mkdir -p pki-ca-trust
 
           shopt -s nullglob dotglob
-          for artifact_dir in build/*; do
+          for artifact_dir in dist/*; do
             base="$(basename "$artifact_dir")"
             # Expect names like trust-store-prod-internal
             if [[ "$base" =~ ^trust-store-([^-/]+)-(.+)$ ]]; then
@@ -287,17 +287,17 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.name }}
           body: |
-            🔒 **PKI CA Trust Store Release**
+            🔒 **BundleCraft Trust Store Release**
             - **Build:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
             - **Branch:** `${{ github.ref_name }}`
             - **Commit:** `${{ github.sha }}`
-            - **Triggered by:** @${{ github.actor }}`
+            - **Triggered by:** @${{ github.actor }}
             - **Signing:** ${{ steps.gpg-check.outputs.available == 'true' && 'Enabled (signature attached)' || 'Disabled' }}
 
             ---
             ### 🧾 Verification Instructions
             ```bash
-            curl -O https://raw.githubusercontent.com/KunaiX/pki-ca-trust/main/docs/public-gpg-key.asc
+            curl -O https://raw.githubusercontent.com/KunaiX/bundlecraft/main/docs/public-gpg-key.asc
             gpg --import public-gpg-key.asc
             gpg --verify truststore_bundle.tar.gz.asc truststore_bundle.tar.gz
             ```
