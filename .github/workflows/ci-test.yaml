@@ -1,5 +1,6 @@
 ---
 name: 🧪 BundleCraft Test Suite
+run-name: BundleCraft Test Suite - ${{ github.sha }}
 on:
   push:
     branches: [main, develop]
@@ -7,7 +8,7 @@ on:
     branches: [main, develop]
 jobs:
   test:
-    name: 🧪 Test Suite
+    name: 🧪 PyTest Suite
     runs-on: ubuntu-latest
     # Only run on push if it's NOT a PR merge commit
     if: |
