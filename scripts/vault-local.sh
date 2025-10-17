@@ -213,7 +213,20 @@ PY
     # Store in KV secrets (enable KV v2 first)
     vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/dev/null 2>&1 || true
 
-  # JSON-escape and put the certificate in KV v2
+    # If PKI generation failed to yield a cert, generate a local test CA PEM
+    if [ -z "${ca_cert}" ]; then
+      warn "PKI engine did not return a certificate; generating a local test CA PEM instead."
+      tmp_dir=$(mktemp -d)
+      openssl req -x509 -newkey rsa:2048 -nodes \
+        -keyout "${tmp_dir}/root.key" -out "${tmp_dir}/root.crt" \
+        -days 1 -subj "/CN=local-root-ca" >/dev/null 2>&1 || true
+      if [ -f "${tmp_dir}/root.crt" ]; then
+        ca_cert=$(cat "${tmp_dir}/root.crt")
+      fi
+      rm -rf "${tmp_dir}" || true
+    fi
+
+    # JSON-escape and put the certificate in KV v2 (from PKI or OpenSSL fallback)
     if [ -n "${ca_cert}" ]; then
       local payload
       payload=$(python3 - <<'PY'
@@ -224,7 +237,7 @@ PY
       <<<"${ca_cert}")
       vault_api POST "secret/data/pki/trusted_roots" "${payload}" >/dev/null
     else
-      warn "Failed to parse certificate from generate/internal response."
+      warn "No certificate available to store in KV."
     fi
   fi
 
@@ -279,7 +292,13 @@ cmd_up() {
 
   if [ -n "${CI_CMD}" ]; then
     log "Running CI command: ${CI_CMD}"
-    bash -c "${CI_CMD}" || warn "CI command failed."
+    set +e
+    bash -c "${CI_CMD}"
+    ci_status=$?
+    set -e
+    if [ ${ci_status} -ne 0 ]; then
+      warn "CI command failed with status ${ci_status}."
+    fi
     # Preserve artifacts for CI before teardown
     ART_DIR="${VAULT_DATA_DIR}_artifacts"
     mkdir -p "${ART_DIR}" || true
@@ -287,7 +306,7 @@ cmd_up() {
       cp -a "${VAULT_DATA_DIR}/." "${ART_DIR}/" || true
     fi
     cmd_down
-    exit 0
+    exit ${ci_status}
   fi
 
   if [ "${AUTO_CLEANUP}" = true ]; then
