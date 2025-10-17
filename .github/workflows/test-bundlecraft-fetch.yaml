@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   vault-fetch:
-    name: 'Test: Vault fetcher'
+    name: 'Test: Vault Fetcher (K/V v2 or v1)'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -41,15 +41,25 @@ jobs:
           VAULT_ADDR: http://127.0.0.1:8200
           VAULT_TOKEN: root
         run: |
-          ./scripts/vault-local.sh up --verbose --runtime podman --ci-cmd "bundlecraft fetch --config-file ci-test-vault.yaml"
+          ./scripts/vault-local.sh up --verbose --runtime podman --ci-cmd "bundlecraft fetch --config-file ci-test-vault.yaml" || { echo "Vault CI command failed"; exit 1; }
       - name: Verify Vault fetch outputs
         run: |
           echo "Checking staged outputs:"
           test -f sources/fetched/ci/ci-vault-test/from_vault.pem || { echo "❌ Missing from_vault.pem"; exit 1; }
           test -f sources/fetched/ci/ci-vault-test/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
           echo "✅ Vault fetch successful"
+      - name: Upload Vault job artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vault-fetch-artifacts
+          path: |
+            sources/fetched/ci/ci-vault-test/**
+            local_vault/**
+            local_vault_artifacts/**
+            ci-test-vault.yaml
   http-fetch:
-    name: 'Test: HTTP fetcher (with pinning)'
+    name: 'Test: HTTP Fetcher (Nginx with pinning)'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -65,12 +75,39 @@ jobs:
       - name: Generate test certificate and content for HTTPS server
         run: |
           mkdir -p ci-http-test
-          # Self-signed cert for localhost
+          # Generate a local CA
           openssl req -x509 -newkey rsa:2048 -nodes \
-            -keyout ci-http-test/server.key \
-            -out ci-http-test/server.crt \
-            -days 1 -subj "/CN=localhost" \
-            -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+            -keyout ci-http-test/ca.key -out ci-http-test/ca.crt \
+            -days 2 -subj "/CN=BundleCraft Test CA" \
+            -addext "basicConstraints=critical,CA:TRUE"
+          # Generate server key and CSR with SAN for 127.0.0.1
+          openssl genrsa -out ci-http-test/server.key 2048
+          cat > ci-http-test/server.cnf <<'CNF'
+          [req]
+          prompt = no
+          distinguished_name = dn
+          req_extensions = v3_req
+          [dn]
+          CN = localhost
+          [v3_req]
+          subjectAltName = @alt_names
+          [alt_names]
+          DNS.1 = localhost
+          IP.1 = 127.0.0.1
+          CNF
+          openssl req -new -key ci-http-test/server.key -out ci-http-test/server.csr -config ci-http-test/server.cnf
+          # Sign server cert with local CA (includes SAN)
+          cat > ci-http-test/server.ext <<'EXT'
+          basicConstraints=CA:FALSE
+          keyUsage = digitalSignature, keyEncipherment
+          extendedKeyUsage = serverAuth
+          subjectAltName = @alt_names
+          [alt_names]
+          DNS.1 = localhost
+          IP.1 = 127.0.0.1
+          EXT
+          openssl x509 -req -in ci-http-test/server.csr -CA ci-http-test/ca.crt -CAkey ci-http-test/ca.key -CAcreateserial \
+            -out ci-http-test/server.crt -days 1 -extfile ci-http-test/server.ext
 
           # Create a test PEM to serve
           cat > ci-http-test/test-cert.pem <<'PEM'
@@ -115,12 +152,17 @@ jobs:
             -v "$(pwd)/ci-http-test/nginx.conf:/etc/nginx/nginx.conf:ro,Z" \
             docker.io/library/nginx:alpine
           sleep 2
+            # Wait for HTTPS to be ready
+            for i in {1..20}; do
+              if curl -sk --cacert ci-http-test/ca.crt https://127.0.0.1:8443/test-cert.pem >/dev/null; then
+                echo "HTTPS endpoint is ready"; break; fi; sleep 1; done
+            curl -sk --cacert ci-http-test/ca.crt https://127.0.0.1:8443/test-cert.pem >/dev/null || { echo "Server did not become ready"; exit 1; }
           echo "HTTPS server started on https://127.0.0.1:8443"
       - name: Generate HTTP fetch config (ci-test-http.yaml)
         run: |
           FINGERPRINT=$(cat ci-http-test/fingerprint.txt)
           # Use absolute path for ca_file
-          CA_FILE="$(pwd)/ci-http-test/server.crt"
+          CA_FILE="$(pwd)/ci-http-test/ca.crt"
           cat > ci-test-http.yaml <<YAML
           id: ci-http-test
           include: []
@@ -143,12 +185,26 @@ jobs:
           test -f sources/fetched/ci/ci-http-test/from_https.pem || { echo "❌ Missing from_https.pem"; exit 1; }
           test -f sources/fetched/ci/ci-http-test/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
           echo "✅ HTTP fetch with pinning successful"
+      - name: HTTP job summary
+        run: |
+          echo "## HTTP fetcher" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Endpoint: https://127.0.0.1:8443/test-cert.pem" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Used CA file: ci-http-test/ca.crt" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload HTTP job artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: http-fetch-artifacts
+          path: |
+            sources/fetched/ci/ci-http-test/**
+            ci-http-test/**
+            ci-test-http.yaml
       - name: Cleanup
         if: always()
         run: |
           podman rm -f bundlecraft-https-test || true
   api-fetch:
-    name: 'Test: API fetcher (Keyfactor mock)'
+    name: 'Test: API Fetcher (Keyfactor API Mock)'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -224,6 +280,11 @@ jobs:
             -p 8443:8443 \
             bundlecraft-api-mock
           sleep 3
+          # Wait for HTTPS to be ready
+          for i in {1..20}; do
+            if curl -sk --cacert ../ci-api-test/api.crt https://127.0.0.1:8443/KeyfactorAPI/CertificateAuthority/Download >/dev/null; then
+              echo "API endpoint is ready"; break; fi; sleep 1; done
+          curl -sk --cacert ../ci-api-test/api.crt https://127.0.0.1:8443/KeyfactorAPI/CertificateAuthority/Download >/dev/null || { echo "API did not become ready"; exit 1; }
           echo "Mock API started on https://127.0.0.1:8443"
           sleep 3
           echo "Mock API started on https://127.0.0.1:8443"
@@ -255,6 +316,20 @@ jobs:
           test -f sources/fetched/ci/ci-api-test/from_keyfactor_mock.pem || { echo "❌ Missing from_keyfactor_mock.pem"; exit 1; }
           test -f sources/fetched/ci/ci-api-test/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
           echo "✅ API fetch (Keyfactor mock) successful"
+      - name: API job summary
+        run: |
+          echo "## API fetcher" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Endpoint: https://127.0.0.1:8443/KeyfactorAPI/CertificateAuthority/Download" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Used CA file: ci-api-test/api.crt" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload API job artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-fetch-artifacts
+          path: |
+            sources/fetched/ci/ci-api-test/**
+            ci-api-test/**
+            ci-test-api.yaml
       - name: Cleanup
         if: always()
         run: |-

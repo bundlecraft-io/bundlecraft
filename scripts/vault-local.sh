@@ -199,6 +199,15 @@ setup_vault_env() {
       "{\"data\":{\"pem\":\"${ca_cert}\"}}" >/dev/null
   fi
 
+  # Write debug file with the stored secret to help CI diagnostics
+  mkdir -p "${VAULT_DATA_DIR}"
+  vault_api GET "secret/data/pki/trusted_roots" > "${VAULT_DATA_DIR}/kv_secret_pki_trusted_roots.json" || true
+
+  # Wait until the KV secret is readable (readiness gate)
+  for i in {1..20}; do
+    if vault_api GET "secret/data/pki/trusted_roots" | grep -q '"data"'; then
+      log "KV secret is readable."; break; fi; sleep 0.5; done
+
   log "Test root CA injected successfully."
 }
 
@@ -221,6 +230,12 @@ cmd_up() {
   if [ -n "${CI_CMD}" ]; then
     log "Running CI command: ${CI_CMD}"
     bash -c "${CI_CMD}" || warn "CI command failed."
+    # Preserve artifacts for CI before teardown
+    ART_DIR="${VAULT_DATA_DIR}_artifacts"
+    mkdir -p "${ART_DIR}" || true
+    if [ -d "${VAULT_DATA_DIR}" ]; then
+      cp -a "${VAULT_DATA_DIR}/." "${ART_DIR}/" || true
+    fi
     cmd_down
     exit 0
   fi

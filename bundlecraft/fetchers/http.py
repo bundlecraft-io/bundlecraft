@@ -27,8 +27,15 @@ def _safe_filename_from_url(url: str, name: str | None = None) -> str:
 
 
 def _tls_leaf_fingerprint_sha256(host: str, port: int) -> str:
-    """Retrieve the server leaf cert and return its SHA256 fingerprint (hex)."""
-    ctx = ssl.create_default_context()
+    """Retrieve the server leaf cert and return its SHA256 fingerprint (hex).
+
+    Note: Fingerprint computation should not depend on system trust to allow
+    pinning against self-signed endpoints. We therefore use an unverified
+    SSL context for the probe and still rely on normal verification (with
+    optional ca_file) during the actual fetch.
+    """
+    # Use an unverified context to allow self-signed endpoints for pinning only
+    ctx = ssl._create_unverified_context()
     with socket.create_connection((host, port), timeout=15) as sock:
         with ctx.wrap_socket(sock, server_hostname=host) as ssock:
             der = ssock.getpeercert(binary_form=True)
