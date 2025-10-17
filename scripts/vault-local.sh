@@ -199,7 +199,7 @@ setup_vault_env() {
 
   # Extract the certificate using Python from STDIN; tolerate empty/invalid JSON
   local ca_cert
-  ca_cert=$(printf '%s' "${root_response}" | python3 - <<'PY' || true
+  ca_cert=$(printf '%s' "${root_response}" | python3 - <<'PY'
 import json, sys
 try:
   data = json.load(sys.stdin)
@@ -240,7 +240,7 @@ PY
   # Quick smoke test: read PEM and show header in logs
   kv_json=$(vault_api GET "secret/data/pki/trusted_roots" || true)
   if [ -n "${kv_json}" ]; then
-    pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY' || true
+  pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY'
 import json,sys
 try:
     data=json.load(sys.stdin)
