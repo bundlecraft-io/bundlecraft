@@ -252,6 +252,12 @@ PY
       warn "Failed to parse certificate from generate/internal response."
       warn "No certificate available to store in KV."
     fi
+
+    # Log the full contents of both KV v1 and KV v2 for diagnostics
+    log "KV v2 (secret/data/pki/trusted_roots):"
+    vault_api GET "secret/data/pki/trusted_roots" | python3 -m json.tool || true
+    log "KV v1 (secret/pki/trusted_roots):"
+    vault_api GET "secret/pki/trusted_roots" | python3 -m json.tool || true
 fi
 
 # Write debug file with the stored secret to help CI diagnostics
