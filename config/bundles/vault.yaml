@@ -1,0 +1,25 @@
+---
+bundle_name: vault
+description: Trust bundle from a local HashiCorp Vault instance
+id: local-vault
+include: []
+fetch:
+  - name: from_vault
+    type: vault
+    mount_point: secret
+    path: pki/trusted_roots
+    pem_field: pem
+    addr: http://127.0.0.1:8200
+    token_ref: VAULT_TOKEN
+output_formats:
+  - pem
+  - jks
+  - p7b
+  - p12
+# --- New options ---
+pem:
+  include_subject_comments: true  # Adds "# Subject:" above each PEM block
+verify:
+  fail_on_expired: true  # Fail build if any cert is expired
+  warn_days_before_expiry: 30  # Warn if cert expires within 30 days
+package: true  # Produce package.tar.gz
