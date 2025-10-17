@@ -14,6 +14,8 @@ Each document describes a specific layer of the system — from goals and design
 4. [Directory Structure](03-directory-structure.md)
 5. [Configuration Design](04-config-design.md)
 6. [Scripts & Components](05-scripts-and-components.md)
+7. [ADR-0002: Fetch Layer](adr-0002-fetch.md)
+8. [Troubleshooting](troubleshooting.md)
 
 ---
 

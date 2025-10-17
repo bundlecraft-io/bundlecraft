@@ -20,6 +20,7 @@ from pathlib import Path
 
 import click
 
+from bundlecraft.fetch import run_fetch
 from bundlecraft.helpers.convert_utils import convert_to_formats
 from bundlecraft.helpers.utils import ensure_dir, list_files, load_yaml, sha256_file
 from bundlecraft.helpers.verify_utils import verifier
@@ -139,12 +140,23 @@ def package_tar(build_path: Path) -> Path:
 @click.option("--package", is_flag=True, help="Also create a .tar.gz of the build folder")
 @click.option("--verify-only", is_flag=True, help="Only verify certificates; skip build")
 @click.option(
+    "--prefetch/--no-prefetch",
+    default=False,
+    help="Run 'fetch' first to stage remote sources for this env/bundle (default: no-prefetch)",
+)
+@click.option(
+    "--offline",
+    is_flag=True,
+    default=False,
+    help="Offline mode: do not contact network; fail if fetch is required",
+)
+@click.option(
     "--output-root",
     type=str,
     default="dist",
     help="Root directory for build outputs (default: ./dist)",
 )
-def main(env, bundle, package, verify_only, output_root):
+def main(env, bundle, package, verify_only, prefetch, offline, output_root):
     """Build or verify trust bundles based on configuration."""
     click.secho(
         "\n🔐 BundleCraft CA Trust Store Builder\n--------------------------------------",
@@ -155,6 +167,22 @@ def main(env, bundle, package, verify_only, output_root):
     # defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False) or {}
     env_cfg = load_yaml(CONFIG_DIR / "envs" / f"{env}.yaml", required=True)
     bundle_cfg = load_yaml(CONFIG_DIR / "bundles" / f"{bundle}.yaml", required=True)
+
+    # Optional prefetch step (no persistent cache; stages into sources/fetched/<env>/<bundle>)
+    if offline and prefetch:
+        click.secho("[ERROR] --offline and --prefetch cannot be used together.", fg="red")
+        sys.exit(2)
+
+    if prefetch:
+        try:
+            staged = run_fetch(env, bundle, ROOT, no_clean=False)
+            if staged:
+                click.secho(f"[INFO] Prefetch staged {len(staged)} file(s).", fg="blue")
+            else:
+                click.secho("[INFO] No fetch entries; skipping prefetch.", fg="blue")
+        except Exception as e:
+            click.secho(f"[ERROR] Prefetch failed: {e}", fg="red")
+            sys.exit(2)
 
     verify_cfg = bundle_cfg.get("verify", True)
     fail_on_expired = (
@@ -175,6 +203,11 @@ def main(env, bundle, package, verify_only, output_root):
     ensure_dir(build_root)
 
     include_items = bundle_cfg.get("include", [])
+    # Add staged fetched sources for this env/bundle if present
+    staged_dir = SOURCES_DIR / "fetched" / env / bundle
+    if staged_dir.exists():
+        # Prepend so explicit excludes can still apply by path
+        include_items = [str(staged_dir.relative_to(ROOT)).replace("\\", "/")] + include_items
     exclude_items = set(bundle_cfg.get("exclude", []))
     include_paths = []
     for item in include_items:
@@ -307,6 +340,15 @@ def main(env, bundle, package, verify_only, output_root):
     # Build manifest["files"] entries (manifest.json excluded)
     file_entries = [{"path": n, "sha256": sha256_file(build_root / n)} for n in files_for_manifest]
 
+    # Load fetch provenance if present
+    fetch_provenance = None
+    prov_path = staged_dir / "provenance.fetch.json"
+    if prov_path.exists():
+        try:
+            fetch_provenance = json.loads(prov_path.read_text(encoding="utf-8"))
+        except Exception:
+            fetch_provenance = {"error": "unreadable"}
+
     manifest_obj = {
         "bundle": bundle,
         "environment": env,
@@ -315,6 +357,7 @@ def main(env, bundle, package, verify_only, output_root):
         "outputs": files_for_manifest,  # includes package.tar.gz if present
         "verify": {"fail_on_expired": fail_on_expired},
         "expiry_summary": expiry_summary,
+        "fetched": fetch_provenance,
         "files": file_entries,
     }
 

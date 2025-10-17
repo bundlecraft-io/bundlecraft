@@ -1,6 +1,6 @@
 # ADR-0002: Introduce a “Fetch/Sourcing” Layer as the First Stage of the BundleCraft Pipeline
 
-**Status:** Draft / Under Review
+**Status:** Accepted (implemented)
 **Date:** October 16 2025
 **Owner:** BundleCraft maintainers
 **Related:** ADR-000X (Containerized Distribution), SECURITY.md, CONFIG-SPEC.md
@@ -48,9 +48,9 @@ fetch  →  build  →  verify  →  convert
 | ----------------------------- | --------------------------------------------------------------------------------------------- |
 | **Declarative configuration** | Define remote sources (URL, API, Vault path, collection ID) within bundle or env YAML.        |
 | **Trusted origins only**      | Each source must specify an approved scheme, expected fingerprint/CA pin, or checksum policy. |
-| **Caching & provenance**      | Downloaded certs are cached locally (`cache/`) with metadata (source URL, SHA256, timestamp). |
+| **Staging & provenance**      | Downloaded certs are staged under `sources/fetched/<env>/<bundle>/` with metadata (origin URL, SHA256, timestamp). No persistent cache; directory cleaned each run. |
 | **Reproducibility**           | Build logs include exact hashes and timestamps so the same inputs can be re-fetched later.    |
-| **Offline/air-gapped**        | Optional “offline mirror” mode uses previously cached artifacts.                              |
+| **Offline/air-gapped**        | `--offline` mode disallows network access; builds proceed only with committed or pre-staged artifacts. |
 
 ### Example bundle config excerpt
 
@@ -70,6 +70,8 @@ fetch:
     type: vault
     path: secret/pki/trusted_roots
     verify_tls: true
+      verify:
+         ca_file: config/certs/vault-ca.pem
 ```
 
 ---
@@ -77,14 +79,14 @@ fetch:
 ## 4️⃣ Expected Behavior
 
 1. **Pre-build phase:**
-   The `fetch` module runs automatically (or via `--fetch` flag).
-   It downloads, validates, and stores certs under `sources/fetched/` (or `.cache/fetch/<hash>/…`).
+   The `fetch` module runs explicitly (via `bundlecraft fetch`) or with `--prefetch` on `bundlecraft build`.
+   It downloads, validates, and stores certs under `sources/fetched/<env>/<bundle>/`. The staging directory is cleaned each run; there is no persistent cache.
 
 2. **Build phase:**
    The `build` module treats fetched files as normal inputs alongside any repository-resident certs.
 
 3. **Verification phase:**
-   Adds origin metadata to the manifest (URL, checksum, verified = true/false).
+   Adds origin metadata to the manifest via embedded `fetched` provenance when available (URL, checksum, verified = true/false).
 
 4. **Convert phase:**
    Unchanged.
@@ -107,9 +109,9 @@ fetch:
 
 | Risk                              | Impact               | Mitigation                                                              |
 | --------------------------------- | -------------------- | ----------------------------------------------------------------------- |
-| Remote source unavailable         | Build failure        | Cache fallback, retry with back-off                                     |
-| Man-in-the-middle or tampering    | Compromised trust    | TLS + CA pinning + expected hash verification                           |
-| Drift / non-determinism           | Reproducibility loss | Record exact source URL + SHA256 + timestamp                            |
+| Remote source unavailable         | Build failure        | Prefer `verify.sha256` pin for static sources; retry with back-off; pre-stage in CI |
+| Man-in-the-middle or tampering    | Compromised trust    | TLS + CA pinning + optional TLS leaf fingerprint + optional content `sha256` pin |
+| Drift / non-determinism           | Reproducibility loss | Record exact source URL + SHA256 + timestamp (provenance file and manifest embedding) |
 | Overreach (fetching too much)     | Performance / size   | Allow per-bundle limits and filters                                     |
 | Secret leakage (Vault/API tokens) | Credential exposure  | Support secret references only (env vars or CI secrets), never hardcode |
 
@@ -138,7 +140,7 @@ fetch:
 
 ### b. Implementation Sketch
 
-* `bundlecraft/fetchers/` module with subclasses: `HttpFetcher`, `VaultFetcher`, `KeyfactorFetcher`, `FileFetcher`.
+* `bundlecraft/fetchers/` module with fetchers: `http` (HTTPS/file), `api` (generic Bearer endpoints), `vault` (HVAC-based KV v2/v1).
 * Unified interface:
 
   ```python
@@ -149,7 +151,7 @@ fetch:
 
 ### c. Security Hooks
 
-* Optional **GPG-signed manifest** of fetched sources.
+* Optional **GPG-signed manifest** of fetched sources (via release pipeline).
 * Optional **sigstore/cosign** attestation of fetch phase.
 
 ---
@@ -174,7 +176,7 @@ fetch:
 
 ## 🔟 Decision
 
-**Decision:** Proceed with designing and implementing the `fetch` layer as an *optional but officially supported* first stage in the BundleCraft pipeline.
+**Decision:** Implement the `fetch` layer as an officially supported first stage in the BundleCraft pipeline.
 
 **Rationale:**
 
@@ -187,17 +189,16 @@ fetch:
 
 ## 11️⃣ Next Steps
 
-1. **Prototype** `bundlecraft/fetch.py` with a generic `url` fetcher (TLS verify + hash pinning).
-2. Extend to `vault` and `keyfactor` fetchers using plugin architecture.
-3. Define `fetch:` schema additions in `config/bundles/*.yaml`.
-4. Update manifest spec to include:
+1. Implement `bundlecraft/fetch.py` with URL/API/Vault fetchers, TLS options, and SHA pinning.
+2. Define `fetch:` schema additions in `config/bundles/*.yaml`.
+3. Update manifest spec to include:
 
    ```json
    "sources": [{"path": "...", "origin": "...", "sha256": "..."}]
    ```
-5. Add CLI flag `--fetch` and automatic pre-build hook.
-6. Extend verification tests to validate provenance metadata.
-7. Update documentation and diagrams (README, CONFIG-SPEC.md, pipeline overview).
+4. Add builder `--prefetch` and `--offline` modes.
+5. Extend tests to validate fetch behavior and provenance embedding.
+6. Update documentation and diagrams (README, CLI reference, pipeline overview).
 
 ---
 

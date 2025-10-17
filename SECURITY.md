@@ -2,11 +2,11 @@
 
 ## Overview
 
-**BundleCraft** is a framework and build automation toolkit for producing and verifying PKI trust bundles.
-It provides deterministic, auditable mechanisms to generate trust artifacts (PEM, P7B, JKS, P12, etc.) from user-supplied certificate sources and configurations.
+**BundleCraft** is a framework and build automation toolkit for securely fetching, producing, and verifying PKI trust bundles.
+It provides deterministic, auditable mechanisms to stage certificate inputs from trusted remote origins (or local files) and generate trust artifacts (PEM, P7B, JKS, P12, etc.).
 
 BundleCraft **does not** distribute, embed, or endorse any certificate authority (CA) certificates.
-All trust inputs are user-provided, locally sourced, and version-controlled by the operator.
+All trust inputs are user-configured and staged via the Fetch layer or provided locally, with trust controls (CA pinning, TLS fingerprint pinning, optional `sha256` content pins) fully under operator control.
 
 The security model of BundleCraft focuses on the *integrity, reproducibility, and transparency* of trust store builds — not the issuance, endorsement, or global distribution of CA material.
 
@@ -16,7 +16,7 @@ The security model of BundleCraft focuses on the *integrity, reproducibility, an
 
 1. **Code, not trust** — BundleCraft builds trust stores but never defines what is trusted.
 2. **Local authority** — Users retain full control and accountability for certificate sources.
-3. **Reproducibility** — Builds are deterministic and traceable to their input files and configurations.
+3. **Reproducibility** — Builds are deterministic and traceable to their input files and configurations, including fetch provenance (`provenance.fetch.json`).
 4. **Separation of concerns** — Trust material and application code are isolated to prevent unintended trust propagation.
 5. **Transparency** — All generated artifacts include manifests, checksums, and optional signatures for verification.
 
@@ -42,15 +42,17 @@ The security model of BundleCraft focuses on the *integrity, reproducibility, an
 ### 3. Input Tampering
 **Risk:** A compromised or unverified certificate source.
 **Controls:**
-- Explicit configuration of input paths (no remote downloads).
+- Declarative Fetch configuration for secure HTTPS/API/Vault sourcing (no implicit downloads).
+- TLS CA verification, optional TLS leaf fingerprint pinning, and optional `sha256` content pinning.
 - SHA256-based deduplication and canonicalization of all input PEMs.
 - Build fails or warns on expired or malformed certificates.
 - Manifest (`manifest.json`) includes full source list and hashes.
+ - Staging-only model: fetched artifacts are ephemeral and cleaned per run; no persistent cache.
 
 ### 4. Build Environment Compromise
 **Risk:** Build runs in an untrusted environment or manipulated workspace.
 **Controls:**
-- Supports fully offline build mode (no network calls).
+- Supports fully offline build mode (no network calls) and explicit fetch step with provenance recording.
 - Environment paths and temp directories explicitly defined.
 - All writes are scoped under the build root (`dist/`).
 

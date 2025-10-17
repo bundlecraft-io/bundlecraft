@@ -1,19 +1,20 @@
 # 🔐 BundleCraft CLI Reference
 
-BundleCraft is a unified command-line toolkit for building, verifying, and converting CA trust bundles. It provides a single, consistent interface for PKI engineers and CI/CD systems to manage certificate trust stores across environments.
+BundleCraft is a unified command-line toolkit for fetching, building, verifying, and converting CA trust bundles. It provides a single, consistent interface for PKI engineers and CI/CD systems to manage certificate trust stores across environments.
 
 ---
 
 ## 📦 Overview
 
-The BundleCraft framework consists of four primary components:
+The BundleCraft framework consists of four primary components (Fetch → Build → Verify → Convert):
 
 | Component                      | Description                                                                 | Invocation            |
 | ------------------------------ | --------------------------------------------------------------------------- | --------------------- |
+| **Fetcher** (`fetch.py`)       | Securely fetches remote certificate sources and stages them for build.      | `bundlecraft fetch`   |
 | **Builder** (`builder.py`)     | Builds trust bundles from configured certificate sources.                   | `bundlecraft build`   |
 | **Verifier** (`verifier.py`)   | Verifies integrity, consistency, and certificate validity of built bundles. | `bundlecraft verify`  |
 | **Converter** (`converter.py`) | Converts certificate bundles between any supported formats (PEM, P7B, JKS, P12, ZIP). Accepts DER as input. | `bundlecraft convert` |
-| **CLI Wrapper** (`cli.py`)     | Aggregates the three tools into a single cohesive interface.                | `bundlecraft`         |
+| **CLI Wrapper** (`cli.py`)     | Aggregates tools into a single cohesive interface.                          | `bundlecraft`         |
 
 Once installed via `pip install -e .`, the command `bundlecraft` becomes available system-wide.
 
@@ -51,10 +52,117 @@ You’ll see:
 Usage: bundlecraft [OPTIONS] COMMAND [ARGS]...
 
 Commands:
+  fetch    Securely fetch and stage certificates from declared sources.
   build     Build CA trust bundles from configured sources.
   verify    Verify integrity and consistency of built bundles.
   convert   Convert PEM bundles into alternate trust store formats.
 ```
+
+### 🌐 `bundlecraft fetch`
+
+Purpose: Reach out to preconfigured and trusted certificate sources at build-time, verify content, and stage PEMs for the builder. No persistent caching; artifacts are written to `sources/fetched/<env>/<bundle>/` and cleaned on each run by default.
+
+Usage:
+
+```bash
+bundlecraft fetch --env <environment> --bundle <bundle_name> [--workspace-root <dir>] [--no-clean] [--offline]
+```
+
+Config excerpts (in `config/bundles/<bundle>.yaml`):
+
+```yaml
+fetch:
+  - name: mozilla
+    type: url
+    url: https://curl.se/ca/cacert.pem
+    verify:
+      sha256: <expected_sha256>  # optional but recommended
+      # Optional TLS enhancements:
+      ca_file: config/certs/public-ca.pem            # custom CA bundle for TLS verification
+      tls_fingerprint_sha256: <leaf_cert_fp_hex>     # pin to server leaf cert
+
+# API example with bearer token from env var
+fetch:
+  - name: keyfactor_trusted
+    type: api
+    provider: keyfactor
+    endpoint: https://pki.example.com/api/v1/collections/trusted
+    token_ref: KEYFACTOR_TOKEN   # reads token from environment
+```
+
+Notes:
+- Only HTTPS and file URLs are supported for URL fetchers; generic API fetcher supports bearer auth.
+- Optional SHA256 pinning defends against tampering; mismatches abort the fetch.
+- Optional TLS security: custom CA bundle and leaf certificate fingerprint pinning.
+- Staging only: no persistent cache. Staging dir is cleaned per run unless `--no-clean`.
+- Offline mode: `--offline` fails if a fetch section exists (no network access allowed).
+
+Philosophy & best practices:
+- You configure trust; BundleCraft enforces it and records provenance.
+- Prefer HTTPS + CA pinning for APIs; add TLS leaf fingerprint pinning during rotations.
+- Pin content hashes for static bundles (e.g., Mozilla public roots) when feasible.
+- Keep secrets in env vars, not YAML; use CI secret stores.
+- Treat `sources/fetched/` as ephemeral staging, not a cache.
+
+### 🔐 Vault fetcher
+
+Install optional dependency for Vault:
+
+```bash
+pip install -e .[fetchers]
+```
+
+Config example:
+
+```yaml
+fetch:
+  - name: internal_roots
+    type: vault
+    mount_point: secret           # KV engine mount
+    path: pki/trusted_roots      # secret path under mount
+    pem_field: pem               # field containing PEM text
+    addr: https://vault.example.com:8200  # or set VAULT_ADDR
+    token_ref: VAULT_TOKEN       # env var name containing token
+    namespace: my/team           # optional
+    verify:
+      ca_file: config/certs/vault-ca.pem  # custom TLS CA if needed
+```
+
+Environment variables supported:
+- `VAULT_ADDR` and `VAULT_TOKEN` are used if `addr` or `token_ref` are not set.
+
+### 🧩 Keyfactor fetcher (generic API)
+
+The `type: api` fetcher can call Keyfactor endpoints with a Bearer token:
+
+```yaml
+fetch:
+  - name: keyfactor_trusted
+    type: api
+    provider: keyfactor
+    endpoint: https://pki.example.com/api/v1/collections/trusted
+    token_ref: KEYFACTOR_TOKEN
+    verify:
+      ca_file: config/certs/pki-ca.pem
+      tls_fingerprint_sha256: <leaf_cert_fp_hex>
+```
+
+Set the token in the environment (e.g., CI secret):
+
+```bash
+export KEYFACTOR_TOKEN=...
+```
+
+Testing without live Vault/Keyfactor:
+- Use `file://` and `https://` against known public resources to validate fetch.
+- For provider flows, mock the endpoints locally (e.g., with `pytest` monkeypatch or a tiny HTTP server) and point `endpoint:` to `http://127.0.0.1:NNNN` (note: the fetcher rejects insecure HTTP by default; for tests use HTTPS with self-signed + `verify.ca_file`, or patch the URL opener in tests).
+- Unit tests in this repo exercise the fetch module via file URLs and hash pinning; provider-specific tests can stub network calls.
+
+Troubleshooting highlights:
+- Insecure HTTP rejected → use HTTPS or file URLs.
+- SHA256/TLS fingerprint mismatch → update pins after validating legitimate changes.
+- `hvac` missing → install extras `.[fetchers]`.
+- `--offline` with `fetch:` present → pre-stage in connected environments.
 
 ---
 
@@ -78,7 +186,9 @@ bundlecraft build --env <environment> --bundle <bundle_name> [OPTIONS]
 | `--bundle`      | Bundle name (e.g., `internal`, `external`). Required.    |
 | `--package`     | Also create a `.tar.gz` archive of the build folder.     |
 | `--verify-only` | Skip build; verify certificates only.                    |
-| `--output-root` | Root directory for build outputs (default: `./dist`).   |
+| `--prefetch`    | Run `fetch` first to stage remote sources (staging only, no cache). |
+| `--offline`     | Do not contact the network; fail if `fetch` is required. |
+| `--output-root` | Root directory for build outputs (default: `./dist`).    |
 
 **Outputs:**
 
@@ -93,10 +203,16 @@ bundlecraft build --env <environment> --bundle <bundle_name> [OPTIONS]
 
 ```bash
 # Build internal trust bundle for production
-tbundlecraft build --env prod --bundle internal
+bundlecraft build --env prod --bundle internal
 
 # Verify only (no rebuild)
 bundlecraft build --env dev --bundle internal --verify-only
+
+# Fetch+Build: prefetch remote sources into staging then build
+bundlecraft build --env prod --bundle internal --prefetch
+
+# Offline build: will fail if bundle config contains 'fetch:' entries
+bundlecraft build --env prod --bundle internal --offline
 ```
 
 ---
@@ -234,9 +350,13 @@ bundlecraft verify --help
 bundlecraft/
 ├── __init__.py
 ├── cli.py          # Unified CLI entrypoint
+├── fetch.py        # Fetch and stage remote sources
 ├── builder.py      # Build trust bundles
 ├── verifier.py     # Verify built bundles
 ├── converter.py    # Convert PEM to other formats
+├── fetchers/
+│   ├── __init__.py
+│   └── http.py     # HTTPS and file URL fetcher
 └── helpers/
     ├── __init__.py
     ├── utils.py

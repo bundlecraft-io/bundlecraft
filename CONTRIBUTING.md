@@ -79,6 +79,19 @@ Each subcommand supports `--help` for detailed options.
 
 ---
 
+## 🌐 Notes on the Fetch Layer
+
+- Fetch is staging-only: do not introduce persistent caches; use `sources/fetched/<env>/<bundle>/` which is cleaned per run.
+- Security controls to uphold:
+	- HTTPS only for remote endpoints (URLs/APIs)
+	- Optional custom CA (`verify.ca_file`), optional TLS leaf fingerprint pin (`verify.tls_fingerprint_sha256`)
+	- Optional content hash pinning (`verify.sha256`) for static/public sources
+- Secrets should be referenced via environment variables (e.g., `KEYFACTOR_TOKEN`, `VAULT_TOKEN`), never committed.
+- Provider integrations should live under `bundlecraft/fetchers/` and optional dependencies declared in `pyproject.toml` extras.
+- Update `docs/adr-0002-fetch.md` and `docs/troubleshooting.md` when behavior changes.
+
+---
+
 ## 🚀 GitHub Workflow Integration
 
 This repository includes a **sample, fully functional GitHub Actions workflow** located under `.github/workflows/`.

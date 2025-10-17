@@ -10,8 +10,8 @@
 
 ## Overview
 
-**BundleCraft** is a modern, configuration-as-code system for **building, verifying, and distributing multi-format certificate trust bundles** across environments.
-It automates the ingestion of versioned certificate sources (roots, intermediates, vendor bundles) and produces reproducible, auditable outputs for OS, Java, and application platforms.
+**BundleCraft** is a modern, configuration-as-code system for **fetching, building, verifying, and distributing multi-format certificate trust bundles** across environments.
+It securely sources certificate material from trusted remote origins or local files, then produces reproducible, auditable outputs for OS, Java, and application platforms.
 
 > **In short:** BundleCraft lets you define *how trust is built* — not just *what to trust*.
 
@@ -57,6 +57,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 ## ✨ Features
 
+- **Trusted Fetch layer**: Securely fetch certificates from HTTPS, APIs, and Vault with CA/fingerprint/sha256 pinning; staging-only (no cache) and full provenance.
 - **Reproducible builds** using layered YAML configs
 - **Multi-format export:** PEM, P7B, JKS, P12, ZIP
 - **Cross-format verification:** expiry, empties, count consistency
@@ -90,9 +91,11 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 ---
 
-## 🏗️ How It Works — Build Pipeline
+## 🏗️ How It Works — Pipeline
 
-BundleCraft uses a **layered configuration model**:
+BundleCraft uses a **layered configuration model** and a four-stage pipeline:
+
+fetch → build → verify → convert
 
 1. **Defaults** (`config/defaults.yaml`):
    Global settings (verification, filters, formats)
@@ -103,9 +106,13 @@ BundleCraft uses a **layered configuration model**:
 3. **Bundle** (`config/bundles/<bundle>.yaml`):
    Content definition (certificate sources to include/exclude)
 
-**Build Flow:**
+4. **Fetch (optional but recommended)** (`fetch:` in bundle):
+  Securely fetch and stage certificates from trusted remote origins into `sources/fetched/<env>/<bundle>/`. Staging is cleaned each run; no persistent cache.
+
+**Flow:**
 
 - Merge config layers: defaults ← env ← bundle
+- If `fetch:` is present, securely stage remote sources under `sources/fetched/<env>/<bundle>/` with provenance
 - Deduplicate, verify, and annotate certs
 - Generate canonical PEM bundle
 - Convert to JKS, P7B, P12
@@ -180,7 +187,7 @@ These can be overridden by environment or bundle configs.
 
 ---
 
-## 🚀 Quickstart — Building and Verifying Trust Bundles
+## 🚀 Quickstart — Fetching, Building, and Verifying Trust Bundles
 
 ### 1. Install Prerequisites
 
@@ -212,10 +219,15 @@ eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 
 - Place PEM files in appropriate folders under `sources/`
 - Update `config/bundles/` YAMLs to specify which sources to include/exclude
+ - Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault)
 
-### 3. Build a Bundle
+### 3. Fetch and Build a Bundle
 
 ```bash
+# Stage remote sources (optional but recommended)
+bundlecraft fetch --env prod --bundle internal
+
+# Build using local + staged sources
 bundlecraft build --env prod --bundle internal
 ```
 - Produces artifacts in `dist/prod/internal/`:
@@ -284,6 +296,8 @@ BundleCraft supports the following environment variables for configuration:
 - **Subject Annotation:** PEM includes `# Subject:` comments for traceability
 - **Manifest & Checksums:** Every build records outputs with SHA256 in both JSON and text formats
 - **Cross-format Verification:** Cert counts and file integrity checked for PEM, P7B, JKS, P12
+- **Fetch provenance:** `provenance.fetch.json` recorded in staging and embedded into `manifest.json` under `fetched`
+- **Network trust controls:** HTTPS only (for APIs and URLs), optional custom CA, optional TLS leaf fingerprint pinning, and optional content `sha256` pinning
 - **Optional GPG signing:** secure release integrity for distributed bundles in GitHub workflow
 
 ---
@@ -292,6 +306,7 @@ BundleCraft supports the following environment variables for configuration:
 
 |Script|Purpose|Example Usage|
 |---|---|---|
+| `bundlecraft.fetch` (CLI: `bundlecraft fetch`) | Securely fetch remote sources and stage them (no persistent cache) | `bundlecraft fetch --env prod --bundle internal` |
 | `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --env prod --bundle internal` |
 | `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify dist/prod/internal/` |
 | `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert any supported input to any supported output (PEM, P7B, JKS, P12, ZIP) | `bundlecraft convert --input dist/prod/internal/ca-trust.pem --output-dir dist/prod/internal/ --output-format jks` |
@@ -362,9 +377,84 @@ You can dispatch builds from the Actions tab for custom scenarios.
 - **Password issues?**
   Default passwords are `"changeit"` for both JKS and P12. Set env vars for production.
 
+- **Fetch: Insecure HTTP rejected**
+  Use only `https://` (or `file://` for local). For APIs, configure `verify.ca_file` and optionally `verify.tls_fingerprint_sha256`.
+
+- **Fetch: SHA256 mismatch**
+  Update the expected `verify.sha256` to the authoritative value, or investigate source changes before proceeding.
+
+- **Fetch: TLS fingerprint mismatch**
+  Re-check the server certificate fingerprint (leaf). If it rotated legitimately, update `verify.tls_fingerprint_sha256`.
+
+- **Vault: hvac not installed**
+  Install optional extras: `pip install -e .[fetchers]`.
+
+- **Offline builds**
+  `bundlecraft build --offline` fails if `fetch:` is present (by design). Pre-stage with `bundlecraft fetch` in connected environments, then commit or package the staged inputs.
+
+See also: [Troubleshooting Guide](docs/troubleshooting.md)
+
 ---
 
-## 🔮 Roadmap & Future Enhancements
+## 🔮 Philosophy, Best Practices, and Roadmap
+
+### Philosophy: BundleCraft as a trusted middleman
+
+BundleCraft’s Fetch layer treats remote origins as configurable, auditable trust sources. You decide what to fetch, from where, and under which verification policies. BundleCraft enforces those policies and records provenance so downstream systems can trust the process as much as the result.
+
+Core principles:
+- Opt-in remote trust: nothing is fetched unless declared in `fetch:`
+- Defense in depth: HTTPS + CA pin + TLS fingerprint pin + optional `sha256` content pin
+- No persistence: staging-only, cleaned per run; no hidden caches
+- Offline-friendly: builds can run offline if inputs are pre-staged or committed
+- Full provenance: every staged artifact is recorded and embedded in build manifests
+
+### Common usage patterns
+
+- Mozilla CA bundle (public roots):
+  ```yaml
+  fetch:
+    - name: mozilla_roots
+      type: url
+      url: https://curl.se/ca/cacert.pem
+      verify:
+        sha256: <expected_sha256>
+  ```
+
+- Keyfactor collection (generic API):
+  ```yaml
+  fetch:
+    - name: keyfactor_trusted
+      type: api
+      provider: keyfactor
+      endpoint: https://pki.example.com/api/v1/collections/trusted
+      token_ref: KEYFACTOR_TOKEN
+      verify:
+        ca_file: config/certs/pki-ca.pem
+        tls_fingerprint_sha256: <leaf_fp>
+  ```
+
+- Vault KV (internal roots):
+  ```yaml
+  fetch:
+    - name: internal_roots
+      type: vault
+      mount_point: secret
+      path: pki/trusted_roots
+      pem_field: pem
+      addr: https://vault.example.com:8200
+      token_ref: VAULT_TOKEN
+      verify:
+        ca_file: config/certs/vault-ca.pem
+  ```
+
+Best config practices:
+- Always use HTTPS; never `http://`
+- Pin content (`verify.sha256`) for static/public bundles when possible (e.g., Mozilla)
+- For APIs/services, prefer TLS CA pinning and optionally leaf fingerprint pinning during rollout windows
+- Keep tokens in env vars (`*_TOKEN`) and never in YAML
+- Commit sample configs but not secrets; use CI secret stores for tokens
+- Treat `sources/fetched/` as ephemeral; do not rely on it as a cache
 
 - Chain validation (issuer/subject path building)
 - Test suite + CI templates

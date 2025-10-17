@@ -4,6 +4,7 @@ Common test fixtures and configuration for BundleCraft tests.
 
 import os
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -14,6 +15,12 @@ import pytest
 def test_data_dir() -> Path:
     """Return path to test data directory containing sample certificates and configs."""
     return Path(__file__).parent / "data"
+
+
+# Ensure the repository root is importable for 'bundlecraft' without requiring installation
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 @pytest.fixture(scope="function")

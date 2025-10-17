@@ -1,0 +1,20 @@
+---
+bundle_name: mozilla
+description: Trust bundle Mozilla containing publicly trusted CA certificates
+fetch:
+  - name: mozilla_roots
+    type: url
+    url: https://curl.se/ca/cacert.pem
+exclude: []
+output_formats:
+  - pem
+  - jks
+  - p7b
+  - p12
+# --- New options ---
+pem:
+  include_subject_comments: true  # Adds "# Subject:" above each PEM block
+verify:
+  fail_on_expired: true  # Fail build if any cert is expired
+  warn_days_before_expiry: 30  # Warn if cert expires within 30 days
+package: true  # Produce package.tar.gz

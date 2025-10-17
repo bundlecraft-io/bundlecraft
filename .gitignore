@@ -3,7 +3,11 @@ __pycache__/
 venv/
 build/
 dist/
-testing/
+personal*/
+*_cache
+
+# Fetch directory should not be committed
+sources/fetched/
 
 # Dist
 *.egg-info/
