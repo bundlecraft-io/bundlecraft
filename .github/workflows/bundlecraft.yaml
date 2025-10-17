@@ -255,7 +255,7 @@ jobs:
             ---
             ### 🧾 Verification Instructions
             ```bash
-            curl -O https://raw.githubusercontent.com/KunaiX/bundlecraft/main/docs/public-gpg-key.asc
+            curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
             gpg --import public-gpg-key.asc
             gpg --verify truststore_bundle.tar.gz.asc truststore_bundle.tar.gz
             ```

@@ -2,9 +2,9 @@
 
 ## Overview
 
-![GitHub license](https://img.shields.io/github/license/KunaiX/bundlecraft)
-![GitHub release](https://img.shields.io/github/v/release/KunaiX/bundlecraft)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/KunaiX/bundlecraft/bundlecraft.yml)
+![GitHub license](https://img.shields.io/github/license/chrisjpich/bundlecraft)
+![GitHub release](https://img.shields.io/github/v/release/chrisjpich/bundlecraft)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/chrisjpich/bundlecraft/bundlecraft.yml)
 
 ---
 
@@ -378,7 +378,7 @@ You can dispatch builds from the Actions tab for custom scenarios.
 - **GPG signing** is supported if a key is provided via GitHub Secrets.
 - **Verification instructions** are included in release notes:
   ```bash
-  curl -O https://raw.githubusercontent.com/KunaiX/bundlecraft/main/docs/public-gpg-key.asc
+  curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
   gpg --import public-gpg-key.asc
   gpg --verify truststore_bundle.tar.gz.asc truststore_bundle.tar.gz
   ```
@@ -436,7 +436,7 @@ Every build produces:
 
 ## �📄 License
 
-MIT © 2025 - [KunaiX](https://github.com/KunaiX)
+MIT © 2025 - [chrisjpich](https://github.com/chrisjpich)
 
 ---
 
@@ -472,5 +472,5 @@ Special thanks to all the security and infrastructure teams out there, whose col
 
 ## 📣 Questions?
 
-Open an [issue](https://github.com/KunaiX/bundlecraft/issues)
-or reach out via [GitHub Discussions](https://github.com/KunaiX/bundlecraft/discussions)
+Open an [issue](https://github.com/chrisjpich/bundlecraft/issues)
+or reach out via [GitHub Discussions](https://github.com/chrisjpich/bundlecraft/discussions)
