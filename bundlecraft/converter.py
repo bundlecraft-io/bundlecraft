@@ -186,6 +186,10 @@ def convert_bundle(pem_path: Path, output_dir: Path, formats: list[str]):
 
         return Result()
     except Exception:
+        import traceback
+
+        traceback.print_exc()  # Print the error for debugging
+        raise  # Re-raise for proper test failure
 
         class Result:
             success = False

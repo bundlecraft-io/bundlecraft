@@ -1,0 +1,12 @@
+---
+bundle_name: test-bundle
+description: Test bundle for unit tests
+include: [sources/internal/sample.pem]
+exclude: []
+output_formats: [pem, jks, p7b, p12]
+pem:
+  include_subject_comments: true
+verify:
+  fail_on_expired: true
+  warn_days_before_expiry: 30
+package: false

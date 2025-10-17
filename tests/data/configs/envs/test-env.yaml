@@ -1,0 +1,12 @@
+---
+name: Test Environment
+description: Environment configuration for unit tests
+format_overrides:
+  jks:
+    storepass_env: TRUST_JKS_PASSWORD
+    alias_format: '{subject.CN}-{serial}'
+  pkcs12:
+    password_env: TRUST_P12_PASSWORD
+verify:
+  fail_on_expired: true
+  warn_days_before_expiry: 30

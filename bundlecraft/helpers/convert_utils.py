@@ -224,21 +224,30 @@ def create_p7b(pem_path: Path, build_root: Path, force: bool = False):
         print(f"[WARN] No certificates found in {pem_path}; skipping P7B.")
         return
 
-    with tempfile.NamedTemporaryFile("w+", delete=False) as tmp:
-        tmp.write("".join(blocks))
-        tmp.flush()
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".pem", text=True)
+    try:
+        # Write PEM blocks to temp file
+        with os.fdopen(tmp_fd, "w") as tmp:
+            tmp.write("".join(blocks))
+
+        # Now run openssl with the closed temp file
         cmd = [
             "openssl",
             "crl2pkcs7",
             "-nocrl",
             "-certfile",
-            tmp.name,  # ← key change
+            tmp_path,
             "-out",
             str(out_path),
             "-outform",
             "DER",
         ]
         subprocess.run(cmd, check=True)
+    finally:
+        # Clean up temp file
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
     print(f"[INFO] Created P7B: {out_path}")
 
 

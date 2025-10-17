@@ -2,12 +2,13 @@
 name: 🔐 BundleCraft CA Trust Pipeline
 run-name: 'BundleCraft CA Trust Pipeline - ${{ github.ref_name }} - Run #${{ github.run_number }}'
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 concurrency:
   group: ${{ github.ref_name }}
-  cancel-in-progress: true  # ensures only one pipeline per branch at a time
+  cancel-in-progress: true
 jobs:
-
   # =========================================================
   #  STAGE 1: DISCOVER - Find all bundles and environments
   # =========================================================
@@ -207,7 +208,7 @@ jobs:
     runs-on: ubuntu-latest
     if: success()
     permissions:
-      contents: write  # required to create releases
+      contents: write
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
