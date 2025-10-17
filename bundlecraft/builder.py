@@ -136,12 +136,8 @@ def package_tar(build_path: Path) -> Path:
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("--env", required=True, help="Environment name (e.g., dev, prod, dmz)")
 @click.option("--bundle", required=True, help="Bundle name (e.g., internal, external)")
-@click.option(
-    "--package", is_flag=True, help="Also create a .tar.gz of the build folder"
-)
-@click.option(
-    "--verify-only", is_flag=True, help="Only verify certificates; skip build"
-)
+@click.option("--package", is_flag=True, help="Also create a .tar.gz of the build folder")
+@click.option("--verify-only", is_flag=True, help="Only verify certificates; skip build")
 @click.option(
     "--output-root",
     type=str,
@@ -162,14 +158,10 @@ def main(env, bundle, package, verify_only, output_root):
 
     verify_cfg = bundle_cfg.get("verify", True)
     fail_on_expired = (
-        verify_cfg.get("fail_on_expired", True)
-        if isinstance(verify_cfg, dict)
-        else True
+        verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
     )
     warn_days = (
-        verify_cfg.get("warn_days_before_expiry", 30)
-        if isinstance(verify_cfg, dict)
-        else 30
+        verify_cfg.get("warn_days_before_expiry", 30) if isinstance(verify_cfg, dict) else 30
     )
 
     pem_cfg = bundle_cfg.get("pem", {})
@@ -194,9 +186,7 @@ def main(env, bundle, package, verify_only, output_root):
         else:
             click.secho(f"[WARN] Include path not found: {item}", fg="yellow")
     include_paths = [
-        p
-        for p in include_paths
-        if str(p.relative_to(ROOT)).replace("\\", "/") not in exclude_items
+        p for p in include_paths if str(p.relative_to(ROOT)).replace("\\", "/") not in exclude_items
     ]
 
     if not include_paths:
@@ -217,9 +207,7 @@ def main(env, bundle, package, verify_only, output_root):
             click.secho(f"[INFO] Verifying existing PEM bundle: {pem_path}", fg="blue")
             code = verifier(pem_path, warn_days, fail_on_expired)
         else:
-            click.secho(
-                "[INFO] No built bundle found; verifying sources directly.", fg="blue"
-            )
+            click.secho("[INFO] No built bundle found; verifying sources directly.", fg="blue")
             import tempfile
 
             tmp_pem = Path(tempfile.gettempdir()) / "verify-temp.pem"
@@ -240,9 +228,7 @@ def main(env, bundle, package, verify_only, output_root):
 
     for i, blk in enumerate(pem_blocks, 1):
         try:
-            cert = x509.load_pem_x509_certificate(
-                blk.encode("utf-8"), default_backend()
-            )
+            cert = x509.load_pem_x509_certificate(blk.encode("utf-8"), default_backend())
             subject = cert.subject.rfc4514_string()
             exp = getattr(cert, "not_valid_after_utc", None)
             if exp is not None and exp.tzinfo is None:
@@ -260,9 +246,7 @@ def main(env, bundle, package, verify_only, output_root):
         click.secho(f"[WARN] {w}", fg="yellow")
 
     if errs:
-        click.secho(
-            f"[SUMMARY] {len(errs)} expired or invalid certificates detected.", fg="red"
-        )
+        click.secho(f"[SUMMARY] {len(errs)} expired or invalid certificates detected.", fg="red")
         if fail_on_expired:
             click.secho("[ERROR] Build aborted due to expired certificates.", fg="red")
             sys.exit(5)
@@ -321,14 +305,12 @@ def main(env, bundle, package, verify_only, output_root):
     files_for_manifest = [n for n in all_files if n != "manifest.json"]
 
     # Build manifest["files"] entries (manifest.json excluded)
-    file_entries = [
-        {"path": n, "sha256": sha256_file(build_root / n)} for n in files_for_manifest
-    ]
+    file_entries = [{"path": n, "sha256": sha256_file(build_root / n)} for n in files_for_manifest]
 
     manifest_obj = {
         "bundle": bundle,
         "environment": env,
-    "timestamp_utc": datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp_utc": datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "sources": [str(p.relative_to(ROOT)).replace("\\", "/") for p in include_paths],
         "outputs": files_for_manifest,  # includes package.tar.gz if present
         "verify": {"fail_on_expired": fail_on_expired},

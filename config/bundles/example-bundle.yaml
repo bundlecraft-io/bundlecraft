@@ -1,3 +1,4 @@
+---
 # =====================================================================
 # Example bundle configuration for PKI-CA-Trust
 # Location: config/bundles/example.yaml
@@ -9,8 +10,8 @@
 # ---------------------------------------------------------------------
 # Basic metadata
 # ---------------------------------------------------------------------
-id: example-bundle                 # Logical ID for this bundle (used in manifests)
-name: Example Trust Bundle         # Descriptive name (shown in logs/manifests)
+id: example-bundle  # Logical ID for this bundle (used in manifests)
+name: Example Trust Bundle  # Descriptive name (shown in logs/manifests)
 description: >
   Demonstration of all supported keys and options for a trust bundle.
   Each file in config/bundles/ defines one trust bundle (e.g. internal,
@@ -20,70 +21,58 @@ description: >
 # ---------------------------------------------------------------------
 # Source certificate inputs
 # ---------------------------------------------------------------------
-include:                           # Relative paths (from repo root) to include
-  - sources/example/roots/         # All .pem files in this folder
-  - sources/example/intermediates/ # Another folder to include
-  - sources/example/special.pem    # You can list single files too
-
-exclude:                           # Optional explicit exclusions
+include:  # Relative paths (from repo root) to include
+  - sources/example/roots/  # All .pem files in this folder
+  - sources/example/intermediates/  # Another folder to include
+  - sources/example/special.pem  # You can list single files too
+exclude:  # Optional explicit exclusions
   - sources/example/intermediates/old-ca.pem  # Path relative to repo root
-
 # ---------------------------------------------------------------------
 # PEM output behavior
 # ---------------------------------------------------------------------
 pem:
-  include_subject_comments: true   # Adds "# Subject:" comment above each PEM block
-                                   # This is the default behavior (matches OS trust bundles)
-
+  include_subject_comments: true  # Adds "# Subject:" comment above each PEM block, matches OS trust bundles
 # ---------------------------------------------------------------------
 # Verification policy
 # ---------------------------------------------------------------------
 verify:
-  fail_on_expired: true            # Abort build if expired certificates exist
-  warn_days_before_expiry: 30      # Warn if any certificate expires within N days
-
+  fail_on_expired: true  # Abort build if expired certificates exist
+  warn_days_before_expiry: 30  # Warn if any certificate expires within N days
 # ---------------------------------------------------------------------
 # Filtering and normalization
 # ---------------------------------------------------------------------
 filters:
-  unique_by_fingerprint: true      # Deduplicate identical certs by SHA256 fingerprint
-  not_expired_only: true           # Exclude expired certificates before writing output
-  ca_certs_only: true              # Include only CA certificates (BasicConstraints CA=TRUE)
-
+  unique_by_fingerprint: true  # Deduplicate identical certs by SHA256 fingerprint
+  not_expired_only: true  # Exclude expired certificates before writing output
+  ca_certs_only: true  # Include only CA certificates (BasicConstraints CA=TRUE)
 # ---------------------------------------------------------------------
 # Output formats
 # ---------------------------------------------------------------------
-output_formats:                    # Which formats to produce for this bundle
-  - pem                            # Always produced; canonical concatenated PEM
-  - p7b                            # PKCS#7 (.p7b, DER)
-  - jks                            # Java KeyStore (.jks)
-  - p12                            # PKCS#12 (.p12/.pfx)
-
-package: false                     # Whether to also produce a .tar.gz of all outputs
-
+output_formats:  # Which formats to produce for this bundle
+  - pem  # Always produced; canonical concatenated PEM
+  - p7b  # PKCS#7 (.p7b, DER)
+  - jks  # Java KeyStore (.jks)
+  - p12  # PKCS#12 (.p12/.pfx)
+package: false  # Whether to also produce a .tar.gz of all outputs
 # ---------------------------------------------------------------------
 # Optional per-format overrides (bundle-specific)
 # ---------------------------------------------------------------------
 format_overrides:
   jks:
-    alias_format: "{subject.CN}-{serial}"    # JKS alias naming pattern
+    alias_format: '{subject.CN}-{serial}'  # JKS alias naming pattern
   pkcs12:
-    filename: example-bundle.p12             # Optional custom filename for .p12 output
-
+    filename: example-bundle.p12  # Optional custom filename for .p12 output
 # ---------------------------------------------------------------------
 # Advanced / optional controls
 # ---------------------------------------------------------------------
 manifest:
-  include_hashes: true             # Include SHA256 of outputs in manifest.json
-  include_expiry_summary: true     # Include validity counts/warnings in manifest
-
+  include_hashes: true  # Include SHA256 of outputs in manifest.json
+  include_expiry_summary: true  # Include validity counts/warnings in manifest
 # ---------------------------------------------------------------------
 # Reserved for future extensions
 # ---------------------------------------------------------------------
 metadata:
-  owner: pki-team@example.com      # Optional contact or maintainer
+  owner: pki-team@example.com  # Optional contact or maintainer
   change_control_id: CAB-2025-001  # Internal tracking for audit or CAB references
-  policy_version: 1.0              # Schema/policy version for consistency
-  tags:                            # Freeform labels (optional)
-    - internal
-    - ca-bundle
+  policy_version: 1.0  # Schema/policy version for consistency
+  tags: [internal, ca-bundle]  # Freeform labels (optional)

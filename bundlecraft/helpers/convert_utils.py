@@ -3,10 +3,19 @@
 convert_utils.py
 Handles format conversions for PKI-CA-Trust bundles.
 
-Supports:
-  • PEM → PKCS#7 (.p7b)
-  • PEM → Java KeyStore (.jks)
-  • PEM → PKCS#12 (.p12 / .pfx)
+IMPORTANT: BundleCraft processes CERTIFICATES and PUBLIC KEYS ONLY.
+           Private keys are explicitly NOT supported and will be ignored if encountered.
+           If you need private keys in your bundles, add them securely via external tooling.
+
+Supports (inputs → outputs):
+  • Inputs: PEM, DER, PKCS#7 (.p7b), Java KeyStore (.jks), PKCS#12 (.p12/.pfx)
+  • Outputs: PEM, PKCS#7 (.p7b), JKS, PKCS#12 (.p12/.pfx), ZIP (tarball of PEMs)
+  • Note: DER is accepted as input only (not output) - use P7B for binary bundle output
+
+Strategy:
+  1) Normalize any input into a canonical PEM bundle (certificates only).
+  2) Reuse existing writers to emit target formats from that PEM bundle.
+  3) Private keys are ignored and excluded from all operations.
 
 Requires:
   - openssl (for p7b / p12)
@@ -15,10 +24,14 @@ Requires:
 
 import os
 import subprocess
+import tarfile
+import tempfile
 from pathlib import Path
 
+from cryptography.hazmat.primitives.serialization import Encoding, pkcs7, pkcs12
+
 # ---------------------------------------------------------------------
-# Main entrypoint
+# Public API
 # ---------------------------------------------------------------------
 
 
@@ -35,39 +48,175 @@ def convert_to_formats(
         pem_path (Path): Input PEM file path
         build_root (Path): Output directory
         formats (list[str]): Target formats (e.g., ["p7b", "jks", "p12"])
-        fmt_overrides (dict|None): Optional per-format overrides (alias/password env)
+        fmt_overrides (dict|None): Optional per-format overrides (alias/password settings)
     """
     fmt_overrides = fmt_overrides or {}
     norm = [f.lower() for f in formats]
 
     for fmt in norm:
-        if fmt in ("p7b", "pkcs7"):
-            create_p7b(pem_path, build_root)
+        if fmt in ("pem",):
+            # Just copy/normalize the PEM into the output directory
+            out_path = build_root / "bundlecraft-ca-trust.pem"
+            if out_path.exists() and not fmt_overrides.get("force", False):
+                raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
+            out_path.write_text(
+                pem_path.read_text(encoding="utf-8", errors="ignore"), encoding="utf-8"
+            )
+            print(f"[INFO] Wrote PEM: {out_path}")
+        elif fmt in ("p7b", "pkcs7"):
+            create_p7b(pem_path, build_root, force=fmt_overrides.get("force", False))
         elif fmt == "jks":
-            create_jks(pem_path, build_root, fmt_overrides.get("jks", {}))
+            create_jks(
+                pem_path,
+                build_root,
+                fmt_overrides.get("jks", {}),
+                force=fmt_overrides.get("force", False),
+            )
         elif fmt in ("p12", "pfx", "pkcs12"):
-            create_pkcs12(pem_path, build_root, fmt_overrides.get("pkcs12", {}))
+            create_pkcs12(
+                pem_path,
+                build_root,
+                fmt_overrides.get("pkcs12", {}),
+                force=fmt_overrides.get("force", False),
+            )
+        elif fmt == "zip":
+            create_zip(pem_path, build_root, force=fmt_overrides.get("force", False))
         else:
             print(f"[WARN] Unknown format requested: {fmt}")
 
 
 # ---------------------------------------------------------------------
-# Conversion helpers
+# ZIP output (tarball of PEMs)
 # ---------------------------------------------------------------------
 
 
-def create_p7b(pem_path: Path, build_root: Path):
+def create_zip(pem_path: Path, build_root: Path, force: bool = False):
+    """
+    Create a tarball (zip) containing each certificate as an individual PEM file.
+    Filenames: {subject.CN}-{thumbprint}.pem
+    """
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+
+    text = pem_path.read_text(encoding="utf-8", errors="ignore")
+    blocks = _split_pem_blocks(text)
+    if not blocks:
+        print(f"[WARN] No certificates found in {pem_path}; skipping ZIP.")
+        return
+
+    tar_path = build_root / "bundlecraft-ca-trust.tar.gz"
+    if tar_path.exists() and not force:
+        raise FileExistsError(f"Output file exists: {tar_path}. Use --force to overwrite.")
+    with tarfile.open(tar_path, "w:gz") as tar:
+        for blk in blocks:
+            cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
+            cn = _get_cn(cert)
+            # Use SHA256 thumbprint for uniqueness
+            from cryptography.hazmat.primitives import hashes
+
+            thumb = cert.fingerprint(hashes.SHA256()).hex()[:16]
+            safe_cn = _sanitize_alias(cn)
+            fname = f"{safe_cn}-{thumb}.pem"
+            # Write PEM to temp file for tar
+            with tempfile.NamedTemporaryFile("w+", delete=False) as tmp:
+                tmp.write(blk)
+                tmp.flush()
+                tar.add(tmp.name, arcname=fname)
+            os.unlink(tmp.name)
+    print(f"[INFO] Created ZIP tarball: {tar_path}")
+
+
+def convert_from_any(
+    input_path: Path,
+    output_dir: Path,
+    formats: list[str],
+    *,
+    input_format: str | None = None,
+    password: str | None = None,
+    verbose: bool = False,
+    force: bool = False,
+) -> None:
+    """
+    Normalize arbitrary input (PEM/P7B/JKS/P12) to a canonical PEM and convert to targets.
+
+    IMPORTANT: Private keys are NEVER processed. Only certificates are extracted.
+    - Password, if required, must be provided via env/argument; no prompting here.
+    """
+    base_name = input_path.stem
+    with tempfile.TemporaryDirectory() as td:
+        tmp_dir = Path(td)
+        pem_path, has_keys = normalize_to_pem(
+            input_path,
+            tmp_dir / f"{base_name}.pem",
+            input_format=input_format,
+            password=password,
+            verbose=verbose,
+        )
+        if has_keys and verbose:
+            print(
+                "[WARN] Private key(s) detected in input and ignored (BundleCraft handles certificates only)"
+            )
+
+        fmt_overrides = {
+            "pkcs12": {
+                "password": password or os.environ.get("TRUST_P12_PASSWORD") or "changeit",
+            },
+            "jks": {
+                "storepass": os.environ.get("TRUST_JKS_PASSWORD") or "changeit",
+            },
+            "force": force,
+        }
+        convert_to_formats(pem_path, output_dir, formats, fmt_overrides)
+
+
+# ---------------------------------------------------------------------
+# Conversion helpers (writers)
+# ---------------------------------------------------------------------
+
+
+def create_der(pem_path: Path, build_root: Path):
+    """
+    Convert PEM → DER (binary certificate format).
+
+    If input has multiple certificates, creates multiple .der files (cert1.der, cert2.der, etc).
+    """
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+
+    text = pem_path.read_text(encoding="utf-8", errors="ignore")
+    blocks = _split_pem_blocks(text)
+    if not blocks:
+        print(f"[WARN] No certificates found in {pem_path}; skipping DER.")
+        return
+
+    if len(blocks) == 1:
+        # Single cert: use same base name
+        out_path = build_root / f"{pem_path.stem}.der"
+        if out_path.exists():
+            out_path.unlink()
+        cert = x509.load_pem_x509_certificate(blocks[0].encode(), default_backend())
+        out_path.write_bytes(cert.public_bytes(Encoding.DER))
+        print(f"[INFO] Created DER: {out_path}")
+    else:
+        # Multiple certs: create numbered files
+        for idx, blk in enumerate(blocks, 1):
+            out_path = build_root / f"{pem_path.stem}-cert{idx}.der"
+            if out_path.exists():
+                out_path.unlink()
+            cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
+            out_path.write_bytes(cert.public_bytes(Encoding.DER))
+            print(f"[INFO] Created DER: {out_path}")
+
+
+def create_p7b(pem_path: Path, build_root: Path, force: bool = False):
     """
     Convert PEM → PKCS#7 (.p7b, DER) including ALL certs.
 
     Use -certfile (not -in) so OpenSSL ingests the entire bundle.
     """
-    import tempfile
-
-    out_path = build_root / f"{pem_path.stem}.p7b"
-    # Nuke stale output to avoid confusion
-    if out_path.exists():
-        out_path.unlink()
+    out_path = build_root / "bundlecraft-ca-trust.p7b"
+    if out_path.exists() and not force:
+        raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
 
     text = pem_path.read_text(encoding="utf-8", errors="ignore")
     blocks = _split_pem_blocks(text)
@@ -93,29 +242,30 @@ def create_p7b(pem_path: Path, build_root: Path):
     print(f"[INFO] Created P7B: {out_path}")
 
 
-def create_jks(pem_path: Path, build_root: Path, overrides: dict):
+def create_jks(pem_path: Path, build_root: Path, overrides: dict, force: bool = False):
     """
     Create a Java KeyStore (JKS) from a PEM bundle.
     Imports each certificate individually with alias naming controlled by alias_format.
     """
-    import tempfile
-
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
 
     alias_format = overrides.get("alias_format", "{subject.CN}-{serial}")
-    storepass_env = overrides.get("storepass_env", "TRUST_JKS_PASSWORD")
-    storepass = os.environ.get(storepass_env) or "changeit"
+    storepass = (
+        overrides.get("storepass")
+        or os.environ.get(overrides.get("storepass_env", "TRUST_JKS_PASSWORD"))
+        or "changeit"
+    )
 
-    out_path = build_root / f"{pem_path.stem}.jks"
-    # Remove existing keystore to avoid duplicate aliases across runs
-    if out_path.exists():
-        out_path.unlink()
+    out_path = build_root / "bundlecraft-ca-trust.jks"
+    if out_path.exists() and not force:
+        raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
 
     text = pem_path.read_text(encoding="utf-8", errors="ignore")
     blocks = _split_pem_blocks(text)
 
     with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
         for idx, blk in enumerate(blocks, 1):
             try:
                 cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
@@ -124,7 +274,7 @@ def create_jks(pem_path: Path, build_root: Path, overrides: dict):
                 alias = _format_alias(alias_format, cn, serial)
                 alias = _sanitize_alias(alias)
 
-                tmp_pem = Path(td) / f"cert{idx}.pem"
+                tmp_pem = td / f"cert{idx}.pem"
                 tmp_pem.write_text(blk, encoding="utf-8")
 
                 cmd = [
@@ -148,25 +298,26 @@ def create_jks(pem_path: Path, build_root: Path, overrides: dict):
     print(f"[INFO] Created JKS: {out_path}")
 
 
-def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict):
+def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict, force: bool = False):
     """
     Create a single PKCS#12 (.p12) containing ALL certificates from the PEM bundle.
 
+    IMPORTANT: Private keys are NOT supported. Only certificates are included.
     Use: -in (first cert) + -certfile (rest) to include entire set.
     """
-    import tempfile
-
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
 
     alias_format = overrides.get("alias_format", "{subject.CN}-{serial}")
-    password_env = overrides.get("password_env", "TRUST_P12_PASSWORD")
-    password = os.environ.get(password_env) or "changeit"
+    password = (
+        overrides.get("password")
+        or os.environ.get(overrides.get("password_env", "TRUST_P12_PASSWORD"))
+        or "changeit"
+    )
 
-    out_path = build_root / f"{pem_path.stem}.p12"
-    # Remove existing to avoid stale results
-    if out_path.exists():
-        out_path.unlink()
+    out_path = build_root / "bundlecraft-ca-trust.p12"
+    if out_path.exists() and not force:
+        raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
 
     text = pem_path.read_text(encoding="utf-8", errors="ignore")
     blocks = _split_pem_blocks(text)
@@ -179,18 +330,17 @@ def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict):
     rest_pems = blocks[1:]
 
     with tempfile.TemporaryDirectory() as td:
-        first_file = Path(td) / "first.pem"
+        td = Path(td)
+        first_file = td / "first.pem"
         first_file.write_text(first_pem, encoding="utf-8")
 
         rest_file = None
         if rest_pems:
-            rest_file = Path(td) / "rest.pem"
+            rest_file = td / "rest.pem"
             rest_file.write_text("".join(rest_pems), encoding="utf-8")
 
         # Alias from the first cert
-        first_cert = x509.load_pem_x509_certificate(
-            first_pem.encode(), default_backend()
-        )
+        first_cert = x509.load_pem_x509_certificate(first_pem.encode(), default_backend())
         cn = _get_cn(first_cert)
         serial = f"{first_cert.serial_number:X}"
         alias = _format_alias(alias_format, cn, serial)
@@ -200,7 +350,7 @@ def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict):
             "openssl",
             "pkcs12",
             "-export",
-            "-nokeys",
+            "-nokeys",  # ALWAYS exclude private keys
             "-in",
             str(first_file),
             "-out",
@@ -211,11 +361,143 @@ def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict):
             alias,
         ]
         if rest_file:
-            cmd[6:6] = ["-certfile", str(rest_file)]  # insert before -out
+            # Insert before '-out'
+            cmd[6:6] = ["-certfile", str(rest_file)]
 
         subprocess.run(cmd, check=True)
 
     print(f"[INFO] Created PKCS#12: {out_path}")
+
+
+# ---------------------------------------------------------------------
+# Normalization helpers (readers)
+# ---------------------------------------------------------------------
+
+
+def normalize_to_pem(
+    input_path: Path,
+    output_pem_path: Path,
+    *,
+    input_format: str | None = None,
+    password: str | None = None,
+    verbose: bool = False,
+) -> tuple[Path, bool]:
+    """
+    Load input of various types and produce a canonical PEM bundle on disk (certificates only).
+
+    IMPORTANT: Private keys are NEVER included. Only certificates are extracted.
+
+    Returns (pem_path, has_private_keys) where has_private_keys indicates if keys were encountered and ignored.
+    """
+    fmt = (input_format or input_path.suffix.lstrip(".")).lower()
+    # Normalize common aliases
+    if fmt in {"pfx", "pkcs12"}:
+        fmt = "p12"
+    if fmt in {"pkcs7"}:
+        fmt = "p7b"
+
+    has_keys = False
+
+    if fmt == "pem":
+        text = input_path.read_text(encoding="utf-8", errors="ignore")
+        certs = _split_pem_blocks(text)
+        keys = _split_pem_key_blocks(text)
+        if not certs:
+            raise ValueError("No certificates found in PEM input")
+        if keys:
+            has_keys = True
+        # Write certificates ONLY
+        output_pem_path.write_text("".join(certs), encoding="utf-8")
+        return output_pem_path, has_keys
+
+    if fmt == "der":
+        from cryptography import x509
+        from cryptography.hazmat.backends import default_backend
+
+        data = input_path.read_bytes()
+        try:
+            # Try loading as a single DER certificate
+            cert = x509.load_der_x509_certificate(data, default_backend())
+            pem_block = cert.public_bytes(Encoding.PEM).decode("utf-8")
+            output_pem_path.write_text(pem_block, encoding="utf-8")
+            return output_pem_path, False
+        except Exception as e:
+            raise ValueError(f"Failed to load DER certificate: {e}") from e
+
+    if fmt == "p7b":
+        data = input_path.read_bytes()
+        try:
+            certs = pkcs7.load_pem_pkcs7_certificates(data)
+        except ValueError:
+            certs = pkcs7.load_der_pkcs7_certificates(data)
+        if not certs:
+            raise ValueError("No certificates found in PKCS#7 input")
+        pem_blocks = [c.public_bytes(Encoding.PEM).decode("utf-8") for c in certs]
+        output_pem_path.write_text("".join(pem_blocks), encoding="utf-8")
+        return output_pem_path, False
+
+    if fmt == "p12":
+        data = input_path.read_bytes()
+        pw = password or os.environ.get("TRUST_P12_PASSWORD")
+        if pw is None:
+            raise ValueError(
+                "Password required for PKCS#12 input; set TRUST_P12_PASSWORD or provide --password"
+            )
+        # cryptography expects bytes for password
+        pw_bytes = pw.encode()
+        pkey, cert, addl = pkcs12.load_key_and_certificates(data, password=pw_bytes)
+        certs = []
+        if cert:
+            certs.append(cert)
+        if addl:
+            certs.extend(addl)
+        if not certs:
+            raise ValueError("No certificates found in PKCS#12 input")
+        # Check if private key was present
+        if pkey is not None:
+            has_keys = True
+        # Write certificates ONLY (never include private key)
+        pem_blocks = [c.public_bytes(Encoding.PEM).decode("utf-8") for c in certs]
+        output_pem_path.write_text("".join(pem_blocks), encoding="utf-8")
+        return output_pem_path, has_keys
+
+    if fmt == "jks":
+        pw = password or os.environ.get("TRUST_JKS_PASSWORD")
+        if pw is None:
+            raise ValueError(
+                "Password required for JKS input; set TRUST_JKS_PASSWORD or provide --password"
+            )
+        # Use keytool to get RFC PEM output
+        result = subprocess.run(
+            [
+                "keytool",
+                "-list",
+                "-rfc",
+                "-keystore",
+                str(input_path),
+                "-storepass",
+                pw,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+            timeout=20,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"keytool failed to read JKS: {result.stdout.strip()[:400]}")
+        pem_text = result.stdout
+        certs = _split_pem_blocks(pem_text)
+        keys = _split_pem_key_blocks(pem_text)
+        if keys:
+            has_keys = True
+        if not certs:
+            raise ValueError("No certificates found in JKS input")
+        # Write certificates ONLY
+        output_pem_path.write_text("".join(certs), encoding="utf-8")
+        return output_pem_path, has_keys
+
+    raise ValueError(f"Unsupported input format: {fmt}")
 
 
 # ---------------------------------------------------------------------
@@ -238,6 +520,21 @@ def _split_pem_blocks(text: str) -> list[str]:
     return blocks
 
 
+def _split_pem_key_blocks(text: str) -> list[str]:
+    start, end = "-----BEGIN", "PRIVATE KEY-----"
+    blocks, buf, inside = [], [], False
+    for line in text.splitlines():
+        if line.startswith(start) and end in line:
+            inside, buf = True, [line]
+        elif line.startswith("-----END") and end in line and inside:
+            buf.append(line)
+            blocks.append("\n".join(buf) + "\n")
+            inside = False
+        elif inside:
+            buf.append(line)
+    return blocks
+
+
 def _get_cn(cert) -> str:
     """Extract CN or fallback to short subject string."""
     try:
@@ -251,9 +548,7 @@ def _get_cn(cert) -> str:
 
 def _sanitize_alias(alias: str) -> str:
     """Make alias keytool/openssl safe."""
-    return "".join(c if c.isalnum() or c in ("-", "_", ".") else "_" for c in alias)[
-        :80
-    ]
+    return "".join(c if c.isalnum() or c in ("-", "_", ".") else "_" for c in alias)[:80]
 
 
 def _format_alias(template: str, cn: str, serial: str) -> str:

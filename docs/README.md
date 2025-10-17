@@ -17,6 +17,6 @@ Each document describes a specific layer of the system — from goals and design
 
 ---
 
-> **Note:**  
-> All documents are version-controlled and treated as part of the source of truth.  
+> **Note:**
+> All documents are version-controlled and treated as part of the source of truth.
 > Any design or behavioral change **must** be reflected here.

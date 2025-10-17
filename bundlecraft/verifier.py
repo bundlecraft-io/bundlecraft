@@ -74,9 +74,7 @@ def count_certs_in_store(file: Path) -> int | None:
             tried_pw = [b"changeit", None]
             for pw in tried_pw:
                 try:
-                    pkey, cert, addl = pkcs12.load_key_and_certificates(
-                        data, password=pw
-                    )
+                    pkey, cert, addl = pkcs12.load_key_and_certificates(data, password=pw)
                     if cert or addl:
                         if cert:
                             count += 1
@@ -153,9 +151,9 @@ def show_manifest_info(build_dir: Path, verbose: bool = False) -> None:
     sha = sha256sum(manifest_path)
     logger.info(f"    SHA256: {sha}")
     if verbose:
-        content_preview = manifest_path.read_text(
-            encoding="utf-8", errors="ignore"
-        ).splitlines()[:10]
+        content_preview = manifest_path.read_text(encoding="utf-8", errors="ignore").splitlines()[
+            :10
+        ]
         if len(content_preview) > 0:
             logger.info("    Content preview:")
             for line in content_preview:
@@ -163,9 +161,7 @@ def show_manifest_info(build_dir: Path, verbose: bool = False) -> None:
     logger.info("✅ Manifest inspection complete.")
 
 
-def verify_directory(
-    build_dir: Path, verbose: bool = False, check_counts: bool = True
-) -> bool:
+def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool = True) -> bool:
     checksum_path = build_dir / CHECKSUM_FILE
     if not checksum_path.exists():
         logger.error(f"Missing {CHECKSUM_FILE} in {build_dir}")
@@ -259,9 +255,7 @@ def verify_directory(
     is_flag=True,
     help="Display manifest info only (no verification)",
 )
-@click.option(
-    "--verify-all", is_flag=True, help="Verify both bundle files and manifest together"
-)
+@click.option("--verify-all", is_flag=True, help="Verify both bundle files and manifest together")
 @click.option("--verbose", is_flag=True, help="Show detailed file metadata and hashes")
 @click.option(
     "--output-root",

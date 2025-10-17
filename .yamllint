@@ -1,0 +1,29 @@
+---
+extends: default
+rules:
+  # Allow files without explicit document start '---'
+  document-start: disable
+
+  # Enforce 2-space indentation, sequences indent 2
+  indentation:
+    spaces: 2
+    indent-sequences: true
+
+  # Keep line length reasonable but don't error on long lines
+  # Multiline strings (like GitHub Actions body) can exceed this
+  line-length:
+    max: 200
+    level: warning
+    allow-non-breakable-inline-mappings: true
+
+  # Use consistent truthy/falsey values
+  # GitHub Actions uses bare 'on:' keywords which trigger false positives
+  truthy:
+    check-keys: false
+    allowed-values: ['yes', 'no', 'true', 'false', 'on', 'off']
+
+  # Permit empty values (common for placeholders)
+  empty-values: disable
+
+  # Trailing spaces will be handled by pre-commit hook
+  trailing-spaces: enable

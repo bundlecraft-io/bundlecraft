@@ -1,0 +1,55 @@
+---
+# Pre-commit hooks to auto-format and lint Python and YAML files
+# Install and enable locally:
+#   pip install pre-commit
+#   pre-commit install
+# Run on all files once:
+#   pre-commit run --all-files
+repos:
+  # Lightweight sanity checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: check-yaml
+
+  # Python linting (with autofix). Configure rules in pyproject.toml [tool.ruff]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.3
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
+  # Python code formatter (opinionated). Configure in pyproject.toml [tool.black]
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+
+  # YAML linter
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [-c, .yamllint, -s]
+
+  # YAML formatter (autofix). Uses sensible defaults; see project docs for config options.
+  - repo: https://github.com/lyz-code/yamlfix
+    rev: 1.17.0
+    hooks:
+      - id: yamlfix
+        exclude: ^\.yamllint$  # Exclude yamllint config (has special quoting requirements)
+ci:
+  autofix_prs: true
+  autofix_commit_msg: 'chore(pre-commit): auto-fix code style issues'
+  skip: []
+exclude: |-
+  ^build/|
+  ^dist/|
+  ^\.venv/|
+  ^venv/|
+  ^.*\.egg-info/|
+  ^testing/

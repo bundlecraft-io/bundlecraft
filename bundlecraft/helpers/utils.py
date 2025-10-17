@@ -14,9 +14,7 @@ def load_yaml(path: Path, required: bool = True) -> dict[str, Any] | None:
     try:
         import yaml  # PyYAML
     except ImportError as e:
-        raise RuntimeError(
-            "PyYAML is required. Install with: pip install pyyaml"
-        ) from e
+        raise RuntimeError("PyYAML is required. Install with: pip install pyyaml") from e
     with path.open("r", encoding="utf-8") as fh:
         return yaml.safe_load(fh) or {}
 

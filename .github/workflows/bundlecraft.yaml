@@ -1,13 +1,11 @@
+---
 name: 🔐 BundleCraft CA Trust Pipeline
 run-name: 'BundleCraft CA Trust Pipeline - ${{ github.ref_name }} - Run #${{ github.run_number }}'
-
 on:
-  workflow_dispatch:  # manual trigger
-
+  workflow_dispatch:
 concurrency:
   group: ${{ github.ref_name }}
-  cancel-in-progress: true   # ensures only one pipeline per branch at a time
-
+  cancel-in-progress: true  # ensures only one pipeline per branch at a time
 jobs:
 
   # =========================================================
@@ -21,12 +19,14 @@ jobs:
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
-
       - name: 🔍 Detect available bundles and environments
         id: detect
         run: |
-          bundles=$(find config/bundles -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
-          envs=$(find config/envs -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; | jq -R -s -c 'split("\n")[:-1]')
+          bundles=$(find config/bundles -type f -name "*.yaml" ! \
+          -name "example*.yaml" -exec basename {} .yaml \; \
+          | jq -R -s -c 'split("\n")[:-1]')
+          envs=$(find config/envs -type f -name "*.yaml" ! -name "example*.yaml" -exec basename {} .yaml \; \
+          | jq -R -s -c 'split("\n")[:-1]')
           echo "Detected bundles: $bundles"
           echo "Detected environments: $envs"
           echo "bundles=$bundles" >> $GITHUB_OUTPUT
@@ -43,25 +43,17 @@ jobs:
       matrix:
         bundle: ${{ fromJson(needs.discover.outputs.bundles) }}
         env: ${{ fromJson(needs.discover.outputs.envs) }}
-
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
-
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
+          python-version: '3.11'
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 🔐 Install BundleCraft Python CLI
-        run: |
-          python -m pip install -e .
-
+          pip install -e ".[dev]"
       - name: 🔨 Build bundle
         run: |
           echo "Building bundle: ${{ matrix.bundle }} in environment: ${{ matrix.env }}"
@@ -69,13 +61,11 @@ jobs:
             --env ${{ matrix.env }} \
             --bundle ${{ matrix.bundle }} \
             --package
-
       - name: 🧱 Show directory structure
         run: |
           echo "=== dist directory structure ==="
           tree dist/ || find dist/
           echo "================================="
-
       - name: 📦 Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
@@ -93,7 +83,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist/
-
       - name: 🗜️ Rehydrate to pki-ca-trust/<env>/<bundle> and package
         run: |
           set -euo pipefail
@@ -104,7 +93,6 @@ jobs:
           # Rebuild canonical tree: pki-ca-trust/<env>/<bundle> from artifact names like trust-store-<env>-<bundle>
           rm -rf pki-ca-trust
           mkdir -p pki-ca-trust
-
           shopt -s nullglob dotglob
           for artifact_dir in dist/*; do
             base="$(basename "$artifact_dir")"
@@ -121,7 +109,6 @@ jobs:
             fi
           done
           shopt -u nullglob dotglob
-
           echo "=== pki-ca-trust (rehydrated) ==="
           find pki-ca-trust -maxdepth 3 -type d || true
           echo "================================="
@@ -131,13 +118,11 @@ jobs:
           sha256sum truststore_bundle.tar.gz > truststore_bundle.sha256
           echo "✅ Created tarball and checksum:"
           sha256sum truststore_bundle.tar.gz
-
       - name: 📦 Upload combined directory
         uses: actions/upload-artifact@v4
         with:
           name: all-builds
           path: pki-ca-trust/
-
       - name: 📦 Upload tarball + checksum
         uses: actions/upload-artifact@v4
         with:
@@ -155,50 +140,38 @@ jobs:
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
-
       - name: 📥 Download all-builds artifact
         uses: actions/download-artifact@v4
         with:
           name: all-builds
           path: pki-ca-trust/
-
       - name: 📥 Download tarball artifact
         uses: actions/download-artifact@v4
         with:
           name: truststore-bundle
           path: verify-tarball/
-
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
+          python-version: '3.11'
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 🔐 Install BundleCraft Python CLI
-        run: |
-          python -m pip install -e .
-
+          pip install -e ".[dev]"
       - name: 🔍 Verify combined directory (with diagnostics)
         run: |
           echo "=== Directory structure before verify ==="
           find pki-ca-trust -maxdepth 3 -type d || true
           echo "========================================"
-
           dirs=$(find pki-ca-trust -mindepth 2 -maxdepth 2 -type d)
           if [ -z "$dirs" ]; then
             echo "⚠️  No bundle directories found under pki-ca-trust/. Check collect stage output."
             exit 1
           fi
-
           for dir in $dirs; do
             echo "🔍 Verifying $dir"
             bundlecraft verify --target "$dir" --verbose
           done
-
       - name: 🗜️ Extract and verify tarball (with diagnostics)
         run: |
           cd verify-tarball
@@ -208,18 +181,15 @@ jobs:
           find . -maxdepth 3 -type d || true
           echo "=========================="
           cd ..
-
           dirs=$(find verify-tarball/pki-ca-trust -mindepth 2 -maxdepth 2 -type d 2>/dev/null)
           if [ -z "$dirs" ]; then
             echo "⚠️  No bundle directories found in extracted tarball."
             exit 1
           fi
-
           for dir in $dirs; do
             echo "🔍 Verifying $dir"
             bundlecraft verify --target "$dir" --verbose
           done
-
       - name: 📊 Summarize verified bundles
         if: success()
         run: |
@@ -237,24 +207,21 @@ jobs:
     runs-on: ubuntu-latest
     if: success()
     permissions:
-      contents: write   # required to create releases
+      contents: write  # required to create releases
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
-
       - name: 📥 Download release artifacts
         uses: actions/download-artifact@v4
         with:
           name: truststore-bundle
           path: release/
-
       - name: 🧮 Generate release tag and name
         id: version
         run: |
           DATE=$(date -u +"%Y.%m.%d-%H%M")
           echo "tag=truststore-v${DATE}" >> $GITHUB_OUTPUT
           echo "name=BundleCraft CA Trust Store Build - ${DATE}" >> $GITHUB_OUTPUT
-
       - name: 🔍 Check if GPG key is available from GitHub Secrets store
         id: gpg-check
         shell: bash
@@ -264,19 +231,16 @@ jobs:
           else
             echo "available=false" >> $GITHUB_OUTPUT
           fi
-
       - name: 🔏 Import GPG key for signing
         if: ${{ steps.gpg-check.outputs.available == 'true' }}
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
-
       - name: 🪪 Sign artifact
         if: ${{ steps.gpg-check.outputs.available == 'true' }}
         run: |
           gpg --armor --detach-sign release/truststore_bundle.tar.gz
-
       - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -289,7 +253,6 @@ jobs:
             - **Commit:** `${{ github.sha }}`
             - **Triggered by:** @${{ github.actor }}
             - **Signing:** ${{ steps.gpg-check.outputs.available == 'true' && 'Enabled (signature attached)' || 'Disabled' }}
-
             ---
             ### 🧾 Verification Instructions
             ```bash
@@ -299,7 +262,7 @@ jobs:
             ```
             ---
             *If you do not see 'Good signature', the artifact may be tampered with.*
-          files: |
+          files: |-
             release/truststore_bundle.tar.gz
             release/truststore_bundle.sha256
             release/truststore_bundle.tar.gz.asc

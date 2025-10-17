@@ -12,7 +12,7 @@ The BundleCraft framework consists of four primary components:
 | ------------------------------ | --------------------------------------------------------------------------- | --------------------- |
 | **Builder** (`builder.py`)     | Builds trust bundles from configured certificate sources.                   | `bundlecraft build`   |
 | **Verifier** (`verifier.py`)   | Verifies integrity, consistency, and certificate validity of built bundles. | `bundlecraft verify`  |
-| **Converter** (`converter.py`) | Converts PEM bundles into alternate trust store formats (P7B, JKS, P12).    | `bundlecraft convert` |
+| **Converter** (`converter.py`) | Converts certificate bundles between any supported formats (PEM, P7B, JKS, P12, ZIP). Accepts DER as input. | `bundlecraft convert` |
 | **CLI Wrapper** (`cli.py`)     | Aggregates the three tools into a single cohesive interface.                | `bundlecraft`         |
 
 Once installed via `pip install -e .`, the command `bundlecraft` becomes available system-wide.
@@ -28,6 +28,8 @@ pip install -e .
 ```
 
 This installs the CLI command `bundlecraft` globally (editable, so code changes take immediate effect).
+
+
 
 ### Manual module invocation (no install)
 
@@ -138,39 +140,64 @@ tbundlecraft verify --target dist/prod/internal --verify-all --verbose
 
 ---
 
+
 ### 🔄 `bundlecraft convert`
 
-**Purpose:** Convert existing PEM bundles into alternate formats such as PKCS#7, PKCS#12, or JKS.
+**Purpose:** Convert certificate bundles between any supported formats: PEM, PKCS#7, JKS, PKCS#12, or ZIP. Accepts DER as input only (not output).
 
 **Usage:**
 
 ```bash
-bundlecraft convert --pem-file <input_pem> --output-dir <output_path> [OPTIONS]
+bundlecraft convert --input <input_file> --output-dir <output_path> --output-format <format> [OPTIONS]
 ```
 
 **Options:**
 
-| Option          | Description                                                           |
-| --------------- | --------------------------------------------------------------------- |
-| `--pem-file`    | Input PEM file containing one or more certificates. Required.         |
-| `--output-dir`  | Directory to write converted formats. Required.                       |
-| `--formats`     | Output formats to produce (default: `p7b jks p12`). Multiple allowed. |
-| `--output-root` | Root directory for build outputs (default: `./dist`).                |
+| Option            | Description                                                                 |
+| ----------------- | --------------------------------------------------------------------------- |
+| `--input`         | Input file (PEM, DER, P7B, JKS, P12). Required.                             |
+| `--output-dir`    | Directory to write converted output. Required.                              |
+| `--output-format` | Output format to produce (one of: pem, p7b, jks, p12, zip). Required.       |
+| `--force`         | Overwrite output files if they already exist. Default: false.               |
+| `--password`      | Password for protected input formats (JKS, P12). Prefer env vars.           |
+| `--verbose`       | Enable detailed logging during conversion.                                  |
+| `--output-root`   | Root directory for build outputs (default: `./dist`).                      |
 
 **Examples:**
 
 ```bash
-# Convert to all default formats
-bundlecraft convert --pem-file dist/prod/internal/ca-trust.pem --output-dir dist/prod/internal/
+# Convert DER to PEM
+bundlecraft convert --input dist/prod/internal/ca-trust.der --output-dir dist/prod/internal/ --output-format pem
 
-# Convert to only JKS and P7B
-bundlecraft convert --pem-file dist/dev/internal/ca-trust.pem --output-dir dist/dev/internal/ --formats jks --formats p7b
+# Convert PEM to P7B (with force overwrite)
+bundlecraft convert --input dist/prod/internal/ca-trust.pem --output-dir dist/prod/internal/ --output-format p7b --force
+
+# Convert to ZIP (tarball of PEMs)
+bundlecraft convert --input dist/prod/internal/ca-trust.pem --output-dir dist/prod/internal/ --output-format zip
 ```
+
+**Output Filenames:**
+All outputs use standardized naming: `bundlecraft-ca-trust.[FORMAT]`
+- Example: `bundlecraft-ca-trust.pem`, `bundlecraft-ca-trust.jks`, `bundlecraft-ca-trust.tar.gz`
+
+**ZIP Output Format:**
+
+- Produces a `.tar.gz` archive containing each certificate as an individual PEM file.
+- Filenames: `{subject.CN}-{thumbprint}.pem`
+- Useful for distributing certs as separate files in a single archive.
+
+**Environment Variables:**
+
+- `TRUST_JKS_PASSWORD`: Password for JKS keystores (default: `"changeit"`)
+- `TRUST_P12_PASSWORD`: Password for PKCS#12 files (default: `"changeit"`)
 
 **Notes:**
 
-* Requires `openssl` and `keytool` binaries in PATH.
-* Uses optional environment variables `TRUST_JKS_PASSWORD` and `TRUST_P12_PASSWORD` for keystore password overrides.
+- Requires `openssl` and `keytool` binaries in PATH for some formats.
+- Uses optional environment variables `TRUST_JKS_PASSWORD` and `TRUST_P12_PASSWORD` for keystore password overrides.
+- Only one output format can be produced per invocation.
+- Any supported input format (PEM, DER, P7B, JKS, P12) can be converted to any supported output format (PEM, P7B, JKS, P12, ZIP).
+- DER is accepted as input only; use P7B for binary bundle output (DER is typically single-cert, not suitable for trust stores).
 
 ---
 

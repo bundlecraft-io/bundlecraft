@@ -1,23 +1,17 @@
+---
 bundle_name: internal
 description: Trust bundle for internal PKI services
-
-include:
-  - sources/internal/rootCA.pem
-  - sources/internal/issuingCA1.pem
+include: [sources/internal/rootCA.pem, sources/internal/issuingCA1.pem]
 exclude: []
-
 output_formats:
   - pem
   - jks
   - p7b
   - p12
-
 # --- New options ---
 pem:
-  include_subject_comments: true     # Adds "# Subject:" above each PEM block
-
+  include_subject_comments: true  # Adds "# Subject:" above each PEM block
 verify:
-  fail_on_expired: true              # Fail build if any cert is expired
-  warn_days_before_expiry: 30        # Warn if cert expires within 30 days
-
-package: true                        # Produce package.tar.gz
+  fail_on_expired: true  # Fail build if any cert is expired
+  warn_days_before_expiry: 30  # Warn if cert expires within 30 days
+package: true  # Produce package.tar.gz

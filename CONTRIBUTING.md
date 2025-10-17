@@ -26,8 +26,11 @@ venv\Scripts\activate      # Windows
 ### 3) Install dependencies and the CLI (editable)
 
 ```bash
-pip install -r requirements.txt
+# Install with runtime dependencies
 pip install -e .
+
+# Or install with dev/test tools
+pip install -e ".[dev]"
 ```
 
 This installs runtime + dev tools and exposes the `bundlecraft` command.
@@ -50,8 +53,7 @@ bundlecraft/
 ├── config/                # environment and bundle definitions
 ├── sources/               # source certificate files
 ├── dist/                  # build outputs (avoid naming this 'build/')
-├── pyproject.toml         # packaging metadata
-├── requirements.txt       # dependency pinning for dev + CI
+├── pyproject.toml         # project metadata and dependencies
 └── CONTRIBUTING.md        # this file
 ```
 

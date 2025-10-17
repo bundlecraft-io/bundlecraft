@@ -70,17 +70,13 @@ def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) ->
                 elif exp < soon_cutoff:
                     expiring += 1
                     days = (exp - now).days
-                    print(
-                        f"[WARN] Expiring soon: {subj} ({days} days left) [{pem.name}]"
-                    )
+                    print(f"[WARN] Expiring soon: {subj} ({days} days left) [{pem.name}]")
             except Exception as e:
                 errors += 1
                 print(f"[ERROR] Parse error in {pem.name}: {e}")
 
     print(f"\n[SUMMARY] Verified {total} certificate(s):")
-    print(
-        f"          Expired = {expired}, Expiring Soon = {expiring}, Errors = {errors}"
-    )
+    print(f"          Expired = {expired}, Expiring Soon = {expiring}, Errors = {errors}")
 
     if errors or (expired and fail_on_expired):
         print("[RESULT] ❌ Verification failed.")
