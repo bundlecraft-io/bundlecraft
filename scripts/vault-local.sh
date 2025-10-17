@@ -199,7 +199,9 @@ setup_vault_env() {
 
   # Extract the certificate using Python from STDIN; tolerate empty/invalid JSON
   local ca_cert
-  ca_cert_json=$(mktemp)
+  TMPDIR="${HOME:-/tmp}"
+  ca_cert_json=$(mktemp -p "$TMPDIR")
+  chmod 600 "${ca_cert_json}" || true
   echo "${root_response}" > "${ca_cert_json}"
   ca_cert=$(python3 - <<'PY'
 import json, sys
@@ -232,7 +234,8 @@ PY
     # JSON-escape and put the certificate in KV v2 and KV v1 (from PKI or OpenSSL fallback)
     if [ -n "${ca_cert}" ]; then
       local payload_v2 payload_v1
-  payload_v2_json=$(mktemp)
+  payload_v2_json=$(mktemp -p "$TMPDIR")
+  chmod 600 "${payload_v2_json}" || true
   echo "${ca_cert}" > "${payload_v2_json}"
   payload_v2=$(python3 - <<'PY'
 import json, sys
@@ -242,7 +245,8 @@ print(json.dumps({"data": {"pem": pem}}))
 PY
   "${payload_v2_json}")
   rm -f "${payload_v2_json}"
-  payload_v1_json=$(mktemp)
+  payload_v1_json=$(mktemp -p "$TMPDIR")
+  chmod 600 "${payload_v1_json}" || true
   echo "${ca_cert}" > "${payload_v1_json}"
   payload_v1=$(python3 - <<'PY'
 import json, sys
@@ -268,7 +272,8 @@ PY
   # Wait until the KV secret contains a non-empty pem (prefer v2, fallback v1)
   for i in {1..40}; do
     kv_json=$(vault_api GET "secret/data/pki/trusted_roots" || true)
-  pem_head_json=$(mktemp)
+  pem_head_json=$(mktemp -p "$TMPDIR")
+  chmod 600 "${pem_head_json}" || true
   echo "${kv_json}" > "${pem_head_json}"
   pem_head=$(python3 - <<'PY'
 import json,sys
@@ -314,8 +319,9 @@ PY
   )
   if [ -z "${pem_head}" ]; then
     kv_json=$(vault_api GET "secret/pki/trusted_roots" || true)
-    pem_head_json=$(mktemp)
-    echo "${kv_json}" > "${pem_head_json}"
+  pem_head_json=$(mktemp -p "$TMPDIR")
+  chmod 600 "${pem_head_json}" || true
+  echo "${kv_json}" > "${pem_head_json}"
     pem_head=$(python3 - <<'PY'
 import json,sys
 import sys
