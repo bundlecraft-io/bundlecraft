@@ -226,16 +226,25 @@ PY
       rm -rf "${tmp_dir}" || true
     fi
 
-    # JSON-escape and put the certificate in KV v2 (from PKI or OpenSSL fallback)
+    # JSON-escape and put the certificate in KV v2 and KV v1 (from PKI or OpenSSL fallback)
     if [ -n "${ca_cert}" ]; then
-      local payload
-      payload=$(python3 - <<'PY'
+      local payload_v2 payload_v1
+      payload_v2=$(python3 - <<'PY'
 import json, sys
 pem = sys.stdin.read()
 print(json.dumps({"data": {"pem": pem}}))
 PY
       <<<"${ca_cert}")
-      vault_api POST "secret/data/pki/trusted_roots" "${payload}" >/dev/null
+      payload_v1=$(python3 - <<'PY'
+import json, sys
+pem = sys.stdin.read()
+print(json.dumps({"pem": pem}))
+PY
+      <<<"${ca_cert}")
+      # Try KV v2 write
+      vault_api POST "secret/data/pki/trusted_roots" "${payload_v2}" >/dev/null 2>&1 || true
+      # Also write KV v1 for compatibility
+      vault_api POST "secret/pki/trusted_roots" "${payload_v1}" >/dev/null 2>&1 || true
     else
       warn "No certificate available to store in KV."
     fi
@@ -245,15 +254,40 @@ PY
   mkdir -p "${VAULT_DATA_DIR}"
   vault_api GET "secret/data/pki/trusted_roots" > "${VAULT_DATA_DIR}/kv_secret_pki_trusted_roots.json" || true
 
-  # Wait until the KV secret is readable (readiness gate)
-  for i in {1..20}; do
-    if vault_api GET "secret/data/pki/trusted_roots" | grep -q '"data"'; then
-      log "KV secret is readable."; break; fi; sleep 0.5; done
+  # Wait until the KV secret contains a non-empty pem (prefer v2, fallback v1)
+  for i in {1..40}; do
+    kv_json=$(vault_api GET "secret/data/pki/trusted_roots" || true)
+    pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY' 2>/dev/null || true
+import json,sys
+try:
+    data=json.load(sys.stdin)
+    pem=data.get('data',{}).get('data',{}).get('pem','')
+    print('\n'.join(pem.splitlines()[:3]))
+except Exception:
+    pass
+PY
+    )
+    if [ -z "${pem_head}" ]; then
+      # Try KV v1
+      kv_json=$(vault_api GET "secret/pki/trusted_roots" || true)
+      pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY' 2>/dev/null || true
+import json,sys
+try:
+    data=json.load(sys.stdin)
+    pem=data.get('data',{}).get('pem','')
+    print('\n'.join(pem.splitlines()[:3]))
+except Exception:
+    pass
+PY
+      )
+    fi
+    if [ -n "${pem_head}" ]; then
+      log "KV secret is writable and contains PEM."; break; fi; sleep 0.5; done
 
   # Quick smoke test: read PEM and show header in logs
+  # Final diagnostic: prefer v2, fallback v1 for PEM head
   kv_json=$(vault_api GET "secret/data/pki/trusted_roots" || true)
-  if [ -n "${kv_json}" ]; then
-  pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY'
+  pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY' 2>/dev/null || true
 import json,sys
 try:
     data=json.load(sys.stdin)
@@ -261,14 +295,23 @@ try:
 except Exception:
     pass
 PY
+  )
+  if [ -z "${pem_head}" ]; then
+    kv_json=$(vault_api GET "secret/pki/trusted_roots" || true)
+    pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY' 2>/dev/null || true
+import json,sys
+try:
+    data=json.load(sys.stdin)
+    print('\n'.join(data.get('data',{}).get('pem','').splitlines()[:3]))
+except Exception:
+    pass
+PY
     )
-    if [ -n "${pem_head}" ]; then
-      log "PEM head from KV:\n${pem_head}"
-    else
-      warn "KV read returned no PEM header."
-    fi
+  fi
+  if [ -n "${pem_head}" ]; then
+    log "PEM head from KV:\n${pem_head}"
   else
-    warn "KV read returned empty response."
+    warn "KV read returned no PEM header."
   fi
 
   log "Test root CA injected successfully."
