@@ -193,32 +193,39 @@ setup_vault_env() {
     vault_api POST "sys/mounts/pki/trusted_roots/tune" '{"max_lease_ttl":"8760h"}' >/dev/null
 
     # Generate root CA and parse certificate
-    local root_response
-    root_response=$(vault_api POST "pki/trusted_roots/root/generate/internal" \
-      '{"common_name":"local-root-ca","ttl":"8760h"}')
+  local root_response
+  root_response=$(vault_api POST "pki/trusted_roots/root/generate/internal" \
+    '{"common_name":"local-root-ca","ttl":"8760h"}')
 
-    # Robustly extract the certificate using Python JSON parser
-    local ca_cert
-    ca_cert=$(python3 - "$root_response" <<'PY'
+  # Extract the certificate using Python from STDIN; tolerate empty/invalid JSON
+  local ca_cert
+  ca_cert=$(printf '%s' "${root_response}" | python3 - <<'PY' || true
 import json, sys
-data = json.loads(sys.argv[1]) if len(sys.argv) > 1 else json.load(sys.stdin)
-print(data.get("data", {}).get("certificate", ""))
+try:
+  data = json.load(sys.stdin)
+  print(data.get("data", {}).get("certificate", ""))
+except Exception:
+  # Print nothing on failure; caller will handle empty value
+  pass
 PY
-    )
+  )
 
     # Store in KV secrets (enable KV v2 first)
     vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/dev/null 2>&1 || true
 
   # JSON-escape and put the certificate in KV v2
-  local payload
-  payload=$(python3 - <<'PY'
+    if [ -n "${ca_cert}" ]; then
+      local payload
+      payload=$(python3 - <<'PY'
 import json, sys
-from pathlib import Path
 pem = sys.stdin.read()
 print(json.dumps({"data": {"pem": pem}}))
 PY
-  <<<"${ca_cert}")
-  vault_api POST "secret/data/pki/trusted_roots" "${payload}" >/dev/null
+      <<<"${ca_cert}")
+      vault_api POST "secret/data/pki/trusted_roots" "${payload}" >/dev/null
+    else
+      warn "Failed to parse certificate from generate/internal response."
+    fi
   fi
 
   # Write debug file with the stored secret to help CI diagnostics
@@ -231,13 +238,25 @@ PY
       log "KV secret is readable."; break; fi; sleep 0.5; done
 
   # Quick smoke test: read PEM and show header in logs
-  pem_head=$(vault_api GET "secret/data/pki/trusted_roots" | python3 - <<'PY'
+  kv_json=$(vault_api GET "secret/data/pki/trusted_roots" || true)
+  if [ -n "${kv_json}" ]; then
+    pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY' || true
 import json,sys
-data=json.load(sys.stdin)
-print('\n'.join(data.get('data',{}).get('data',{}).get('pem','').splitlines()[:3]))
+try:
+    data=json.load(sys.stdin)
+    print('\n'.join(data.get('data',{}).get('data',{}).get('pem','').splitlines()[:3]))
+except Exception:
+    pass
 PY
-  )
-  log "PEM head from KV:\n${pem_head}"
+    )
+    if [ -n "${pem_head}" ]; then
+      log "PEM head from KV:\n${pem_head}"
+    else
+      warn "KV read returned no PEM header."
+    fi
+  else
+    warn "KV read returned empty response."
+  fi
 
   log "Test root CA injected successfully."
 }
