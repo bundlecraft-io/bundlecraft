@@ -13,6 +13,7 @@ Design choices per ADR-0002 and user guidance:
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,14 @@ from bundlecraft.fetchers.vault import fetch_vault
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
 CURRENT_DIR = Path(__file__).resolve().parent
+
+# Setup logger
+logger = logging.getLogger("bundlecraft.fetch")
+handler = logging.StreamHandler()
+formatter = logging.Formatter("[%(levelname)s] %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 def _clean_dir(path: Path) -> None:
@@ -51,7 +60,9 @@ def _write_provenance(dir_path: Path, records: list[dict[str, Any]]) -> None:
     )
 
 
-def _fetch_from_config(fetch_cfg: list[dict[str, Any]], dest_dir: Path, root: Path) -> list[Path]:
+def _fetch_from_config(
+    fetch_cfg: list[dict[str, Any]], dest_dir: Path, root: Path, verbose: bool = False
+) -> list[Path]:
     outputs: list[Path] = []
     provenance: list[dict[str, Any]] = []
 
@@ -60,78 +71,119 @@ def _fetch_from_config(fetch_cfg: list[dict[str, Any]], dest_dir: Path, root: Pa
         name = src.get("name") or f"fetched-{idx}"
         verify = src.get("verify") or {}
 
-        if ftype == "url":
-            url = src.get("url")
-            if not url:
-                raise click.ClickException("Fetch source missing 'url'")
-            out_path = fetch_url(url, dest_dir, name=name, verify=verify, root=root)
-        elif ftype == "api":
-            endpoint = src.get("endpoint") or src.get("url")
-            if not endpoint:
-                raise click.ClickException("API fetch source requires 'endpoint' (or 'url')")
-            provider = src.get("provider")
-            token_ref = src.get("token_ref")
-            headers = (verify or {}).get("headers") if isinstance(verify, dict) else None
-            out_path = fetch_api(
-                endpoint,
-                dest_dir,
-                name=name,
-                provider=provider,
-                token_ref=token_ref,
-                headers=headers,
-                verify=verify if isinstance(verify, dict) else None,
-            )
-        elif ftype == "vault":
-            mount_point = (
-                src.get("mount_point") or src.get("mount") or src.get("engine") or "secret"
-            )
-            path = src.get("path")
-            if not path:
-                raise click.ClickException("Vault fetch source requires 'path'")
-            pem_field = src.get("pem_field") or "pem"
-            addr = src.get("addr")  # fallback to VAULT_ADDR if not provided
-            token_ref = src.get("token_ref")  # fallback to VAULT_TOKEN
-            namespace = src.get("namespace")
-            out_path = fetch_vault(
-                dest_dir,
-                name=name,
-                mount_point=mount_point,
-                path=path,
-                pem_field=pem_field,
-                addr=addr,
-                token_ref=token_ref,
-                namespace=namespace,
-                verify=verify if isinstance(verify, dict) else None,
-            )
-        else:
-            raise click.ClickException(f"Unsupported fetch type: {ftype}")
+        logger.info(f"[Fetch {idx}/{len(fetch_cfg)}] Type: {ftype}, Name: {name}")
+        if verbose:
+            logger.debug(f"  Full config: {json.dumps(src, indent=2)}")
 
-        actual_sha = sha256_file(out_path)
-        if "sha256" in verify:
-            expected_sha256 = str(verify.get("sha256"))
-            if actual_sha.lower() != expected_sha256.lower():
-                # Remove the file immediately to avoid accidental use
-                out_path.unlink(missing_ok=True)
-                raise click.ClickException(
-                    f"SHA256 mismatch for {name}: expected {expected_sha256}, got {actual_sha}"
+        try:
+            if ftype == "url":
+                url = src.get("url")
+                if not url:
+                    raise click.ClickException("Fetch source missing 'url'")
+                logger.info(f"  Fetching from URL: {url}")
+                if verbose and verify:
+                    logger.debug(f"  Verification config: {json.dumps(verify, indent=2)}")
+                out_path = fetch_url(url, dest_dir, name=name, verify=verify, root=root)
+            elif ftype == "api":
+                endpoint = src.get("endpoint") or src.get("url")
+                if not endpoint:
+                    raise click.ClickException("API fetch source requires 'endpoint' (or 'url')")
+                provider = src.get("provider")
+                token_ref = src.get("token_ref")
+                headers = (verify or {}).get("headers") if isinstance(verify, dict) else None
+                logger.info(f"  Fetching from API: {endpoint}")
+                logger.info(f"    Provider: {provider or 'generic'}")
+                if verbose:
+                    logger.debug(f"    Token ref: {token_ref}")
+                    if headers:
+                        logger.debug(f"    Custom headers: {list(headers.keys())}")
+                out_path = fetch_api(
+                    endpoint,
+                    dest_dir,
+                    name=name,
+                    provider=provider,
+                    token_ref=token_ref,
+                    headers=headers,
+                    verify=verify if isinstance(verify, dict) else None,
                 )
+            elif ftype == "vault":
+                mount_point = (
+                    src.get("mount_point") or src.get("mount") or src.get("engine") or "secret"
+                )
+                path = src.get("path")
+                if not path:
+                    raise click.ClickException("Vault fetch source requires 'path'")
+                pem_field = src.get("pem_field") or "pem"
+                addr = src.get("addr")  # fallback to VAULT_ADDR if not provided
+                token_ref = src.get("token_ref")  # fallback to VAULT_TOKEN
+                namespace = src.get("namespace")
+                logger.info("  Fetching from Vault:")
+                logger.info(f"    Address: {addr or 'from VAULT_ADDR env'}")
+                logger.info(f"    Mount: {mount_point}, Path: {path}")
+                logger.info(f"    Field: {pem_field}")
+                if verbose:
+                    logger.debug(f"    Namespace: {namespace or 'default'}")
+                    logger.debug(f"    Token ref: {token_ref or 'from VAULT_TOKEN env'}")
+                out_path = fetch_vault(
+                    dest_dir,
+                    name=name,
+                    mount_point=mount_point,
+                    path=path,
+                    pem_field=pem_field,
+                    addr=addr,
+                    token_ref=token_ref,
+                    namespace=namespace,
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            else:
+                raise click.ClickException(f"Unsupported fetch type: {ftype}")
 
-        outputs.append(out_path)
-        provenance.append(
-            {
-                "name": name,
-                "origin": src,
-                "staged_path": str(out_path.relative_to(root)),
-                "sha256": actual_sha,
-            }
-        )
+            actual_sha = sha256_file(out_path)
+            logger.info(f"  ✓ Fetched successfully: {out_path.name}")
+            logger.info(f"    SHA256: {actual_sha}")
+
+            if "sha256" in verify:
+                expected_sha256 = str(verify.get("sha256"))
+                if actual_sha.lower() != expected_sha256.lower():
+                    out_path.unlink(missing_ok=True)
+                    logger.error(f"  ✗ SHA256 mismatch for {name}:")
+                    logger.error(f"    Expected: {expected_sha256}")
+                    logger.error(f"    Got:      {actual_sha}")
+                    raise click.ClickException(
+                        f"SHA256 mismatch for {name}: expected {expected_sha256}, got {actual_sha}"
+                    )
+                logger.info("  ✓ SHA256 verification passed")
+
+            outputs.append(out_path)
+            provenance.append(
+                {
+                    "name": name,
+                    "origin": src,
+                    "staged_path": str(out_path.relative_to(root)),
+                    "sha256": actual_sha,
+                }
+            )
+        except click.ClickException:
+            raise
+        except Exception as e:
+            logger.error(f"  ✗ Fetch failed for {name}: {e}")
+            if verbose:
+                import traceback
+
+                logger.error(traceback.format_exc())
+            raise click.ClickException(f"Fetch failed for {name}: {e}") from e
 
     _write_provenance(dest_dir, provenance)
     return outputs
 
 
 def run_fetch(
-    env: str, bundle: str, workspace_root: Path, no_clean: bool = False, offline: bool = False
+    env: str,
+    bundle: str,
+    workspace_root: Path,
+    no_clean: bool = False,
+    offline: bool = False,
+    verbose: bool = False,
 ) -> list[Path]:
     """Programmatic entrypoint to fetch-and-stage.
 
@@ -146,6 +198,7 @@ def run_fetch(
     ensure_dir(sources_dir)
 
     # Load config
+    logger.info(f"Loading config for env={env}, bundle={bundle}")
     _ = load_yaml(config_dir / "envs" / f"{env}.yaml", required=True)
     bundle_cfg = load_yaml(config_dir / "bundles" / f"{bundle}.yaml", required=True)
     fetch_cfg = bundle_cfg.get("fetch") or []
@@ -154,16 +207,18 @@ def run_fetch(
     if not fetch_cfg:
         return []
 
+    logger.info(f"Found {len(fetch_cfg)} fetch source(s)")
     dest_dir = sources_dir / "fetched" / env / bundle
     ensure_dir(dest_dir)
     if not no_clean:
+        logger.info(f"Cleaning staging directory: {dest_dir}")
         _clean_dir(dest_dir)
         ensure_dir(dest_dir)
 
     if offline:
         # In offline mode, do not perform network calls. If any fetch entries exist, fail.
         raise click.ClickException("Offline mode is enabled but fetch entries are present.")
-    outputs = _fetch_from_config(fetch_cfg, dest_dir, root)
+    outputs = _fetch_from_config(fetch_cfg, dest_dir, root, verbose=verbose)
     return outputs
 
 
@@ -191,6 +246,9 @@ def run_fetch(
     help="Do not clean staging directory before fetching (default is to clean)",
 )
 @click.option("--offline", is_flag=True, help="Fail if 'fetch' is required; do not contact network")
+@click.option(
+    "--verbose", is_flag=True, help="Show extra debug output and tracebacks for fetch operations"
+)
 def main(
     config_file: Path | None,
     env: str | None,
@@ -198,6 +256,7 @@ def main(
     workspace_root: Path,
     no_clean: bool,
     offline: bool,
+    verbose: bool,
 ):
     """Fetch and stage certificate inputs declared in bundle config (CLI).
 
@@ -206,12 +265,22 @@ def main(
     - Direct (--config-file): loads bundle config from the given path; --env optional (defaults 'ci')
     """
     click.secho("\n🔐 BundleCraft Fetcher\n----------------------", fg="cyan")
+
+    # Set logging level based on verbose flag
+    if verbose:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Verbose mode enabled")
+    else:
+        logger.setLevel(logging.INFO)
+
     try:
         outputs: list[Path] = []
         root = workspace_root.resolve()
+        logger.info(f"Workspace root: {root}")
 
         if config_file is not None:
             # Direct-from-file mode
+            logger.info(f"Loading bundle config from file: {config_file}")
             cfg = load_yaml(config_file, required=True)
             fetch_cfg = cfg.get("fetch") or []
             if not isinstance(fetch_cfg, list):
@@ -225,25 +294,30 @@ def main(
 
             bundle_name = cfg.get("id") or config_file.stem
             env_name = env or "ci"
+            logger.info(f"Bundle: {bundle_name}, Environment: {env_name}")
+            logger.info(f"Found {len(fetch_cfg)} fetch source(s)")
 
             sources_dir = root / "sources"
             ensure_dir(sources_dir)
             dest_dir = sources_dir / "fetched" / env_name / bundle_name
             ensure_dir(dest_dir)
             if not no_clean:
+                logger.info(f"Cleaning staging directory: {dest_dir}")
                 _clean_dir(dest_dir)
                 ensure_dir(dest_dir)
 
             if offline:
                 raise click.ClickException("Offline mode is enabled but fetch entries are present.")
-            outputs = _fetch_from_config(fetch_cfg, dest_dir, root)
+            outputs = _fetch_from_config(fetch_cfg, dest_dir, root, verbose=verbose)
         else:
             # Legacy/default mode
             if not env or not bundle:
                 raise click.ClickException(
                     "--env and --bundle are required unless --config-file is used"
                 )
-            outputs = run_fetch(env, bundle, workspace_root, no_clean=no_clean, offline=offline)
+            outputs = run_fetch(
+                env, bundle, workspace_root, no_clean=no_clean, offline=offline, verbose=verbose
+            )
     except click.ClickException as e:
         click.secho(f"[ERROR] {e}", fg="red", err=True)
         sys.exit(2)
