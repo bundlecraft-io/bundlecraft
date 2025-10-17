@@ -234,7 +234,7 @@ vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/d
 
   # KV v2 only
   local payload_v2
-  payload_v2=$(echo "${ca_cert}" | python3 - <<'PY'
+  payload_v2=$(printf '%s' "${ca_cert}" | python3 - <<'PY'
 import json, sys
 pem = sys.stdin.read()
 print(json.dumps({"data": {"pem": pem}}))
