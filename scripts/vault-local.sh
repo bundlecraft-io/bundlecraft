@@ -53,17 +53,17 @@ usage() { grep '^# ' "$0" | cut -c 3-; exit 0; }
 
 ACTION="${1:-}"; shift || true
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --port) VAULT_PORT="$2"; shift 2 ;;
-    --data-dir) VAULT_DATA_DIR="$2"; shift 2 ;;
-    --token) VAULT_TOKEN="$2"; shift 2 ;;
-    --runtime) RUNTIME="$2"; shift 2 ;;
-    --auto-cleanup) AUTO_CLEANUP=true; shift ;;
-    --ci-cmd) CI_CMD="$2"; AUTO_CLEANUP=true; shift 2 ;;
-    --verbose) VERBOSE=true; shift ;;
-    -h|--help) usage ;;
-    *) error "Unknown option: $1" ;;
-  esac
+case "$1" in
+--port) VAULT_PORT="$2"; shift 2 ;;
+--data-dir) VAULT_DATA_DIR="$2"; shift 2 ;;
+--token) VAULT_TOKEN="$2"; shift 2 ;;
+--runtime) RUNTIME="$2"; shift 2 ;;
+--auto-cleanup) AUTO_CLEANUP=true; shift ;;
+--ci-cmd) CI_CMD="$2"; AUTO_CLEANUP=true; shift 2 ;;
+--verbose) VERBOSE=true; shift ;;
+-h|--help) usage ;;
+*) error "Unknown option: $1" ;;
+esac
 done
 
 VAULT_ADDR="http://127.0.0.1:${VAULT_PORT}"
@@ -71,153 +71,149 @@ PID_FILE="${VAULT_DATA_DIR}/vault.pid"
 PODMAN_CONTAINER_NAME="bundlecraft-vault"
 
 check_binary() {
-  command -v vault >/dev/null 2>&1 || error "Vault CLI not found. Install from https://developer.hashicorp.com/vault/downloads"
+command -v vault >/dev/null 2>&1 || error "Vault CLI not found. Install from https://developer.hashicorp.com/vault/downloads"
 }
 check_podman() {
-  command -v podman >/dev/null 2>&1 || error "Podman not found. Install from https://podman.io/getting-started"
+command -v podman >/dev/null 2>&1 || error "Podman not found. Install from https://podman.io/getting-started"
 }
 
 start_vault_binary() {
-  check_binary
-  log "Starting Vault (binary mode)..."
-  mkdir -p "${VAULT_DATA_DIR}"
-  if [ -f "${PID_FILE}" ] && ps -p "$(cat ${PID_FILE})" >/dev/null 2>&1; then
-    error "Vault already running (PID $(cat ${PID_FILE})). Stop it first."
-  fi
-  vault server -dev \
-    -dev-root-token-id="${VAULT_TOKEN}" \
-    -dev-listen-address="127.0.0.1:${VAULT_PORT}" \
-    >"${VAULT_DATA_DIR}/vault.log" 2>&1 &
-  echo $! > "${PID_FILE}"
-  sleep 2
-  export VAULT_ADDR VAULT_TOKEN
+check_binary
+log "Starting Vault (binary mode)..."
+mkdir -p "${VAULT_DATA_DIR}"
+if [ -f "${PID_FILE}" ] && ps -p "$(cat ${PID_FILE})" >/dev/null 2>&1; then
+error "Vault already running (PID $(cat ${PID_FILE})). Stop it first."
+fi
+vault server -dev \
+-dev-root-token-id="${VAULT_TOKEN}" \
+-dev-listen-address="127.0.0.1:${VAULT_PORT}" \
+>"${VAULT_DATA_DIR}/vault.log" 2>&1 &
+echo $! > "${PID_FILE}"
+sleep 2
+export VAULT_ADDR VAULT_TOKEN
 }
 
 stop_vault_binary() {
-  local stopped=false
-  if [ -f "${PID_FILE}" ]; then
-    pid=$(cat "${PID_FILE}")
-    if ps -p "${pid}" >/dev/null 2>&1; then
-      kill "${pid}"
-      stopped=true
-    fi
-    rm -f "${PID_FILE}"
-  fi
-  if [ "${stopped}" = false ]; then
-    warn "No Vault process found to stop (binary mode)."
-  fi
+local stopped=false
+if [ -f "${PID_FILE}" ]; then
+pid=$(cat "${PID_FILE}")
+if ps -p "${pid}" >/dev/null 2>&1; then
+kill "${pid}"
+stopped=true
+fi
+rm -f "${PID_FILE}"
+fi
+if [ "${stopped}" = false ]; then
+warn "No Vault process found to stop (binary mode)."
+fi
 }
 
 start_vault_podman() {
-  check_podman
-  log "Starting Vault (Podman mode)..."
-  mkdir -p "${VAULT_DATA_DIR}"
-  if podman ps -a --format '{{.Names}}' | grep -q "^${PODMAN_CONTAINER_NAME}$"; then
-    podman rm -f "${PODMAN_CONTAINER_NAME}" >/dev/null 2>&1 || true
-  fi
-  podman run -d \
-    --name "${PODMAN_CONTAINER_NAME}" \
-    -p ${VAULT_PORT}:8200 \
-    -v "${VAULT_DATA_DIR}":/vault/data:Z \
-    -e "VAULT_DEV_ROOT_TOKEN_ID=${VAULT_TOKEN}" \
-    -e "VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200" \
-    docker.io/hashicorp/vault:latest >/dev/null
-  sleep 3
-  export VAULT_ADDR VAULT_TOKEN
+check_podman
+log "Starting Vault (Podman mode)..."
+mkdir -p "${VAULT_DATA_DIR}"
+if podman ps -a --format '{{.Names}}' | grep -q "^${PODMAN_CONTAINER_NAME}$"; then
+podman rm -f "${PODMAN_CONTAINER_NAME}" >/dev/null 2>&1 || true
+fi
+podman run -d \
+--name "${PODMAN_CONTAINER_NAME}" \
+-p ${VAULT_PORT}:8200 \
+-v "${VAULT_DATA_DIR}":/vault/data:Z \
+-e "VAULT_DEV_ROOT_TOKEN_ID=${VAULT_TOKEN}" \
+-e "VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200" \
+docker.io/hashicorp/vault:latest >/dev/null
+sleep 3
+export VAULT_ADDR VAULT_TOKEN
 }
 
 stop_vault_podman() {
-  if podman ps -a --format '{{.Names}}' | grep -q "^${PODMAN_CONTAINER_NAME}$"; then
-    podman rm -f "${PODMAN_CONTAINER_NAME}" >/dev/null
-  else
-    warn "No Vault container found to remove (podman mode)."
-  fi
+if podman ps -a --format '{{.Names}}' | grep -q "^${PODMAN_CONTAINER_NAME}$"; then
+podman rm -f "${PODMAN_CONTAINER_NAME}" >/dev/null
+else
+warn "No Vault container found to remove (podman mode)."
+fi
 }
 
 # Helper: run vault command (uses binary or podman exec based on runtime)
 vault_cmd() {
-  if [ "${RUNTIME}" = "binary" ]; then
-    vault "$@"
-  else
-    # For podman runtime, use exec if available, otherwise fall back to API
-    if podman exec "${PODMAN_CONTAINER_NAME}" vault "$@" 2>/dev/null; then
-      return 0
-    else
-      warn "podman exec failed or unavailable, using API calls instead"
-      return 1
-    fi
-  fi
+if [ "${RUNTIME}" = "binary" ]; then
+vault "$@"
+else
+# For podman runtime, use exec if available, otherwise fall back to API
+if podman exec "${PODMAN_CONTAINER_NAME}" vault "$@" 2>/dev/null; then
+return 0
+else
+warn "podman exec failed or unavailable, using API calls instead"
+return 1
+fi
+fi
 }
 
 # Helper: Vault API call wrapper
 vault_api() {
-  local method="$1"
-  local path="$2"
-  local data="${3:-}"
+local method="$1"
+local path="$2"
+local data="${3:-}"
 
-  local url="${VAULT_ADDR}/v1/${path}"
-  local args=(-s -X "${method}" -H "X-Vault-Token: ${VAULT_TOKEN}")
+local url="${VAULT_ADDR}/v1/${path}"
+local args=(-s -X "${method}" -H "X-Vault-Token: ${VAULT_TOKEN}")
 
-  if [ -n "${data}" ]; then
-    args+=(-H "Content-Type: application/json" -d "${data}")
-  fi
+if [ -n "${data}" ]; then
+args+=(-H "Content-Type: application/json" -d "${data}")
+fi
 
-  curl "${args[@]}" "${url}"
+curl "${args[@]}" "${url}"
 }
 
 setup_vault_env() {
-  log "Configuring Vault PKI test data..."
+log "Configuring Vault PKI test data..."
 
-  # Try using vault CLI first (binary or podman exec)
-  if vault_cmd secrets enable -path=pki/trusted_roots pki 2>/dev/null; then
-    vault_cmd secrets tune -max-lease-ttl=8760h pki/trusted_roots
-    # Capture certificate directly from generation output
-    local ca_cert
-    ca_cert=$(podman exec "${PODMAN_CONTAINER_NAME}" vault write -field=certificate \
-      pki/trusted_roots/root/generate/internal common_name="local-root-ca" ttl=8760h)
-    # Fallback: if exec not possible, try local vault binary
-    if [ -z "${ca_cert}" ] && command -v vault >/dev/null 2>&1; then
-      ca_cert=$(vault write -field=certificate \
-        pki/trusted_roots/root/generate/internal common_name="local-root-ca" ttl=8760h)
-    fi
-    # Store PEM in KV v2 at secret/pki/trusted_roots
-    vault_cmd kv put secret/pki/trusted_roots pem="${ca_cert}" >/dev/null
-  else
-    # Fall back to API calls (works without vault binary or exec)
-    log "Using Vault HTTP API for configuration..."
+# Try using vault CLI first (binary or podman exec)
+if vault_cmd secrets enable -path=pki/trusted_roots pki 2>/dev/null; then
+vault_cmd secrets tune -max-lease-ttl=8760h pki/trusted_roots
+# Capture certificate directly from generation output
+local ca_cert
+ca_cert=$(podman exec "${PODMAN_CONTAINER_NAME}" vault write -field=certificate \
+     pki/trusted_roots/root/generate/internal common_name="local-root-ca" ttl=8760h)
+# Fallback: if exec not possible, try local vault binary
+if [ -z "${ca_cert}" ] && command -v vault >/dev/null 2>&1; then
+ca_cert=$(vault write -field=certificate \
+       pki/trusted_roots/root/generate/internal common_name="local-root-ca" ttl=8760h)
+fi
+# Store PEM in KV v2 at secret/pki/trusted_roots
+vault_cmd kv put secret/pki/trusted_roots pem="${ca_cert}" >/dev/null
+else
+# Fall back to API calls (works without vault binary or exec)
+log "Using Vault HTTP API for configuration..."
 
-    # Enable PKI secrets engine
-    vault_api POST "sys/mounts/pki/trusted_roots" '{"type":"pki"}' >/dev/null 2>&1 || true
+# Enable PKI secrets engine
+vault_api POST "sys/mounts/pki/trusted_roots" '{"type":"pki"}' >/dev/null 2>&1 || true
 
-    # Tune max lease TTL
-    vault_api POST "sys/mounts/pki/trusted_roots/tune" '{"max_lease_ttl":"8760h"}' >/dev/null
+# Tune max lease TTL
+vault_api POST "sys/mounts/pki/trusted_roots/tune" '{"max_lease_ttl":"8760h"}' >/dev/null
 
-    # Generate root CA and parse certificate
-  local root_response
-  root_response=$(vault_api POST "pki/trusted_roots/root/generate/internal" \
-    '{"common_name":"local-root-ca","ttl":"8760h"}')
+# Generate root CA and parse certificate
+local root_response
+root_response=$(vault_api POST "pki/trusted_roots/root/generate/internal" \
+   '{"common_name":"local-root-ca","ttl":"8760h"}')
 
-  # Extract the certificate using Python from STDIN; tolerate empty/invalid JSON
-  local ca_cert
-  TMPDIR="${HOME:-/tmp}"
-  ca_cert_json=$(mktemp -p "$TMPDIR")
-  chmod 600 "${ca_cert_json}" || true
-  echo "${root_response}" > "${ca_cert_json}"
-  ca_cert=$(python3 - <<'PY'
+# Extract the certificate using Python from STDIN; tolerate empty/invalid JSON
+local ca_cert
+ca_cert=$(printf '%s' "${root_response}" | python3 - <<'PY'
 import json, sys
 try:
-  with open(sys.argv[1], "r") as f:
-    data = json.load(f)
-  print(data.get("data", {}).get("certificate", ""))
+ data = json.load(sys.stdin)
+ print(data.get("data", {}).get("certificate", ""))
 except Exception:
-  pass
+ # Print nothing on failure; caller will handle empty value
+ pass
 PY
-  "${ca_cert_json}")
-  rm -f "${ca_cert_json}"
+ )
 
-    # Store in KV secrets (enable KV v2 first)
-    vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/dev/null 2>&1 || true
+# Store in KV secrets (enable KV v2 first)
+vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/dev/null 2>&1 || true
 
+  # JSON-escape and put the certificate in KV v2
     # If PKI generation failed to yield a cert, generate a local test CA PEM
     if [ -z "${ca_cert}" ]; then
       warn "PKI engine did not return a certificate; generating a local test CA PEM instead."
@@ -231,137 +227,85 @@ PY
       rm -rf "${tmp_dir}" || true
     fi
 
-    # JSON-escape and put the certificate in KV v2 and KV v1 (from PKI or OpenSSL fallback)
+    # Write PEM to KV v2 (data) and KV v1 (top-level) for compatibility
     if [ -n "${ca_cert}" ]; then
-      local payload_v2 payload_v1
-  payload_v2_json=$(mktemp -p "$TMPDIR")
-  chmod 600 "${payload_v2_json}" || true
-  echo "${ca_cert}" > "${payload_v2_json}"
-  payload_v2=$(python3 - <<'PY'
+      # KV v2
+      local payload_v2
+      payload_v2=$(python3 - <<'PY'
 import json, sys
-with open(sys.argv[1], "r") as f:
-  pem = f.read()
+pem = sys.stdin.read()
 print(json.dumps({"data": {"pem": pem}}))
 PY
-  "${payload_v2_json}")
-  rm -f "${payload_v2_json}"
-  payload_v1_json=$(mktemp -p "$TMPDIR")
-  chmod 600 "${payload_v1_json}" || true
-  echo "${ca_cert}" > "${payload_v1_json}"
-  payload_v1=$(python3 - <<'PY'
+        <<<"${ca_cert}")
+      vault_api POST "secret/data/pki/trusted_roots" "${payload_v2}" >/dev/null
+
+      # KV v1
+      local payload_v1
+      payload_v1=$(python3 - <<'PY'
 import json, sys
-with open(sys.argv[1], "r") as f:
-  pem = f.read()
+pem = sys.stdin.read()
 print(json.dumps({"pem": pem}))
 PY
-  "${payload_v1_json}")
-  rm -f "${payload_v1_json}"
-      # Try KV v2 write
-      vault_api POST "secret/data/pki/trusted_roots" "${payload_v2}" >/dev/null 2>&1 || true
-      # Also write KV v1 for compatibility
-      vault_api POST "secret/pki/trusted_roots" "${payload_v1}" >/dev/null 2>&1 || true
+        <<<"${ca_cert}")
+      vault_api POST "secret/pki/trusted_roots" "${payload_v1}" >/dev/null
     else
+      warn "Failed to parse certificate from generate/internal response."
       warn "No certificate available to store in KV."
     fi
-  fi
+fi
 
-  # Write debug file with the stored secret to help CI diagnostics
-  mkdir -p "${VAULT_DATA_DIR}"
-  vault_api GET "secret/data/pki/trusted_roots" > "${VAULT_DATA_DIR}/kv_secret_pki_trusted_roots.json" || true
+# Write debug file with the stored secret to help CI diagnostics
+mkdir -p "${VAULT_DATA_DIR}"
+vault_api GET "secret/data/pki/trusted_roots" > "${VAULT_DATA_DIR}/kv_secret_pki_trusted_roots.json" || true
 
-  # Wait until the KV secret contains a non-empty pem (prefer v2, fallback v1)
-  for i in {1..40}; do
-    kv_json=$(vault_api GET "secret/data/pki/trusted_roots" || true)
-  pem_head_json=$(mktemp -p "$TMPDIR")
-  chmod 600 "${pem_head_json}" || true
-  echo "${kv_json}" > "${pem_head_json}"
-  pem_head=$(python3 - <<'PY'
-import json,sys
-import sys
-try:
-  with open(sys.argv[1], "r") as f:
-    data=json.load(f)
-  pem=data.get('data',{}).get('data',{}).get('pem','')
-  print('\n'.join(pem.splitlines()[:3]))
-except Exception:
-  pass
-PY
-  "${pem_head_json}")
-  rm -f "${pem_head_json}"
-    if [ -z "${pem_head}" ]; then
-      # Try KV v1
-      kv_json=$(vault_api GET "secret/pki/trusted_roots" || true)
-      pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY' 2>/dev/null || true
+# Wait until the KV secret is readable (readiness gate)
+for i in {1..20}; do
+if vault_api GET "secret/data/pki/trusted_roots" | grep -q '"data"'; then
+log "KV secret is readable."; break; fi; sleep 0.5; done
+
+# Quick smoke test: read PEM and show header in logs
+kv_json=$(vault_api GET "secret/data/pki/trusted_roots" || true)
+if [ -n "${kv_json}" ]; then
+pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY'
 import json,sys
 try:
-    data=json.load(sys.stdin)
-    pem=data.get('data',{}).get('pem','')
-    print('\n'.join(pem.splitlines()[:3]))
+   data=json.load(sys.stdin)
+   print('\n'.join(data.get('data',{}).get('data',{}).get('pem','').splitlines()[:3]))
 except Exception:
-    pass
+   pass
 PY
-      )
-    fi
-    if [ -n "${pem_head}" ]; then
-      log "KV secret is writable and contains PEM."; break; fi; sleep 0.5; done
+   )
+if [ -n "${pem_head}" ]; then
+log "PEM head from KV:\n${pem_head}"
+else
+warn "KV read returned no PEM header."
+fi
+else
+warn "KV read returned empty response."
+fi
 
-  # Quick smoke test: read PEM and show header in logs
-  # Final diagnostic: prefer v2, fallback v1 for PEM head
-  kv_json=$(vault_api GET "secret/data/pki/trusted_roots" || true)
-  pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY' 2>/dev/null || true
-import json,sys
-try:
-    data=json.load(sys.stdin)
-    print('\n'.join(data.get('data',{}).get('data',{}).get('pem','').splitlines()[:3]))
-except Exception:
-    pass
-PY
-  )
-  if [ -z "${pem_head}" ]; then
-    kv_json=$(vault_api GET "secret/pki/trusted_roots" || true)
-  pem_head_json=$(mktemp -p "$TMPDIR")
-  chmod 600 "${pem_head_json}" || true
-  echo "${kv_json}" > "${pem_head_json}"
-    pem_head=$(python3 - <<'PY'
-import json,sys
-import sys
-try:
-  with open(sys.argv[1], "r") as f:
-    data=json.load(f)
-  print('\n'.join(data.get('data',{}).get('pem','').splitlines()[:3]))
-except Exception:
-  pass
-PY
-    "${pem_head_json}")
-    rm -f "${pem_head_json}"
-  fi
-  if [ -n "${pem_head}" ]; then
-    log "PEM head from KV:\n${pem_head}"
-  else
-    warn "KV read returned no PEM header."
-  fi
-
-  log "Test root CA injected successfully."
+log "Test root CA injected successfully."
 }
 
 cmd_up() {
-  case "${RUNTIME}" in
-    binary) start_vault_binary ;;
-    podman) start_vault_podman ;;
-    *) error "Invalid runtime '${RUNTIME}'. Use 'binary' or 'podman'." ;;
-  esac
+case "${RUNTIME}" in
+binary) start_vault_binary ;;
+podman) start_vault_podman ;;
+*) error "Invalid runtime '${RUNTIME}'. Use 'binary' or 'podman'." ;;
+esac
 
-  export VAULT_ADDR VAULT_TOKEN
-  setup_vault_env
+export VAULT_ADDR VAULT_TOKEN
+setup_vault_env
 
-  echo -e "${GREEN}✅ Vault setup complete!${RESET}"
-  echo "Vault Address : ${VAULT_ADDR}"
-  echo "Root Token    : ${VAULT_TOKEN}"
-  echo "Runtime       : ${RUNTIME}"
-  echo
+echo -e "${GREEN}✅ Vault setup complete!${RESET}"
+echo "Vault Address : ${VAULT_ADDR}"
+echo "Root Token    : ${VAULT_TOKEN}"
+echo "Runtime       : ${RUNTIME}"
+echo
 
-  if [ -n "${CI_CMD}" ]; then
-    log "Running CI command: ${CI_CMD}"
+if [ -n "${CI_CMD}" ]; then
+log "Running CI command: ${CI_CMD}"
+    bash -c "${CI_CMD}" || warn "CI command failed."
     set +e
     bash -c "${CI_CMD}"
     ci_status=$?
@@ -369,38 +313,39 @@ cmd_up() {
     if [ ${ci_status} -ne 0 ]; then
       warn "CI command failed with status ${ci_status}."
     fi
-    # Preserve artifacts for CI before teardown
-    ART_DIR="${VAULT_DATA_DIR}_artifacts"
-    mkdir -p "${ART_DIR}" || true
-    if [ -d "${VAULT_DATA_DIR}" ]; then
-      cp -a "${VAULT_DATA_DIR}/." "${ART_DIR}/" || true
-    fi
-    cmd_down
+# Preserve artifacts for CI before teardown
+ART_DIR="${VAULT_DATA_DIR}_artifacts"
+mkdir -p "${ART_DIR}" || true
+if [ -d "${VAULT_DATA_DIR}" ]; then
+cp -a "${VAULT_DATA_DIR}/." "${ART_DIR}/" || true
+fi
+cmd_down
+    exit 0
     exit ${ci_status}
-  fi
+fi
 
-  if [ "${AUTO_CLEANUP}" = true ]; then
-    echo -e "${YELLOW}[AUTO-CLEANUP ENABLED]${RESET}"
-    read -p "Press ENTER when done testing to clean up Vault... " || true
-    cmd_down
-  else
-    echo "Run '$0 down' when done."
-  fi
+if [ "${AUTO_CLEANUP}" = true ]; then
+echo -e "${YELLOW}[AUTO-CLEANUP ENABLED]${RESET}"
+read -p "Press ENTER when done testing to clean up Vault... " || true
+cmd_down
+else
+echo "Run '$0 down' when done."
+fi
 }
 
 cmd_down() {
-  log "Tearing down Vault..."
-  case "${RUNTIME}" in
-    binary) stop_vault_binary ;;
-    podman) stop_vault_podman ;;
-  esac
-  rm -rf "${VAULT_DATA_DIR}" || true
-  echo -e "${GREEN}✅ Cleanup complete.${RESET}"
+log "Tearing down Vault..."
+case "${RUNTIME}" in
+binary) stop_vault_binary ;;
+podman) stop_vault_podman ;;
+esac
+rm -rf "${VAULT_DATA_DIR}" || true
+echo -e "${GREEN}✅ Cleanup complete.${RESET}"
 }
 
 case "${ACTION}" in
-  up) cmd_up ;;
-  down) cmd_down ;;
-  ""|-h|--help) usage ;;
-  *) error "Unknown command: ${ACTION} (expected up|down)" ;;
+up) cmd_up ;;
+down) cmd_down ;;
+""|-h|--help) usage ;;
+*) error "Unknown command: ${ACTION} (expected up|down)" ;;
 esac
