@@ -343,6 +343,33 @@ For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/R
 
 ---
 
+## 📐 Trust Matrix (Envs × Bundles)
+
+The release pipeline now publishes a trust matrix that shows which environments (rows) trust which bundles (columns), derived from `config/envs/*.yaml` composition (`targets.<name>.includes`).
+
+Artifacts attached to releases:
+- `TRUST_MATRIX.md` — Markdown table (human-readable)
+- `trust-matrix.json` — Structured JSON (machine-readable)
+
+Generate locally:
+
+```bash
+# Table (terminal)
+python scripts/trust_matrix.py --config-dir config --format table
+
+# Markdown
+python scripts/trust_matrix.py --config-dir config --format markdown --output TRUST_MATRIX.md
+
+# JSON
+python scripts/trust_matrix.py --config-dir config --format json --output trust-matrix.json
+```
+
+Notes:
+- Trust for an environment is the union of all bundles included by its targets
+- Legacy `bundle_targets: [...]` is also supported and treated as trusted bundles
+
+---
+
 ## 🏭 CI/CD Pipeline
 
 The included [GitHub Actions workflow](.github/workflows/bundlecraft.yaml) automates:

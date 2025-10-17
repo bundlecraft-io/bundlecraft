@@ -253,6 +253,20 @@ jobs:
             done
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
+      - name: Setup Python for trust matrix
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PyYAML for trust matrix
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+      - name: Generate trust matrix artifacts
+        run: |
+          python scripts/trust_matrix.py --config-dir config --format markdown --output release/TRUST_MATRIX.md
+          python scripts/trust_matrix.py --config-dir config --format json --output release/trust-matrix.json
+          echo "Generated trust matrix:"
+          ls -l release/TRUST_MATRIX.md release/trust-matrix.json
       - name: Create GitHub Release (signed)
         if: ${{ steps.gpg-check.outputs.available == 'true' }}
         uses: softprops/action-gh-release@v2
@@ -268,24 +282,29 @@ jobs:
               - Triggered by: @${{ github.actor }}
               - Signing: Enabled (signature attached)
             Bundles built (${{ steps.summary.outputs.bundle_count }})
-              ${{ steps.summary.outputs.bundle_list_markdown }}
+                - ${{ steps.summary.outputs.bundle_list_markdown }}
             What’s included in this release
-              - bundlecraft-trust.tar.gz: tarball containing pki-ca-trust/<env>/<bundle>/ directories
-              - bundlecraft-trust.sha256: SHA-256 checksum of the tarball
-              - bundlecraft-trust.tar.gz.asc: GPG detached signature
-            Each bundle directory typically includes:
-              - Canonical PEM bundle (.pem)
-              - Additional formats when configured (.p7b, .p12, .jks)
-              - checksums.sha256
+              - Files:
+                - bundlecraft-trust.tar.gz: tarball containing pki-ca-trust/<env>/<bundle>/ directories
+                - bundlecraft-trust.sha256: SHA-256 checksum of the tarball
+                - bundlecraft-trust.tar.gz.asc: GPG detached signature
+                - TRUST_MATRIX.md: Markdown trust matrix (envs x bundles)
+                - trust-matrix.json: JSON trust matrix (structured)
+              - Each bundle directory typically includes:
+                - Canonical PEM bundle (.pem)
+                - Additional formats when configured (.p7b, .p12, .jks)
+                - checksums.sha256
             Verification Instructions
               curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
               gpg --import public-gpg-key.asc
               gpg --verify bundlecraft-trust.tar.gz.asc bundlecraft-trust.tar.gz
-            If you do not see 'Good signature', the artifact may be tampered with.
+            **If you do not see 'Good signature', the artifact may be tampered with.**
           files: |-
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
             release/bundlecraft-trust.tar.gz.asc
+            release/TRUST_MATRIX.md
+            release/trust-matrix.json
       - name: Create GitHub Release (unsigned)
         if: ${{ steps.gpg-check.outputs.available == 'false' }}
         uses: softprops/action-gh-release@v2
@@ -300,11 +319,13 @@ jobs:
               - Commit: `${{ github.sha }}`
               - Triggered by: @${{ github.actor }}
               - Signing: Disabled
-            Bundles built (${{ steps.summary.outputs.bundle_count }})
-              ${{ steps.summary.outputs.bundle_list_markdown }}
+              - Bundles built (${{ steps.summary.outputs.bundle_count }})
+                - ${{ steps.summary.outputs.bundle_list_markdown }}
             What’s included in this release
               - bundlecraft-trust.tar.gz: tarball containing pki-ca-trust/<env>/<bundle>/ directories
               - bundlecraft-trust.sha256: SHA-256 checksum of the tarball
+              - TRUST_MATRIX.md: Markdown trust matrix (envs x bundles)
+              - trust-matrix.json: JSON trust matrix (structured)
             Each bundle directory typically includes:
               - Canonical PEM bundle (.pem)
               - Additional formats when configured (.p7b, .p12, .jks)
@@ -312,3 +333,5 @@ jobs:
           files: |-
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
+            release/TRUST_MATRIX.md
+            release/trust-matrix.json
