@@ -1,5 +1,5 @@
 ---
-name: BundleCraft CA Trust Pipeline
+name: 🧱 BundleCraft CA Trust Pipeline
 run-name: 'BundleCraft CA Trust Pipeline - ${{ github.ref_name }} - Run #${{ github.run_number }}'
 on:
   workflow_dispatch:
@@ -103,10 +103,10 @@ jobs:
           echo "=== pki-ca-trust (rehydrated) ==="
           find pki-ca-trust -maxdepth 3 -type d || true
           echo "================================="
-          tar -czf truststore_bundle.tar.gz pki-ca-trust/
-          sha256sum truststore_bundle.tar.gz > truststore_bundle.sha256
+          tar -czf bundlecraft-trust.tar.gz pki-ca-trust/
+          sha256sum bundlecraft-trust.tar.gz > bundlecraft-trust.sha256
           echo "Created tarball and checksum:"
-          sha256sum truststore_bundle.tar.gz
+          sha256sum bundlecraft-trust.tar.gz
       - name: Upload combined directory
         uses: actions/upload-artifact@v4
         with:
@@ -117,8 +117,8 @@ jobs:
         with:
           name: truststore-bundle
           path: |
-            truststore_bundle.tar.gz
-            truststore_bundle.sha256
+            bundlecraft-trust.tar.gz
+            bundlecraft-trust.sha256
   verify:
     name: Verify builds and tarball
     needs: collect
@@ -161,8 +161,8 @@ jobs:
       - name: Extract and verify tarball
         run: |
           cd verify-tarball
-          echo "Extracting truststore_bundle.tar.gz..."
-          tar -xzf truststore_bundle.tar.gz
+          echo "Extracting bundlecraft-trust.tar.gz..."
+          tar -xzf bundlecraft-trust.tar.gz
           echo "=== Extracted contents ==="
           find . -maxdepth 3 -type d || true
           echo "=========================="
@@ -204,7 +204,7 @@ jobs:
         run: |
           DATE=$(date -u +"%Y.%m.%d-%H%M")
           echo "tag=truststore-v${DATE}" >> $GITHUB_OUTPUT
-          echo "name=BundleCraft CA Trust Store Build - ${DATE}" >> $GITHUB_OUTPUT
+          echo "name=BundleCraft CA Trust Store - ${DATE}" >> $GITHUB_OUTPUT
       - name: Check if GPG key is available
         id: gpg-check
         shell: bash
@@ -223,27 +223,96 @@ jobs:
       - name: Sign artifact
         if: ${{ steps.gpg-check.outputs.available == 'true' }}
         run: |
-          gpg --armor --detach-sign release/truststore_bundle.tar.gz
-      - name: Create GitHub Release
+          gpg --armor --detach-sign release/bundlecraft-trust.tar.gz
+      - name: Summarize bundles in tarball
+        id: summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAR="release/bundlecraft-trust.tar.gz"
+          if [ ! -f "$TAR" ]; then
+            echo "Tarball not found: $TAR" >&2
+            exit 1
+          fi
+          # Find unique pki-ca-trust/<env>/<bundle>/ directories inside the tarball
+          mapfile -t DIRS < <(tar -tzf "$TAR" | awk -F/ 'NF>=3 {print $1"/"$2"/"$3"/"}' | sort -u)
+          mapfile -t BUNDLES < <(printf "%s\n" "${DIRS[@]}" | grep -E '^pki-ca-trust/[^/]+/[^/]+/$' | sed -E 's#^pki-ca-trust/([^/]+)/([^/]+)/$#\1/\2#' | sort)
+          count=${#BUNDLES[@]}
+          echo "bundle_count=$count" >> "$GITHUB_OUTPUT"
+          {
+            echo "bundle_list<<EOF"
+            for b in "${BUNDLES[@]}"; do
+              echo "$b"
+            done
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "bundle_list_markdown<<EOF"
+            for b in "${BUNDLES[@]}"; do
+              echo "- $b"
+            done
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Create GitHub Release (signed)
+        if: ${{ steps.gpg-check.outputs.available == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.name }}
           body: |
             BundleCraft Trust Store Release
+            Build metadata
             - Build: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
             - Branch: `${{ github.ref_name }}`
             - Commit: `${{ github.sha }}`
-            - Triggered by: @${{ github.actor }})
-            - Signing: ${{ steps.gpg-check.outputs.available == 'true' && 'Enabled (signature attached)' || 'Disabled' }}
-            ---
+            - Triggered by: @${{ github.actor }}
+            - Signing: Enabled (signature attached)
+            Bundles built (${{ steps.summary.outputs.bundle_count }})
+            ${{ steps.summary.outputs.bundle_list_markdown }}
+            What’s included in this release
+            - bundlecraft-trust.tar.gz: tarball containing pki-ca-trust/<env>/<bundle>/ directories
+            - bundlecraft-trust.sha256: SHA-256 checksum of the tarball
+            - bundlecraft-trust.tar.gz.asc: GPG detached signature
+            Each bundle directory typically includes:
+            - Canonical PEM bundle (.pem)
+            - Additional formats when configured (.p7b, .p12, .jks)
+            - checksums.sha256
             Verification Instructions
             curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
             gpg --import public-gpg-key.asc
-            gpg --verify truststore_bundle.tar.gz.asc truststore_bundle.tar.gz
-            ---
+            gpg --verify bundlecraft-trust.tar.gz.asc bundlecraft-trust.tar.gz
             If you do not see 'Good signature', the artifact may be tampered with.
           files: |-
-            release/truststore_bundle.tar.gz
-            release/truststore_bundle.sha256
-            release/truststore_bundle.tar.gz.asc
+            release/bundlecraft-trust.tar.gz
+            release/bundlecraft-trust.sha256
+            release/bundlecraft-trust.tar.gz.asc
+      - name: Create GitHub Release (unsigned)
+        if: ${{ steps.gpg-check.outputs.available == 'false' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
+          body: |
+            BundleCraft Trust Store Release
+            Build metadata
+            - Build: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - Branch: `${{ github.ref_name }}`
+            - Commit: `${{ github.sha }}`
+            - Triggered by: @${{ github.actor }}
+            - Signing: Disabled
+            Bundles built (${{ steps.summary.outputs.bundle_count }})
+            ${{ steps.summary.outputs.bundle_list_markdown }}
+            What’s included in this release
+            - bundlecraft-trust.tar.gz: tarball containing pki-ca-trust/<env>/<bundle>/ directories
+            - bundlecraft-trust.sha256: SHA-256 checksum of the tarball
+            Each bundle directory typically includes:
+            - Canonical PEM bundle (.pem)
+            - Additional formats when configured (.p7b, .p12, .jks)
+            - checksums.sha256
+            Verification Instructions
+            curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
+            # No signature file is attached when signing is disabled
+            If you do not see 'Good signature', the artifact may be tampered with.
+          files: |-
+            release/bundlecraft-trust.tar.gz
+            release/bundlecraft-trust.sha256
