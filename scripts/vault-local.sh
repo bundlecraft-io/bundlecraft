@@ -229,6 +229,9 @@ vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/d
 
     # Write PEM to KV v2 (data) and KV v1 (top-level) for compatibility
     if [ -n "${ca_cert}" ]; then
+      log "PEM to be written to Vault (first 3 lines):"
+      echo "${ca_cert}" | head -n 3
+
       # KV v2
       local payload_v2
       payload_v2=$(python3 - <<'PY'
