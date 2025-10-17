@@ -5,6 +5,8 @@ build/
 dist/
 personal*/
 *_cache
+.coverage
+.cov
 
 # Fetch directory should not be committed
 sources/fetched/
@@ -22,3 +24,9 @@ sources/fetched/
 *.json
 *.hash
 *.p7b
+
+# Never commit private keys (even for testing)
+*-key.pem
+*_key.pem
+*/key.pem
+*.key

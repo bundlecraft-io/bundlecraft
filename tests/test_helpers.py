@@ -1,5 +1,7 @@
 """Tests for BundleCraft helper modules."""
 
+import json
+
 import pytest
 
 from bundlecraft.helpers import utils
@@ -51,3 +53,35 @@ class TestUtils:
         if certs_dir.exists():
             pem_files = utils.list_files(certs_dir, suffixes=(".pem",))
             assert isinstance(pem_files, list)
+
+    def test_write_json(self, temp_dir):
+        """Test writing JSON to file."""
+        json_file = temp_dir / "test.json"
+        test_data = {"key1": "value1", "key2": 123, "key3": ["a", "b", "c"]}
+        utils.write_json(json_file, test_data)
+
+        assert json_file.exists()
+        with json_file.open("r") as f:
+            loaded = json.load(f)
+        assert loaded == test_data
+
+    def test_load_yaml_import_error(self, temp_dir, monkeypatch):
+        """Test that missing PyYAML raises helpful error."""
+        # Create a valid YAML file
+        yaml_file = temp_dir / "test.yaml"
+        yaml_file.write_text("key: value\n")
+
+        # Mock import failure
+        import builtins
+
+        original_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "yaml":
+                raise ImportError("No module named 'yaml'")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+
+        with pytest.raises(RuntimeError, match="PyYAML is required"):
+            utils.load_yaml(yaml_file)

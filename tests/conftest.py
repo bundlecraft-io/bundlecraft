@@ -59,6 +59,25 @@ def sample_cert_path(test_data_dir) -> Path:
 
 
 @pytest.fixture(scope="function")
+def intermediate_cert_path(test_data_dir) -> Path:
+    """Return path to an intermediate test certificate."""
+    return test_data_dir / "certs" / "intermediate.pem"
+
+
+@pytest.fixture(scope="function")
+def multi_cert_bundle(tmp_path, sample_cert_path, intermediate_cert_path) -> Path:
+    """Create a bundle with multiple certificates for testing."""
+    bundle_path = tmp_path / "multi-cert-bundle.pem"
+    with open(bundle_path, "w") as out:
+        with open(sample_cert_path) as f1:
+            out.write(f1.read())
+        out.write("\n")
+        with open(intermediate_cert_path) as f2:
+            out.write(f2.read())
+    return bundle_path
+
+
+@pytest.fixture(scope="function")
 def sample_bundle_config(test_data_dir) -> Path:
     """Return path to a sample bundle configuration."""
     return test_data_dir / "configs" / "bundles" / "test-bundle.yaml"
