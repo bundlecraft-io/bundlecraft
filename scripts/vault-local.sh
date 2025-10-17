@@ -199,16 +199,19 @@ setup_vault_env() {
 
   # Extract the certificate using Python from STDIN; tolerate empty/invalid JSON
   local ca_cert
-  ca_cert=$(printf '%s' "${root_response}" | python3 - <<'PY'
+  ca_cert_json=$(mktemp)
+  echo "${root_response}" > "${ca_cert_json}"
+  ca_cert=$(python3 - <<'PY'
 import json, sys
 try:
-  data = json.load(sys.stdin)
+  with open(sys.argv[1], "r") as f:
+    data = json.load(f)
   print(data.get("data", {}).get("certificate", ""))
 except Exception:
-  # Print nothing on failure; caller will handle empty value
   pass
 PY
-  )
+  "${ca_cert_json}")
+  rm -f "${ca_cert_json}"
 
     # Store in KV secrets (enable KV v2 first)
     vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/dev/null 2>&1 || true
@@ -229,18 +232,26 @@ PY
     # JSON-escape and put the certificate in KV v2 and KV v1 (from PKI or OpenSSL fallback)
     if [ -n "${ca_cert}" ]; then
       local payload_v2 payload_v1
-      payload_v2=$(python3 - <<'PY'
+  payload_v2_json=$(mktemp)
+  echo "${ca_cert}" > "${payload_v2_json}"
+  payload_v2=$(python3 - <<'PY'
 import json, sys
-pem = sys.stdin.read()
+with open(sys.argv[1], "r") as f:
+  pem = f.read()
 print(json.dumps({"data": {"pem": pem}}))
 PY
-      <<<"${ca_cert}")
-      payload_v1=$(python3 - <<'PY'
+  "${payload_v2_json}")
+  rm -f "${payload_v2_json}"
+  payload_v1_json=$(mktemp)
+  echo "${ca_cert}" > "${payload_v1_json}"
+  payload_v1=$(python3 - <<'PY'
 import json, sys
-pem = sys.stdin.read()
+with open(sys.argv[1], "r") as f:
+  pem = f.read()
 print(json.dumps({"pem": pem}))
 PY
-      <<<"${ca_cert}")
+  "${payload_v1_json}")
+  rm -f "${payload_v1_json}"
       # Try KV v2 write
       vault_api POST "secret/data/pki/trusted_roots" "${payload_v2}" >/dev/null 2>&1 || true
       # Also write KV v1 for compatibility
@@ -257,16 +268,21 @@ PY
   # Wait until the KV secret contains a non-empty pem (prefer v2, fallback v1)
   for i in {1..40}; do
     kv_json=$(vault_api GET "secret/data/pki/trusted_roots" || true)
-    pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY' 2>/dev/null || true
+  pem_head_json=$(mktemp)
+  echo "${kv_json}" > "${pem_head_json}"
+  pem_head=$(python3 - <<'PY'
 import json,sys
+import sys
 try:
-    data=json.load(sys.stdin)
-    pem=data.get('data',{}).get('data',{}).get('pem','')
-    print('\n'.join(pem.splitlines()[:3]))
+  with open(sys.argv[1], "r") as f:
+    data=json.load(f)
+  pem=data.get('data',{}).get('data',{}).get('pem','')
+  print('\n'.join(pem.splitlines()[:3]))
 except Exception:
-    pass
+  pass
 PY
-    )
+  "${pem_head_json}")
+  rm -f "${pem_head_json}"
     if [ -z "${pem_head}" ]; then
       # Try KV v1
       kv_json=$(vault_api GET "secret/pki/trusted_roots" || true)
@@ -298,15 +314,20 @@ PY
   )
   if [ -z "${pem_head}" ]; then
     kv_json=$(vault_api GET "secret/pki/trusted_roots" || true)
-    pem_head=$(printf '%s' "${kv_json}" | python3 - <<'PY' 2>/dev/null || true
+    pem_head_json=$(mktemp)
+    echo "${kv_json}" > "${pem_head_json}"
+    pem_head=$(python3 - <<'PY'
 import json,sys
+import sys
 try:
-    data=json.load(sys.stdin)
-    print('\n'.join(data.get('data',{}).get('pem','').splitlines()[:3]))
+  with open(sys.argv[1], "r") as f:
+    data=json.load(f)
+  print('\n'.join(data.get('data',{}).get('pem','').splitlines()[:3]))
 except Exception:
-    pass
+  pass
 PY
-    )
+    "${pem_head_json}")
+    rm -f "${pem_head_json}"
   fi
   if [ -n "${pem_head}" ]; then
     log "PEM head from KV:\n${pem_head}"
