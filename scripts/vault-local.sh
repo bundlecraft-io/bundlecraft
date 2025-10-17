@@ -214,9 +214,9 @@ PY
 vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/dev/null 2>&1 || true
 
   # JSON-escape and put the certificate in KV v2
-    # If PKI generation failed to yield a cert, generate a local test CA PEM
-    if [ -z "${ca_cert}" ]; then
-      warn "PKI engine did not return a certificate; generating a local test CA PEM instead."
+    # If PKI generation failed to yield a cert, or PEM is invalid, generate a local test CA PEM
+    if [ -z "${ca_cert}" ] || [[ ! "${ca_cert}" =~ ^-----BEGIN[[:space:]]CERTIFICATE----- ]]; then
+      warn "PKI engine did not return a valid certificate; generating a local test CA PEM instead."
       tmp_dir=$(mktemp -d)
       openssl req -x509 -newkey rsa:2048 -nodes \
         -keyout "${tmp_dir}/root.key" -out "${tmp_dir}/root.crt" \
