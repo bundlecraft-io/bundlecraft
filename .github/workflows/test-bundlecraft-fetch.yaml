@@ -42,8 +42,8 @@ jobs:
               token_ref: VAULT_TOKEN
           YAML
           echo "Wrote ci-test-vault.yaml:" && cat ci-test-vault.yaml
-      - name: Ensure vault-local.sh is executable
-        run: chmod +x scripts/vault-local.sh
+      - name: Ensure vault-local.py is executable
+        run: chmod +x scripts/vault-local.py
       - name: Run local Vault and fetch via BundleCraft
         env:
           VAULT_ADDR: http://127.0.0.1:8200
