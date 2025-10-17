@@ -232,35 +232,23 @@ vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/d
       log "PEM to be written to Vault (first 3 lines):"
       echo "${ca_cert}" | head -n 3
 
-      # KV v2
-      local payload_v2
-      payload_v2=$(python3 - <<'PY'
+  # KV v2 only
+  local payload_v2
+  payload_v2=$(echo "${ca_cert}" | python3 - <<'PY'
 import json, sys
 pem = sys.stdin.read()
 print(json.dumps({"data": {"pem": pem}}))
 PY
-        <<<"${ca_cert}")
-      vault_api POST "secret/data/pki/trusted_roots" "${payload_v2}" >/dev/null
-
-      # KV v1
-      local payload_v1
-      payload_v1=$(python3 - <<'PY'
-import json, sys
-pem = sys.stdin.read()
-print(json.dumps({"pem": pem}))
-PY
-        <<<"${ca_cert}")
-      vault_api POST "secret/pki/trusted_roots" "${payload_v1}" >/dev/null
+  )
+  vault_api POST "secret/data/pki/trusted_roots" "${payload_v2}" >/dev/null
     else
       warn "Failed to parse certificate from generate/internal response."
       warn "No certificate available to store in KV."
     fi
 
-    # Log the full contents of both KV v1 and KV v2 for diagnostics
-    log "KV v2 (secret/data/pki/trusted_roots):"
-    vault_api GET "secret/data/pki/trusted_roots" | python3 -m json.tool || true
-    log "KV v1 (secret/pki/trusted_roots):"
-    vault_api GET "secret/pki/trusted_roots" | python3 -m json.tool || true
+  # Log the full contents of KV v2 for diagnostics
+  log "KV v2 (secret/data/pki/trusted_roots):"
+  vault_api GET "secret/data/pki/trusted_roots" | python3 -m json.tool || true
 fi
 
 # Write debug file with the stored secret to help CI diagnostics
