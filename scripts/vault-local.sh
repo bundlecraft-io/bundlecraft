@@ -171,8 +171,16 @@ setup_vault_env() {
   # Try using vault CLI first (binary or podman exec)
   if vault_cmd secrets enable -path=pki/trusted_roots pki 2>/dev/null; then
     vault_cmd secrets tune -max-lease-ttl=8760h pki/trusted_roots
-    vault_cmd write pki/trusted_roots/root/generate/internal common_name="local-root-ca" ttl=8760h >/dev/null
-    local ca_cert=$(vault_cmd read -field=certificate pki/trusted_roots/cert/ca)
+    # Capture certificate directly from generation output
+    local ca_cert
+    ca_cert=$(podman exec "${PODMAN_CONTAINER_NAME}" vault write -field=certificate \
+      pki/trusted_roots/root/generate/internal common_name="local-root-ca" ttl=8760h)
+    # Fallback: if exec not possible, try local vault binary
+    if [ -z "${ca_cert}" ] && command -v vault >/dev/null 2>&1; then
+      ca_cert=$(vault write -field=certificate \
+        pki/trusted_roots/root/generate/internal common_name="local-root-ca" ttl=8760h)
+    fi
+    # Store PEM in KV v2 at secret/pki/trusted_roots
     vault_cmd kv put secret/pki/trusted_roots pem="${ca_cert}" >/dev/null
   else
     # Fall back to API calls (works without vault binary or exec)
@@ -184,19 +192,33 @@ setup_vault_env() {
     # Tune max lease TTL
     vault_api POST "sys/mounts/pki/trusted_roots/tune" '{"max_lease_ttl":"8760h"}' >/dev/null
 
-    # Generate root CA
-    local root_response=$(vault_api POST "pki/trusted_roots/root/generate/internal" \
+    # Generate root CA and parse certificate
+    local root_response
+    root_response=$(vault_api POST "pki/trusted_roots/root/generate/internal" \
       '{"common_name":"local-root-ca","ttl":"8760h"}')
 
-    # Extract certificate from response
-    local ca_cert=$(echo "${root_response}" | grep -o '"certificate":"[^"]*"' | cut -d'"' -f4 | sed 's/\\n/\n/g')
+    # Robustly extract the certificate using Python JSON parser
+    local ca_cert
+    ca_cert=$(python3 - "$root_response" <<'PY'
+import json, sys
+data = json.loads(sys.argv[1]) if len(sys.argv) > 1 else json.load(sys.stdin)
+print(data.get("data", {}).get("certificate", ""))
+PY
+    )
 
     # Store in KV secrets (enable KV v2 first)
     vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/dev/null 2>&1 || true
 
-    # Put the certificate in KV
-    vault_api POST "secret/data/pki/trusted_roots" \
-      "{\"data\":{\"pem\":\"${ca_cert}\"}}" >/dev/null
+  # JSON-escape and put the certificate in KV v2
+  local payload
+  payload=$(python3 - <<'PY'
+import json, sys
+from pathlib import Path
+pem = sys.stdin.read()
+print(json.dumps({"data": {"pem": pem}}))
+PY
+  <<<"${ca_cert}")
+  vault_api POST "secret/data/pki/trusted_roots" "${payload}" >/dev/null
   fi
 
   # Write debug file with the stored secret to help CI diagnostics
@@ -207,6 +229,15 @@ setup_vault_env() {
   for i in {1..20}; do
     if vault_api GET "secret/data/pki/trusted_roots" | grep -q '"data"'; then
       log "KV secret is readable."; break; fi; sleep 0.5; done
+
+  # Quick smoke test: read PEM and show header in logs
+  pem_head=$(vault_api GET "secret/data/pki/trusted_roots" | python3 - <<'PY'
+import json,sys
+data=json.load(sys.stdin)
+print('\n'.join(data.get('data',{}).get('data',{}).get('pem','').splitlines()[:3]))
+PY
+  )
+  log "PEM head from KV:\n${pem_head}"
 
   log "Test root CA injected successfully."
 }
