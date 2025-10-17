@@ -1,6 +1,6 @@
 ---
-name: 🧪 BundleCraft Test Suite
-run-name: BundleCraft Test Suite - ${{ github.sha }}
+name: 🧪 BundleCraft PyTest Suite
+run-name: BundleCraft PyTest Suite - ${{ github.sha }}
 on:
   push:
     branches: [main, develop]

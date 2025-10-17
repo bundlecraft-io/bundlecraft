@@ -168,8 +168,17 @@ def run_fetch(
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--env", required=True, help="Environment name (e.g., dev, prod, dmz)")
-@click.option("--bundle", required=True, help="Bundle name (e.g., internal, external)")
+@click.option(
+    "--config-file",
+    type=click.Path(exists=True, dir_okay=False, file_okay=True, path_type=Path),
+    help=(
+        "Optional: Path to a single bundle config YAML to fetch from directly. When provided,"
+        " --env/--bundle are optional; env defaults to 'ci' and bundle name is derived from"
+        " the config 'id' or filename."
+    ),
+)
+@click.option("--env", required=False, help="Environment name (e.g., dev, prod, dmz)")
+@click.option("--bundle", required=False, help="Bundle name (e.g., internal, external)")
 @click.option(
     "--workspace-root",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
@@ -182,11 +191,59 @@ def run_fetch(
     help="Do not clean staging directory before fetching (default is to clean)",
 )
 @click.option("--offline", is_flag=True, help="Fail if 'fetch' is required; do not contact network")
-def main(env: str, bundle: str, workspace_root: Path, no_clean: bool, offline: bool):
-    """Fetch and stage certificate inputs declared in bundle config (CLI)."""
+def main(
+    config_file: Path | None,
+    env: str | None,
+    bundle: str | None,
+    workspace_root: Path,
+    no_clean: bool,
+    offline: bool,
+):
+    """Fetch and stage certificate inputs declared in bundle config (CLI).
+
+    Modes:
+    - Default (no --config-file): requires --env and --bundle; loads from config/bundles
+    - Direct (--config-file): loads bundle config from the given path; --env optional (defaults 'ci')
+    """
     click.secho("\n🔐 BundleCraft Fetcher\n----------------------", fg="cyan")
     try:
-        outputs = run_fetch(env, bundle, workspace_root, no_clean=no_clean, offline=offline)
+        outputs: list[Path] = []
+        root = workspace_root.resolve()
+
+        if config_file is not None:
+            # Direct-from-file mode
+            cfg = load_yaml(config_file, required=True)
+            fetch_cfg = cfg.get("fetch") or []
+            if not isinstance(fetch_cfg, list):
+                raise click.ClickException("Config key 'fetch' must be a list of sources")
+            if not fetch_cfg:
+                click.secho(
+                    "[INFO] No 'fetch' entries found in provided config. Nothing to do.",
+                    fg="yellow",
+                )
+                sys.exit(0)
+
+            bundle_name = cfg.get("id") or config_file.stem
+            env_name = env or "ci"
+
+            sources_dir = root / "sources"
+            ensure_dir(sources_dir)
+            dest_dir = sources_dir / "fetched" / env_name / bundle_name
+            ensure_dir(dest_dir)
+            if not no_clean:
+                _clean_dir(dest_dir)
+                ensure_dir(dest_dir)
+
+            if offline:
+                raise click.ClickException("Offline mode is enabled but fetch entries are present.")
+            outputs = _fetch_from_config(fetch_cfg, dest_dir, root)
+        else:
+            # Legacy/default mode
+            if not env or not bundle:
+                raise click.ClickException(
+                    "--env and --bundle are required unless --config-file is used"
+                )
+            outputs = run_fetch(env, bundle, workspace_root, no_clean=no_clean, offline=offline)
     except click.ClickException as e:
         click.secho(f"[ERROR] {e}", fg="red", err=True)
         sys.exit(2)

@@ -1,0 +1,217 @@
+---
+name: 🥏 BundleCraft Fetch Test Suite
+run-name: 'Fetch test suite - ${{ github.ref_name }} - Run  #${{ github.run_number }}'
+on:
+  workflow_dispatch:
+jobs:
+  vault-fetch:
+    name: 'Test: Vault fetcher'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install BundleCraft (with Vault fetcher)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,fetchers]"
+      - name: Generate bundle config for Vault test (ci-test-vault.yaml)
+        shell: bash
+        run: |
+          cat > ci-test-vault.yaml <<'YAML'
+          id: ci-vault-test
+          include: []
+          fetch:
+            - name: from_vault
+              type: vault
+              mount_point: secret
+              path: pki/trusted_roots
+              pem_field: pem
+              addr: http://127.0.0.1:8200
+              token_ref: VAULT_TOKEN
+          YAML
+          echo "Wrote ci-test-vault.yaml:" && cat ci-test-vault.yaml
+      - name: Ensure vault-local.sh is executable
+        run: chmod +x scripts/vault-local.sh
+      - name: Run local Vault and fetch via BundleCraft
+        env:
+          VAULT_ADDR: http://127.0.0.1:8200
+          VAULT_TOKEN: root
+        run: |
+          ./scripts/vault-local.sh up --ci-cmd "bundlecraft fetch --config-file ci-test-vault.yaml"
+      - name: Verify Vault fetch outputs
+        run: |
+          echo "Checking staged outputs:"
+          test -f sources/fetched/ci/ci-vault-test/from_vault.pem || { echo "❌ Missing from_vault.pem"; exit 1; }
+          test -f sources/fetched/ci/ci-vault-test/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
+          echo "✅ Vault fetch successful"
+  http-fetch:
+    name: 'Test: HTTP fetcher (with pinning)'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install BundleCraft and Flask
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,fetchers]"
+          pip install flask
+      - name: Generate test certificate for HTTPS server
+        run: |
+          mkdir -p ci-http-test
+          # Self-signed cert for localhost
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout ci-http-test/server.key \
+            -out ci-http-test/server.crt \
+            -days 1 -subj "/CN=localhost" \
+            -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+
+          # Create a test PEM to serve
+          cat > ci-http-test/test-cert.pem <<'PEM'
+          -----BEGIN CERTIFICATE-----
+          MIICxjCCAa6gAwIBAgIUTest123456789ABCDEFGHIJKLMN0wDQYJKoZIhvcNAQEL
+          BQAwDzENMAsGA1UEAwwEVEVTVDAeFw0yNTAxMDEwMDAwMDBaFw0zNTAxMDEwMDAw
+          MDBaMA8xDTALBgNVBAMMBFRFU1QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+          AoIBAQDExampleCertDataHere123456789ABCDEFGHIJKLMNOP
+          -----END CERTIFICATE-----
+          PEM
+
+          # Compute SHA256 of server cert for pinning test
+          openssl x509 -in ci-http-test/server.crt -outform DER | sha256sum | awk '{print $1}' > ci-http-test/fingerprint.txt
+          echo "Server cert fingerprint: $(cat ci-http-test/fingerprint.txt)"
+      - name: Create Flask HTTPS server script
+        run: |
+          cat > ci-http-test/server.py <<'PYCODE'
+          from flask import Flask, send_file
+          import ssl
+          app = Flask(__name__)
+          @app.route('/test-cert.pem')
+          def serve_cert():
+              return send_file('test-cert.pem', mimetype='application/x-pem-file')
+          if __name__ == '__main__':
+              context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+              context.load_cert_chain('server.crt', 'server.key')
+              app.run(host='127.0.0.1', port=8443, ssl_context=context)
+          PYCODE
+      - name: Start Flask HTTPS server in background
+        run: |
+          cd ci-http-test
+          python server.py &
+          sleep 2
+          echo "Flask server started on https://127.0.0.1:8443"
+      - name: Generate HTTP fetch config (ci-test-http.yaml)
+        run: |
+          FINGERPRINT=$(cat ci-http-test/fingerprint.txt)
+          cat > ci-test-http.yaml <<YAML
+          id: ci-http-test
+          include: []
+          fetch:
+            - name: from_https
+              type: url
+              url: https://127.0.0.1:8443/test-cert.pem
+              verify:
+                tls_fingerprint_sha256: "$FINGERPRINT"
+          YAML
+          echo "Generated ci-test-http.yaml with fingerprint pinning"
+      - name: Run HTTP fetch with pinning
+        run: |
+          bundlecraft fetch --config-file ci-test-http.yaml
+      - name: Verify HTTP fetch outputs
+        run: |
+          echo "Checking staged outputs:"
+          test -f sources/fetched/ci/ci-http-test/from_https.pem || { echo "❌ Missing from_https.pem"; exit 1; }
+          test -f sources/fetched/ci/ci-http-test/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
+          echo "✅ HTTP fetch with pinning successful"
+  api-fetch:
+    name: 'Test: API fetcher (Keyfactor mock)'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install BundleCraft
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,fetchers]"
+      - name: Install Prism (OpenAPI mock server)
+        run: |
+          npm install -g @stoplight/prism-cli
+      - name: Fetch Keyfactor OpenAPI spec
+        run: |
+          mkdir -p ci-api-test
+          # Try to fetch the real spec; if unavailable, create a minimal mock spec
+          curl -sSL https://keyfactor.github.io/keyfactor-openapi/KeyfactorAPI/swagger/v1/swagger.json \
+            -o ci-api-test/keyfactor-spec.json 2>/dev/null || \
+          cat > ci-api-test/keyfactor-spec.json <<'JSON'
+          {
+            "swagger": "2.0",
+            "info": {"title": "Keyfactor API Mock", "version": "1.0"},
+            "host": "localhost:8080",
+            "basePath": "/KeyfactorAPI",
+            "schemes": ["http"],
+            "paths": {
+              "/CertificateAuthority/Download": {
+                "get": {
+                  "summary": "Download CA certificate",
+                  "produces": ["application/x-pem-file"],
+                  "responses": {
+                    "200": {
+                      "description": "PEM certificate",
+                      "schema": {"type": "string"},
+                      "examples": {
+                        "application/x-pem-file": "-----BEGIN CERTIFICATE-----\nMIICMOCK...\n-----END CERTIFICATE-----\n"
+                      }
+                    }
+                  },
+                  "security": [{"Bearer": []}]
+                }
+              }
+            },
+            "securityDefinitions": {
+              "Bearer": {"type": "apiKey", "name": "Authorization", "in": "header"}
+            }
+          }
+          JSON
+          echo "Keyfactor spec ready"
+      - name: Start Prism mock server
+        run: |
+          cd ci-api-test
+          prism mock keyfactor-spec.json \
+            --host 127.0.0.1 --port 8080 \
+            > prism.log 2>&1 &
+          sleep 3
+          echo "Prism mock API started on http://127.0.0.1:8080"
+      - name: Generate API fetch config (ci-test-api.yaml)
+        run: |
+          cat > ci-test-api.yaml <<'YAML'
+          id: ci-api-test
+          include: []
+          fetch:
+            - name: from_keyfactor_mock
+              type: api
+              endpoint: http://127.0.0.1:8080/KeyfactorAPI/CertificateAuthority/Download
+              provider: keyfactor
+              token_ref: KEYFACTOR_TOKEN
+          YAML
+          echo "Generated ci-test-api.yaml"
+      - name: Run API fetch
+        env:
+          KEYFACTOR_TOKEN: mock-token-12345
+        run: |
+          bundlecraft fetch --config-file ci-test-api.yaml
+      - name: Verify API fetch outputs
+        run: |-
+          echo "Checking staged outputs:"
+          test -f sources/fetched/ci/ci-api-test/from_keyfactor_mock.pem || { echo "❌ Missing from_keyfactor_mock.pem"; exit 1; }
+          test -f sources/fetched/ci/ci-api-test/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
+          echo "✅ API fetch (Keyfactor mock) successful"
