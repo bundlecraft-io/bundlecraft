@@ -4,7 +4,7 @@
 
 ![GitHub license](https://img.shields.io/github/license/chrisjpich/bundlecraft)
 ![GitHub release](https://img.shields.io/github/v/release/chrisjpich/bundlecraft)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/chrisjpich/bundlecraft/bundlecraft.yml)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/chrisjpich/bundlecraft/bundlecraft.yaml)
 
 ---
 
@@ -95,7 +95,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 BundleCraft uses a **layered configuration model** and a four-stage pipeline:
 
-fetch → build → verify → convert
+fetch → build → verify → convert (CI orchestrates discover → build → collect → verify → publish)
 
 1. **Defaults** (`config/defaults.yaml`):
    Global settings (verification, filters, formats)
@@ -120,6 +120,34 @@ fetch → build → verify → convert
 - Package build into `.tar.gz` tarball if configured
 - Verify all outputs and cross-format consistency
 - Optionally sign and publish release artifacts
+
+### Environment composition (merge bundles per environment)
+
+Environments can define composed target bundles that merge one or more base bundles.
+
+In `config/envs/dev.yaml`:
+
+```yaml
+targets:
+  internal-dev:
+    includes: [internal, mozilla]
+  mozilla:
+    includes: [mozilla]
+```
+
+Commands:
+
+```bash
+# Prefetch remote sources for all included bundles and build merged target
+bundlecraft build --env dev --bundle internal-dev --prefetch
+
+# Build a single-bundle target
+bundlecraft build --env prod --bundle mozilla --prefetch
+```
+
+Outputs:
+- `dist/dev/internal-dev/` contains both internal and mozilla certs
+- `dist/prod/mozilla/` contains only mozilla certs
 
 ---
 
@@ -176,7 +204,7 @@ filters:
   not_expired_only: true
   ca_certs_only: true
 metadata:
-  contact: security-team@example.com
+  contact: security@bundlecraft.io
   policy_version: 1.0
 ```
 
@@ -319,12 +347,18 @@ For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/R
 
 The included [GitHub Actions workflow](.github/workflows/bundlecraft.yaml) automates:
 
-- **Build & Verification** for all bundles/environments on push/PR/manual dispatch
-- **Artifact Uploads** for all intermediate and final products
-- **Release Publication**: Generates release tarballs, optional GPG signing, and release notes
-- **Concurrency Control**: Ensures only one pipeline per branch at a time
+- Discover → Build → Collect → Verify → Publish
+- Build per-environment “targets” declared in `config/envs/<env>.yaml` under `targets:` (composition-aware)
+- For each target, the job runs `bundlecraft build --prefetch` and respects `build_path` via `--output-root`
+- Uploads artifacts per target using the naming `trust-store-<env>-<target>`
+- Optionally signs and publishes a release tarball
+- Concurrency: only one pipeline per branch at a time
 
-**Manual trigger:**
+Notes:
+- Prefer declaring composed targets in env files (for example: `internal-dev` includes `[internal, mozilla]`).
+- If you want bundles to build offline, pre-stage with `bundlecraft fetch` in a connected job, then run build with `--offline`.
+
+Manual trigger:
 You can dispatch builds from the Actions tab for custom scenarios.
 
 ---
@@ -332,6 +366,7 @@ You can dispatch builds from the Actions tab for custom scenarios.
 ## 📝 Documentation
 
 - **CLI reference:** [`bundlecraft/README.md`](bundlecraft/README.md)
+- **Configuration spec:** [`docs/CONFIG-SPEC.md`](docs/CONFIG-SPEC.md)
 - **Contributing guide:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - **Security policy:** [`SECURITY.md`](SECURITY.md)
 - **Test documentation:** [`tests/README.md`](tests/README.md)

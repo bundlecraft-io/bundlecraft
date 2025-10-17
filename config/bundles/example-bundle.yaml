@@ -1,6 +1,6 @@
 ---
 # =====================================================================
-# Example bundle configuration for PKI-CA-Trust
+# Example bundle configuration for BundleCraft
 # Location: config/bundles/example.yaml
 #
 # Defines WHAT certificates to include, HOW they should be filtered,
@@ -19,7 +19,7 @@ description: >
   behavior like passwords.
 
 # ---------------------------------------------------------------------
-# Source certificate inputs
+# High-importance: Source inputs and formats
 # ---------------------------------------------------------------------
 include:  # Relative paths (from repo root) to include
   - sources/example/roots/  # All .pem files in this folder
@@ -27,6 +27,20 @@ include:  # Relative paths (from repo root) to include
   - sources/example/special.pem  # You can list single files too
 exclude:  # Optional explicit exclusions
   - sources/example/intermediates/old-ca.pem  # Path relative to repo root
+output_formats:  # Which formats to produce for this bundle
+  - pem  # Always produced; canonical concatenated PEM
+  - p7b  # PKCS#7 (.p7b, DER)
+  - jks  # Java KeyStore (.jks)
+  - p12  # PKCS#12 (.p12/.pfx)
+package: false  # Whether to also produce a .tar.gz of all outputs
+# Optional: Fetch remote sources securely (staged to sources/fetched/<env>/<bundle>)
+fetch:
+  - name: mozilla_roots
+    type: url
+    url: https://curl.se/ca/cacert.pem
+    verify:
+      # Prefer to pin the expected sha256 for static/public bundles
+      sha256: <expected_sha256>
 # ---------------------------------------------------------------------
 # PEM output behavior
 # ---------------------------------------------------------------------
@@ -45,15 +59,6 @@ filters:
   unique_by_fingerprint: true  # Deduplicate identical certs by SHA256 fingerprint
   not_expired_only: true  # Exclude expired certificates before writing output
   ca_certs_only: true  # Include only CA certificates (BasicConstraints CA=TRUE)
-# ---------------------------------------------------------------------
-# Output formats
-# ---------------------------------------------------------------------
-output_formats:  # Which formats to produce for this bundle
-  - pem  # Always produced; canonical concatenated PEM
-  - p7b  # PKCS#7 (.p7b, DER)
-  - jks  # Java KeyStore (.jks)
-  - p12  # PKCS#12 (.p12/.pfx)
-package: false  # Whether to also produce a .tar.gz of all outputs
 # ---------------------------------------------------------------------
 # Optional per-format overrides (bundle-specific)
 # ---------------------------------------------------------------------

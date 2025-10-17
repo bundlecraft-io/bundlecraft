@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 convert_utils.py
-Handles format conversions for PKI-CA-Trust bundles.
+Handles format conversions for BundleCraft bundles.
 
 IMPORTANT: BundleCraft processes CERTIFICATES and PUBLIC KEYS ONLY.
            Private keys are explicitly NOT supported and will be ignored if encountered.

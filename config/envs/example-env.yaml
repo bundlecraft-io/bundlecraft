@@ -1,6 +1,6 @@
 ---
 # =====================================================================
-# Example environment configuration for PKI-CA-Trust
+# Example environment configuration for BundleCraft
 # Location: config/envs/example.yaml
 #
 # Defines environment-specific build options, overrides, and secrets.
@@ -61,6 +61,16 @@ filters:
 # Reserved fields (for future expansion)
 # ---------------------------------------------------------------------
 metadata:
-  contact: security-team@example.com  # Optional contact for this environment
+  contact: security@bundlecraft.io  # Optional contact for this environment
   policy_version: 1.0  # Internal policy schema version tracking
   created_by: automation              # Can be "manual" or "automation"
+# ---------------------------------------------------------------------
+# Bundle composition for this environment
+# Define which target bundles should be built in this env, and from which
+# base bundle configurations they are composed.
+# ---------------------------------------------------------------------
+targets:
+  internal-dev:
+    includes: [internal, mozilla]
+  mozilla:
+    includes: [mozilla]

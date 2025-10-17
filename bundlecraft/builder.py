@@ -166,7 +166,27 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
     # defaults is currently unused, to be refactored when the config structure is revalidated
     # defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False) or {}
     env_cfg = load_yaml(CONFIG_DIR / "envs" / f"{env}.yaml", required=True)
-    bundle_cfg = load_yaml(CONFIG_DIR / "bundles" / f"{bundle}.yaml", required=True)
+
+    # Environment-driven composition support: env can define targets mapping
+    # a target bundle name to one or more base bundle configs to include/merge.
+    # Schema examples:
+    #   targets:
+    #     internal-dev:
+    #       includes: [internal, mozilla]
+    #     mozilla:
+    #       includes: [mozilla]
+    # Back-compat: some envs may define bundle_targets as a list (no composition).
+    targets = env_cfg.get("targets") or {}
+    comp_includes = None
+    if isinstance(targets, dict) and bundle in targets:
+        entry = targets[bundle] or {}
+        comp_includes = entry.get("includes") or entry.get("compose") or []
+
+    # Load bundle config; if this bundle is only an env-level composition target,
+    # allow the bundle file to be missing.
+    bundle_cfg = load_yaml(
+        CONFIG_DIR / "bundles" / f"{bundle}.yaml", required=not bool(comp_includes)
+    )
 
     # Optional prefetch step (no persistent cache; stages into sources/fetched/<env>/<bundle>)
     if offline and prefetch:
@@ -175,9 +195,14 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
 
     if prefetch:
         try:
-            staged = run_fetch(env, bundle, ROOT, no_clean=False)
-            if staged:
-                click.secho(f"[INFO] Prefetch staged {len(staged)} file(s).", fg="blue")
+            # If composed, prefetch each included base bundle; otherwise prefetch this bundle
+            base_bundles = comp_includes if comp_includes else [bundle]
+            total_staged = 0
+            for bname in base_bundles:
+                staged = run_fetch(env, bname, ROOT, no_clean=False)
+                total_staged += len(staged)
+            if total_staged:
+                click.secho(f"[INFO] Prefetch staged {total_staged} file(s).", fg="blue")
             else:
                 click.secho("[INFO] No fetch entries; skipping prefetch.", fg="blue")
         except Exception as e:
@@ -202,13 +227,32 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
     build_root = BUILD_DIR / env / bundle
     ensure_dir(build_root)
 
-    include_items = bundle_cfg.get("include", [])
-    # Add staged fetched sources for this env/bundle if present
-    staged_dir = SOURCES_DIR / "fetched" / env / bundle
-    if staged_dir.exists():
-        # Prepend so explicit excludes can still apply by path
-        include_items = [str(staged_dir.relative_to(ROOT)).replace("\\", "/")] + include_items
-    exclude_items = set(bundle_cfg.get("exclude", []))
+    # Build include/exclude lists, possibly across composed base bundles
+    include_items = []
+    exclude_items = set()
+
+    def _rel(p: Path) -> str:
+        return str(p.relative_to(ROOT)).replace("\\", "/")
+
+    base_bundles = comp_includes if comp_includes else [bundle]
+    base_bundle_cfgs = {}
+    for bname in base_bundles:
+        # Include staged fetched sources for each base bundle if present
+        b_staged_dir = SOURCES_DIR / "fetched" / env / bname
+        if b_staged_dir.exists():
+            include_items.append(_rel(b_staged_dir))
+        # Load base bundle config for source includes/excludes
+        b_cfg = load_yaml(CONFIG_DIR / "bundles" / f"{bname}.yaml", required=True)
+        base_bundle_cfgs[bname] = b_cfg
+        include_items.extend(b_cfg.get("include", []) or [])
+        for ex in b_cfg.get("exclude", []) or []:
+            exclude_items.add(ex)
+
+    # Also allow the target bundle file to contribute extra include/exclude if it exists
+    if bundle_cfg:
+        include_items.extend(bundle_cfg.get("include", []) or [])
+        for ex in bundle_cfg.get("exclude", []) or []:
+            exclude_items.add(ex)
     include_paths = []
     for item in include_items:
         p = (ROOT / item).resolve()
@@ -342,12 +386,17 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
 
     # Load fetch provenance if present
     fetch_provenance = None
-    prov_path = staged_dir / "provenance.fetch.json"
-    if prov_path.exists():
-        try:
-            fetch_provenance = json.loads(prov_path.read_text(encoding="utf-8"))
-        except Exception:
-            fetch_provenance = {"error": "unreadable"}
+    # Embed fetch provenance for each base bundle (if any)
+    fetched_prov_map = {}
+    for bname in base_bundles:
+        b_staged_dir = SOURCES_DIR / "fetched" / env / bname
+        prov_path = b_staged_dir / "provenance.fetch.json"
+        if prov_path.exists():
+            try:
+                fetched_prov_map[bname] = json.loads(prov_path.read_text(encoding="utf-8"))
+            except Exception:
+                fetched_prov_map[bname] = {"error": "unreadable"}
+    fetch_provenance = {"bundles": fetched_prov_map} if fetched_prov_map else None
 
     manifest_obj = {
         "bundle": bundle,

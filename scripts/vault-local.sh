@@ -121,7 +121,7 @@ start_vault_podman() {
     -v "${VAULT_DATA_DIR}":/vault/data:Z \
     -e "VAULT_DEV_ROOT_TOKEN_ID=${VAULT_TOKEN}" \
     -e "VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200" \
-    docker.io/library/vault:latest >/dev/null
+    docker.io/hashicorp/vault:latest >/dev/null
   sleep 3
   export VAULT_ADDR VAULT_TOKEN
 }

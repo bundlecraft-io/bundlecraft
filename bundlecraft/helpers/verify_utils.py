@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 verify_utils.py
-Verification utilities for PKI-CA-Trust.
+Verification utilities for BundleCraft.
 
 Capabilities:
     • verifier() – Verify PEMs or built trust bundles

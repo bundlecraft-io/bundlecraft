@@ -1,6 +1,6 @@
 ---
 # =====================================================================
-# Global defaults configuration for PKI-CA-Trust
+# Global defaults configuration for BundleCraft
 # Location: config/defaults.yaml
 #
 # Acts as the baseline applied before merging environment and bundle
@@ -8,35 +8,23 @@
 # filtering, PEM formatting, and output behavior.
 # =====================================================================
 # ---------------------------------------------------------------------
-# Global verification defaults
-# ---------------------------------------------------------------------
-verify:
-  fail_on_expired: true  # Abort build if expired certs found (safe default)
-  warn_days_before_expiry: 30  # Warn when cert expires within N days
-# ---------------------------------------------------------------------
-# Global PEM output behavior
-# ---------------------------------------------------------------------
-pem:
-  include_subject_comments: true  # Adds "# Subject:" above each PEM block (like OS bundles)
-# ---------------------------------------------------------------------
-# Default filtering behavior
-# ---------------------------------------------------------------------
-filters:
-  unique_by_fingerprint: true  # Remove duplicates by SHA256 fingerprint
-  not_expired_only: true  # Skip expired certs before writing outputs
-  ca_certs_only: true  # Only include CA certificates (BasicConstraints: CA=TRUE)
-# ---------------------------------------------------------------------
-# Default formats to build
+# High-importance defaults (top)
 # ---------------------------------------------------------------------
 output_formats:
   - pem  # Concatenated PEM file (always on)
   - p7b  # PKCS#7 DER (.p7b)
   - jks  # Java KeyStore (.jks)
   - p12  # PKCS#12 (.p12)
-# ---------------------------------------------------------------------
-# Packaging behavior
-# ---------------------------------------------------------------------
+verify:
+  fail_on_expired: true  # Abort build if expired certs found (safe default)
+  warn_days_before_expiry: 30  # Warn when cert expires within N days
 package: false  # Do not create .tar.gz by default (env/bundle may override)
+pem:
+  include_subject_comments: true  # Adds "# Subject:" above each PEM block (like OS bundles)
+filters:
+  unique_by_fingerprint: true  # Remove duplicates by SHA256 fingerprint
+  not_expired_only: true  # Skip expired certs before writing outputs
+  ca_certs_only: true  # Only include CA certificates (BasicConstraints: CA=TRUE)
 # ---------------------------------------------------------------------
 # Default per-format overrides (non-sensitive defaults only)
 # ---------------------------------------------------------------------
@@ -53,3 +41,18 @@ format_overrides:
 metadata:
   maintainer: pki-team@example.com  # Default contact for repository maintainers
   policy_version: 1.0  # Schema version tracking for config evolution
+# ---------------------------------------------------------------------
+# Environment composition guidance (env files)
+#
+# Environments can declare composed target bundles that merge one or more
+# base bundle configurations. Example in config/envs/example-env.yaml:
+#
+# targets:
+#   internal-dev:
+#     includes: [internal, mozilla]
+#   mozilla:
+#     includes: [mozilla]
+#
+# Then build with:
+#   bundlecraft build --env dev --bundle internal-dev --prefetch
+# ---------------------------------------------------------------------
