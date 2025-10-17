@@ -475,10 +475,11 @@ You can manually test all BundleCraft fetch types end-to-end using a comprehensi
 
 - **Workflow:** `.github/workflows/test-bundlecraft-fetch.yaml`
 - **Trigger:** Manually, via the GitHub Actions UI ("Run workflow")
+- **Architecture:** All services run in **Podman containers** for consistency and isolation
 - **Test coverage:**
-  - **Vault fetcher:** Spins up local Vault dev server, fetches PEM from KV secret
-  - **HTTP fetcher:** Flask HTTPS server with self-signed cert, tests TLS fingerprint pinning
-  - **API fetcher:** Prism mock of Keyfactor API (from OpenAPI spec), tests bearer token auth
+  - **Vault fetcher:** HashiCorp Vault container (via `vault-local.sh --runtime podman`), no binary required
+  - **HTTP fetcher:** nginx container with self-signed cert, tests CA trust + TLS fingerprint pinning
+  - **API fetcher:** Custom Flask mock API container (Keyfactor simulation), tests bearer token auth + HTTPS
 
 **To use:**
 
@@ -488,9 +489,16 @@ You can manually test all BundleCraft fetch types end-to-end using a comprehensi
 
 Each test job:
 - Generates a temporary bundle config (e.g., `ci-test-vault.yaml`, `ci-test-http.yaml`, `ci-test-api.yaml`)
-- Spins up the required service (Vault, Flask, Prism)
+- Spins up the required containerized service (Vault, nginx, Flask API)
 - Runs `bundlecraft fetch --config-file <config>` using the new `--config-file` flag
 - Verifies staged outputs and provenance
+- Automatically cleans up containers on completion
+
+**Container-based approach:**
+- ✅ No local dependencies (no Flask, Prism, or vault binary required)
+- ✅ Clean isolation and reproducible environments
+- ✅ Self-signed certificates properly handled via `ca_file` with absolute paths
+- ✅ Automatic cleanup with `podman rm -f` in workflow cleanup steps
 
 **Outputs:** All jobs stage to `sources/fetched/ci/<test-id>/` with:
 - Fetched PEM files

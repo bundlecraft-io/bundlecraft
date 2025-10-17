@@ -134,13 +134,71 @@ stop_vault_podman() {
   fi
 }
 
+# Helper: run vault command (uses binary or podman exec based on runtime)
+vault_cmd() {
+  if [ "${RUNTIME}" = "binary" ]; then
+    vault "$@"
+  else
+    # For podman runtime, use exec if available, otherwise fall back to API
+    if podman exec "${PODMAN_CONTAINER_NAME}" vault "$@" 2>/dev/null; then
+      return 0
+    else
+      warn "podman exec failed or unavailable, using API calls instead"
+      return 1
+    fi
+  fi
+}
+
+# Helper: Vault API call wrapper
+vault_api() {
+  local method="$1"
+  local path="$2"
+  local data="${3:-}"
+
+  local url="${VAULT_ADDR}/v1/${path}"
+  local args=(-s -X "${method}" -H "X-Vault-Token: ${VAULT_TOKEN}")
+
+  if [ -n "${data}" ]; then
+    args+=(-H "Content-Type: application/json" -d "${data}")
+  fi
+
+  curl "${args[@]}" "${url}"
+}
+
 setup_vault_env() {
   log "Configuring Vault PKI test data..."
-  vault secrets enable -path=pki/trusted_roots pki 2>/dev/null || true
-  vault secrets tune -max-lease-ttl=8760h pki/trusted_roots
-  vault write pki/trusted_roots/root/generate/internal common_name="local-root-ca" ttl=8760h >/dev/null
-  vault kv put secret/pki/trusted_roots \
-    pem="$(vault read -field=certificate pki/trusted_roots/cert/ca)" >/dev/null
+
+  # Try using vault CLI first (binary or podman exec)
+  if vault_cmd secrets enable -path=pki/trusted_roots pki 2>/dev/null; then
+    vault_cmd secrets tune -max-lease-ttl=8760h pki/trusted_roots
+    vault_cmd write pki/trusted_roots/root/generate/internal common_name="local-root-ca" ttl=8760h >/dev/null
+    local ca_cert=$(vault_cmd read -field=certificate pki/trusted_roots/cert/ca)
+    vault_cmd kv put secret/pki/trusted_roots pem="${ca_cert}" >/dev/null
+  else
+    # Fall back to API calls (works without vault binary or exec)
+    log "Using Vault HTTP API for configuration..."
+
+    # Enable PKI secrets engine
+    vault_api POST "sys/mounts/pki/trusted_roots" '{"type":"pki"}' >/dev/null 2>&1 || true
+
+    # Tune max lease TTL
+    vault_api POST "sys/mounts/pki/trusted_roots/tune" '{"max_lease_ttl":"8760h"}' >/dev/null
+
+    # Generate root CA
+    local root_response=$(vault_api POST "pki/trusted_roots/root/generate/internal" \
+      '{"common_name":"local-root-ca","ttl":"8760h"}')
+
+    # Extract certificate from response
+    local ca_cert=$(echo "${root_response}" | grep -o '"certificate":"[^"]*"' | cut -d'"' -f4 | sed 's/\\n/\n/g')
+
+    # Store in KV secrets (enable KV v2 first)
+    vault_api POST "sys/mounts/secret" '{"type":"kv","options":{"version":"2"}}' >/dev/null 2>&1 || true
+
+    # Put the certificate in KV
+    vault_api POST "secret/data/pki/trusted_roots" \
+      "{\"data\":{\"pem\":\"${ca_cert}\"}}" >/dev/null
+  fi
+
   log "Test root CA injected successfully."
 }
 
