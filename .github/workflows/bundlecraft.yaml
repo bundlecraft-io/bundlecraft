@@ -262,25 +262,25 @@ jobs:
           body: |
             BundleCraft Trust Store Release
             Build metadata
-            - Build: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            - Branch: `${{ github.ref_name }}`
-            - Commit: `${{ github.sha }}`
-            - Triggered by: @${{ github.actor }}
-            - Signing: Enabled (signature attached)
+              - Build: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+              - Branch: `${{ github.ref_name }}`
+              - Commit: `${{ github.sha }}`
+              - Triggered by: @${{ github.actor }}
+              - Signing: Enabled (signature attached)
             Bundles built (${{ steps.summary.outputs.bundle_count }})
-            ${{ steps.summary.outputs.bundle_list_markdown }}
+              ${{ steps.summary.outputs.bundle_list_markdown }}
             What’s included in this release
-            - bundlecraft-trust.tar.gz: tarball containing pki-ca-trust/<env>/<bundle>/ directories
-            - bundlecraft-trust.sha256: SHA-256 checksum of the tarball
-            - bundlecraft-trust.tar.gz.asc: GPG detached signature
+              - bundlecraft-trust.tar.gz: tarball containing pki-ca-trust/<env>/<bundle>/ directories
+              - bundlecraft-trust.sha256: SHA-256 checksum of the tarball
+              - bundlecraft-trust.tar.gz.asc: GPG detached signature
             Each bundle directory typically includes:
-            - Canonical PEM bundle (.pem)
-            - Additional formats when configured (.p7b, .p12, .jks)
-            - checksums.sha256
+              - Canonical PEM bundle (.pem)
+              - Additional formats when configured (.p7b, .p12, .jks)
+              - checksums.sha256
             Verification Instructions
-            curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
-            gpg --import public-gpg-key.asc
-            gpg --verify bundlecraft-trust.tar.gz.asc bundlecraft-trust.tar.gz
+              curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
+              gpg --import public-gpg-key.asc
+              gpg --verify bundlecraft-trust.tar.gz.asc bundlecraft-trust.tar.gz
             If you do not see 'Good signature', the artifact may be tampered with.
           files: |-
             release/bundlecraft-trust.tar.gz
@@ -295,24 +295,20 @@ jobs:
           body: |
             BundleCraft Trust Store Release
             Build metadata
-            - Build: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            - Branch: `${{ github.ref_name }}`
-            - Commit: `${{ github.sha }}`
-            - Triggered by: @${{ github.actor }}
-            - Signing: Disabled
+              - Build: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+              - Branch: `${{ github.ref_name }}`
+              - Commit: `${{ github.sha }}`
+              - Triggered by: @${{ github.actor }}
+              - Signing: Disabled
             Bundles built (${{ steps.summary.outputs.bundle_count }})
-            ${{ steps.summary.outputs.bundle_list_markdown }}
+              ${{ steps.summary.outputs.bundle_list_markdown }}
             What’s included in this release
-            - bundlecraft-trust.tar.gz: tarball containing pki-ca-trust/<env>/<bundle>/ directories
-            - bundlecraft-trust.sha256: SHA-256 checksum of the tarball
+              - bundlecraft-trust.tar.gz: tarball containing pki-ca-trust/<env>/<bundle>/ directories
+              - bundlecraft-trust.sha256: SHA-256 checksum of the tarball
             Each bundle directory typically includes:
-            - Canonical PEM bundle (.pem)
-            - Additional formats when configured (.p7b, .p12, .jks)
-            - checksums.sha256
-            Verification Instructions
-            curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
-            # No signature file is attached when signing is disabled
-            If you do not see 'Good signature', the artifact may be tampered with.
+              - Canonical PEM bundle (.pem)
+              - Additional formats when configured (.p7b, .p12, .jks)
+              - checksums.sha256
           files: |-
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
