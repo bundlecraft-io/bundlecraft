@@ -1,76 +1,162 @@
 ---
 # =====================================================================
-# Example environment configuration for BundleCraft
-# Location: config/envs/example.yaml
-#
-# Defines environment-specific build options, overrides, and secrets.
-# Each file under config/envs/ represents one environment context
-# (e.g., dev, prod, dmz, staging) that controls *how* bundles are built.
+# Example Environment Configuration for BundleCraft
 # =====================================================================
-
-# ---------------------------------------------------------------------
-# Human-readable metadata (optional)
-# ---------------------------------------------------------------------
-name: Example Environment  # Display name for this environment (shown in manifests/logs)
+# Location: config/envs/example-env.yaml
+#
+# Environment configs define HOW to build and WHERE to distribute.
+# This controls output formats, verification policies, secrets handling,
+# filtering rules, and distribution targets.
+#
+# Philosophy: Bundle configs define WHAT/WHERE (sources),
+#            Environment configs define HOW/WHERE (build & deploy).
+# =====================================================================
+name: Example Environment
 description: >
-  Example configuration illustrating all supported keys and overrides.
-  This file defines environment-wide behavior like passwords, formats,
-  and validation policies used when building trust bundles.
-
+  Comprehensive example showing all environment configuration options.
+  Demonstrates build settings, format overrides, verification policies,
+  and distribution configuration for multiple target types.
 # ---------------------------------------------------------------------
-# Output and directory behavior
+# Bundle Composition
 # ---------------------------------------------------------------------
-build_path: dist/example/  # Override default output path (default: dist/<env>/<bundle>/)
-package: false  # Whether to produce a .tar.gz package of the build output, Can be overridden per bundle or via CLI --package flag
+# Define which target bundles should be built in this environment.
+# Each target can include/merge multiple base bundle configurations.
+targets:
+  internal-dev:
+    includes: [internal, mozilla]  # Merge internal PKI + Mozilla roots
+    description: Combined trust bundle for development services
+  mozilla-only:
+    includes: [mozilla]  # Mozilla roots only
+    description: Public web PKI roots
+  vault-roots:
+    includes: [vault]  # Certificates from HashiCorp Vault
+    description: Dynamic certificates from Vault
 # ---------------------------------------------------------------------
-# Global verification policy overrides
+# Output Configuration
 # ---------------------------------------------------------------------
-verify:
-  fail_on_expired: true  # Abort build if any expired certificate is found
-  warn_days_before_expiry: 30  # Warn if a cert expires within this many days
-# ---------------------------------------------------------------------
-# Global output format defaults
-# ---------------------------------------------------------------------
-output_formats:  # Default formats if a bundle doesn't specify its own list
-  - pem  # Canonical PEM (always recommended)
-  - p7b  # DER PKCS#7 (.p7b)
+# Specify which certificate formats to generate
+output_formats:
+  - pem  # Canonical PEM format (X.509 certificates)
+  - p7b  # PKCS#7 DER format (.p7b)
   - jks  # Java KeyStore (.jks)
   - p12  # PKCS#12 / PFX (.p12)
+# Create .tar.gz archives of build output
+package: true
+
+# Override default output path (default: dist/<env>/<bundle>/)
+build_path: dist/example/
 # ---------------------------------------------------------------------
-# Format-specific overrides (optional)
-# These control per-format behavior or environment secrets.
+# Verification & Validation
+# ---------------------------------------------------------------------
+verify:
+  fail_on_expired: true  # Abort build if expired certificates found
+  warn_days_before_expiry: 30  # Warn if cert expires within 30 days
+# ---------------------------------------------------------------------
+# Certificate Filtering
+# ---------------------------------------------------------------------
+# Apply filtering rules to all bundles in this environment
+filters:
+  unique_by_fingerprint: true  # Deduplicate by SHA256 fingerprint
+  not_expired_only: true  # Exclude expired certificates
+  ca_certs_only: true  # Only include CA certificates (BasicConstraints: CA=TRUE)
+# ---------------------------------------------------------------------
+# Format-Specific Configuration
 # ---------------------------------------------------------------------
 format_overrides:
   jks:
-    storepass_env: TRUST_JKS_PASSWORD  # Env var name containing the JKS store password
-    alias_format: '{subject.CN}-{serial}'  # Optional alias template for keytool imports
+    # Java KeyStore password (read from environment variable)
+    storepass_env: TRUST_JKS_PASSWORD
+    # Alias template for keytool imports
+    alias_format: '{subject.CN}-{serial}'
   pkcs12:
-    password_env: TRUST_P12_PASSWORD  # Env var name containing PKCS#12 export password
+    # PKCS#12 export password (read from environment variable)
+    password_env: TRUST_P12_PASSWORD
   pem:
-    include_subject_comments: true  # Add "# Subject:" comment lines above each PEM block
+    # Add "# Subject: CN=..." comments above each PEM block
+    include_subject_comments: true
   p7b:
-    include_chain: true  # Whether to include full chain in .p7b (if supported)
+    # Include full certificate chain in .p7b files
+    include_chain: true
 # ---------------------------------------------------------------------
-# Environment-wide default filters or rules (optional)
+# Distribution Configuration
 # ---------------------------------------------------------------------
-filters:
-  unique_by_fingerprint: true  # Deduplicate identical certs by SHA256 fingerprint (default true)
-  not_expired_only: true  # Exclude expired certs (redundant if fail_on_expired = true)
-  ca_certs_only: true  # Keep only CA certificates (BasicConstraints: CA=TRUE)
+# Define where and how to distribute built trust bundles.
+# This provides CI/CD hints for automated publishing workflows.
+distribution:
+  targets:
+    # GitHub Releases
+    - type: github-release
+      enabled: true
+      description: Publish to GitHub Releases with GPG signatures
+      assets:
+        - bundlecraft-trust.tar.gz
+        - bundlecraft-trust-env-*.tar.gz
+        - '*.sha256'
+        - '*.asc'  # GPG signature files
+      draft: false
+      prerelease: false
+
+    # JFrog Artifactory
+    - type: artifactory
+      enabled: false
+      description: Upload to JFrog Artifactory Maven repository
+      url: https://artifactory.example.com
+      repository: libs-release-local
+      path: com/example/truststore/${VERSION}/
+      auth_env: ARTIFACTORY_TOKEN  # Bearer token from environment
+
+    # AWS S3
+    - type: s3
+      enabled: false
+      description: Distribute via AWS S3 bucket
+      bucket: company-truststores
+      prefix: prod/
+      region: us-east-1
+      public: false
+      storage_class: STANDARD
+
+    # Azure Blob Storage
+    - type: azure-blob
+      enabled: false
+      description: Microsoft Azure Blob Storage distribution
+      account: companystorage
+      container: truststores
+      prefix: prod/
+      public_access: false
+
+    # Generic HTTP POST
+    - type: http-post
+      enabled: false
+      description: POST to internal API endpoint
+      url: https://internal-api.example.com/v1/truststores
+      method: POST
+      headers:
+        - 'Authorization: Bearer ${API_TOKEN}'
+        - 'Content-Type: application/octet-stream'
+
+    # Custom distribution script
+    - type: custom
+      enabled: false
+      description: Run custom distribution script
+      command: ./scripts/distribute.sh
+      args:
+        - ${BUNDLE_PATH}
+        - ${ENVIRONMENT}
+        - ${VERSION}
+
+  # Tags for CI/CD pipeline routing and filtering
+  tags:
+    - staging
+    - automated-build
+    - unsigned
+    - testing
 # ---------------------------------------------------------------------
-# Reserved fields (for future expansion)
+# Metadata
 # ---------------------------------------------------------------------
 metadata:
-  contact: security@bundlecraft.io  # Optional contact for this environment
-  policy_version: 1.0  # Internal policy schema version tracking
-  created_by: automation              # Can be "manual" or "automation"
-# ---------------------------------------------------------------------
-# Bundle composition for this environment
-# Define which target bundles should be built in this env, and from which
-# base bundle configurations they are composed.
-# ---------------------------------------------------------------------
-targets:
-  internal-dev:
-    includes: [internal, mozilla]
-  mozilla:
-    includes: [mozilla]
+  contact: security@bundlecraft.io
+  environment_tier: staging
+  policy_version: 2.0
+  created_by: automation
+  compliance: internal
+  approval_required: false

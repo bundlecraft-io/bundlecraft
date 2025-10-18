@@ -35,10 +35,18 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${INPUT_ENVIRONMENTS:-}" ]; then
-            python scripts/detect_env_targets.py --envs "${INPUT_ENVIRONMENTS}" | tee env_targets.json
+            python scripts/detect_env_targets.py --envs "${INPUT_ENVIRONMENTS}" | tee env_targets_raw.json
           else
-            python scripts/detect_env_targets.py | tee env_targets.json
+            python scripts/detect_env_targets.py | tee env_targets_raw.json
           fi
+          # Native Python filter: only environments with github-release enabled in distribution_metadata
+          python -c "import sys, json;\n"
+          "envs = json.load(open('env_targets_raw.json'))\n"
+          "def has_github_release_enabled(env):\n"
+          "    dist = env.get('distribution_metadata') or env.get('distribution')\n"
+          "    return any(t.get('type') == 'github-release' and t.get('enabled') == True for t in (dist.get('targets', []) if dist else []))\n"
+          "filtered = [e for e in envs if has_github_release_enabled(e)]\n"
+          "json.dump(filtered, sys.stdout)" > env_targets.json
           echo "env_targets=$(cat env_targets.json)" >> "$GITHUB_OUTPUT"
       - name: Summarize selection and validate
         env:

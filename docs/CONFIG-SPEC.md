@@ -1,205 +1,372 @@
-# BundleCraft Configuration Specification (ENV + BUNDLE)
+# BundleCraft Configuration Specification
 
-This document defines the supported configuration schema for BundleCraft. It covers:
+This document defines the configuration schema for BundleCraft, clearly separating concerns between:
 
-- Defaults (config/defaults.yaml)
-- Environments (config/envs/*.yaml)
-- Bundles (config/bundles/*.yaml)
-- Fetch entries (staging-only, no persistent cache)
-
-Merging order: defaults ← environment ← bundle. For composed targets (env.targets), multiple base bundle configs are merged as described below.
+- **Bundle configs** (`config/bundles/*.yaml`) — Certificate sourcing and gathering
+- **Environment configs** (`config/envs/*.yaml`) — Build, output, and deployment configuration
+- **Defaults** (`config/defaults.yaml`) — Global fallback settings
 
 ---
 
-## 1) Defaults: `config/defaults.yaml`
+## Configuration Philosophy
 
-Applied first; provides safe, global defaults.
+### Bundle Configs: Source & Fetch Layer
+**Purpose:** Define WHAT certificates to source and WHERE to get them
 
-Keys:
-- output_formats: ["pem", "p7b", "jks", "p12"]
-- verify:
-  - fail_on_expired: bool (default true)
-  - warn_days_before_expiry: int (days, default 30)
-- package: bool (default false)
-- pem:
-  - include_subject_comments: bool (default true)
-- filters:
-  - unique_by_fingerprint: bool (default true)
-  - not_expired_only: bool (default true)
-  - ca_certs_only: bool (default true)
-- format_overrides:
-  - jks:
-    - alias_format: string (default "{subject.CN}-{serial}")
-  - pkcs12:
-    - filename: string (optional)
-  - pem:
-    - include_subject_comments: bool (reinforces default)
-- metadata: free-form object (optional)
+**Responsibilities:**
+- Certificate source paths (`include`, `exclude`)
+- Remote fetch definitions (`fetch`)
+- Source verification and provenance
+- Content metadata (descriptions, owners, tags)
 
-Notes:
-- Defaults are not required. Any missing keys fall back to built-in defaults.
+**Forbidden:** Output formats, build paths, passwords, verification policies
+
+### Environment Configs: Build & Deploy Layer
+**Purpose:** Define HOW to build and WHERE to distribute
+
+**Responsibilities:**
+- Output formats (PEM, JKS, P7B, P12)
+- Build paths and packaging
+- Verification and filtering policies
+- Format-specific secrets (passwords via env vars)
+- Distribution targets and CI/CD tags
+- Bundle composition (`targets.<name>.includes`)
+
+**Forbidden:** Certificate sources, fetch entries, include/exclude paths
 
 ---
 
-## 2) Environment: `config/envs/<env>.yaml`
+## 1) Bundle Configuration: `config/bundles/<bundle>.yaml`
 
-Defines how bundles are built/merged for a given environment.
+Defines certificate sources for a logical bundle.
 
-High-importance keys:
-- targets: map of target bundle name → composition
-  - <target>:
-    - includes: [bundleName, ...]  (list of base bundles to merge)
-    - (reserved for future: exclude, extra include)
-- output_formats: list (overrides defaults)
-- verify: same shape as defaults.verify
-- filters: same shape as defaults.filters
-- format_overrides:
-  - jks:
-    - storepass_env: ENV_VAR_NAME (read from environment; default TRUST_JKS_PASSWORD)
-    - alias_format: string
-  - pkcs12:
-    - password_env: ENV_VAR_NAME (default TRUST_P12_PASSWORD)
-    - alias_format: string
-  - force: bool (overwrite outputs when true)
-- metadata: { name, contact, policy_version, ... } (optional)
+### Required Keys
+- `bundle_name`: string (logical identifier)
+- `description`: string (purpose/context)
 
-Deprecated/Reserved:
-- build_path: reserved (not currently consumed). Use CLI `--output-root` instead.
-- publish_targets: reserved (not consumed by the builder).
-
-Example:
+### Source Definition
 ```yaml
-name: Dev
-targets:
-  internal-dev:
-    includes: [internal, mozilla]
-  mozilla:
-    includes: [mozilla]
-output_formats: [pem, p7b, jks, p12]
-format_overrides:
-  jks:
-    storepass_env: TRUST_JKS_PASSWORD
-  pkcs12:
-    password_env: TRUST_P12_PASSWORD
-verify:
-  fail_on_expired: true
-  warn_days_before_expiry: 30
-filters:
-  unique_by_fingerprint: true
-  not_expired_only: true
-  ca_certs_only: true
+include:  # Relative paths from repo root
+  - sources/internal/rootCA.pem
+  - sources/partners/
+exclude:  # Optional exclusions
+  - sources/partners/deprecated.pem
 ```
 
-Composition semantics:
-- For `bundlecraft build --env <env> --bundle <target>`:
-  - If `<target>` is in `env.targets`, the builder merges sources from each base bundle in `includes`.
-  - Staged fetch sources for each base bundle (under `sources/fetched/<env>/<base>`) are included automatically if present.
-  - The builder also loads each base bundle’s own include/exclude lists and merges them.
-  - If a `config/bundles/<target>.yaml` file exists, its include/exclude are also honored as additional inputs.
-
----
-
-## 3) Bundle: `config/bundles/<bundle>.yaml`
-
-Defines what to include in a bundle and how to produce outputs (content, not environment policies).
-
-High-importance keys:
-- id: string (logical id; optional for naming)
-- name: string (optional descriptive name)
-- description: string (optional)
-- include: [paths...] (files or directories, relative to repo root)
-- exclude: [paths...] (optional)
-- output_formats: list (e.g., [pem, p7b, jks, p12])
-- package: bool (whether to create a .tar.gz)
-- fetch: list of remote source declarations (see section 4)
-
-Other keys:
-- pem: { include_subject_comments: bool }
-- verify: { fail_on_expired: bool, warn_days_before_expiry: int }
-- filters: same shape as defaults.filters
-- format_overrides: same shape as env.format_overrides (bundle-scoped tweaks)
-- metadata: free-form object
-
-Example:
+### Fetch Definitions
 ```yaml
-id: mozilla
-include: []
-output_formats: [pem, p7b]
 fetch:
   - name: mozilla_roots
     type: url
     url: https://curl.se/ca/cacert.pem
     verify:
-      sha256: <expected_sha256>
+      sha256: <expected_sha256>  # Content pinning (recommended)
+
+  - name: partner_roots
+    type: api
+    endpoint: https://api.partner.com/pki/roots
+    token_ref: PARTNER_API_TOKEN
+    verify:
+      ca_file: sources/partner-ca.pem
+      tls_fingerprint_sha256: <cert_pin>
+
+  - name: vault_roots
+    type: vault
+    mount_point: secret
+    path: pki/trusted_roots
+    pem_field: pem
+    addr: http://127.0.0.1:8200
+    token_ref: VAULT_TOKEN
+```
+
+### Metadata
+```yaml
+metadata:
+  owner: security-team@example.com
+  purpose: Internal PKI trust anchors
+  change_control: CAB-2025-001
+  tags: [internal, production]
+```
+
+### Complete Example
+```yaml
+---
+bundle_name: internal
+description: Trust bundle for internal PKI services (root + issuing CAs)
+
+include:
+  - sources/internal/rootCA.pem
+  - sources/internal/issuingCA1.pem
+
+exclude: []
+
+metadata:
+  owner: pki-team@example.com
+  purpose: Internal service mesh authentication
+  tags: [internal, ca-bundle]
 ```
 
 ---
 
-## 4) Fetch entries (staging-only)
+## 2) Environment Configuration: `config/envs/<env>.yaml`
 
-Fetched artifacts are staged under `sources/fetched/<env>/<bundle>/` and cleaned each run; no persistent cache is kept. Provenance is written to `provenance.fetch.json` and embedded into the build manifest.
+Defines build behavior and deployment configuration for an environment.
 
-Supported types:
+### Bundle Composition
+```yaml
+targets:
+  internal-prod:
+    includes: [internal, mozilla]  # Merge multiple bundles
+  mozilla-only:
+    includes: [mozilla]
+```
 
-1) type: url
-- url: https://... or file://...
-- verify (optional):
-  - sha256: hex string
-  - ca_file: path to custom CA PEM bundle for TLS verification
-  - tls_fingerprint_sha256: pin leaf certificate fingerprint (hex)
+### Output Configuration
+```yaml
+output_formats:  # Which formats to produce
+  - pem   # Canonical PEM (always recommended)
+  - p7b   # PKCS#7 DER
+  - jks   # Java KeyStore
+  - p12   # PKCS#12
 
-2) type: api
-- endpoint: https://... (HTTPS required)
-- provider: string (hint; optional)
-- token_ref: ENV_VAR_NAME (Bearer token read from env)
-- verify (optional):
-  - ca_file: custom CA PEM bundle
-  - tls_fingerprint_sha256: leaf fingerprint pin
-  - headers: map of additional headers
+build_path: dist/prod/  # Override default (dist/<env>/<bundle>/)
+package: true  # Create .tar.gz of outputs
+```
 
-3) type: vault
-- mount_point: string (e.g., "secret")
-- path: secret path under the mount (e.g., "pki/trusted_roots")
-- pem_field: field name containing PEM text (default "pem")
-- addr: Vault address (defaults to VAULT_ADDR)
-- token_ref: ENV_VAR_NAME (defaults to VAULT_TOKEN)
-- namespace: optional
-- verify (optional):
-  - ca_file: path to custom CA PEM bundle
+### Verification & Filtering
+```yaml
+verify:
+  fail_on_expired: true
+  warn_days_before_expiry: 30
 
-Offline mode:
-- `bundlecraft fetch --offline` fails if `fetch` is present.
-- `bundlecraft build --offline` also fails if fetch is required; pre-stage in connected environments and commit/package inputs.
+filters:
+  unique_by_fingerprint: true
+  not_expired_only: true
+  ca_certs_only: true
 
-Security posture:
-- HTTPS required for remote endpoints; `http://` is rejected.
-- Optional CA pinning and leaf fingerprint pinning for defense in depth.
-- Optional content `sha256` pin for static/public sources (recommended for Mozilla).
+pem:
+  include_subject_comments: true  # Add "# Subject:" comments
+```
+
+### Format-Specific Secrets
+```yaml
+format_overrides:
+  jks:
+    storepass_env: TRUST_JKS_PASSWORD  # Read from environment
+    alias_format: '{subject.CN}-{serial}'
+  pkcs12:
+    password_env: TRUST_P12_PASSWORD
+```
+
+### Distribution Metadata (for CI/CD pipeline use only)
+```yaml
+distribution_metadata:
+  # NOTE: BundleCraft CLI does NOT publish or upload bundles directly.
+  # This section provides metadata for CI/CD pipelines (e.g., GitHub Actions)
+  # to know where and how to distribute built bundles. Keys/values are flexible.
+  targets:
+    - type: github-release
+      enabled: true
+      assets:
+        - bundlecraft-trust.tar.gz
+        - bundlecraft-trust-env-*.tar.gz
+    - type: artifactory
+      enabled: false
+      repository: libs-release-local
+      path: com/example/truststore/${VERSION}/
+    - type: s3
+      enabled: false
+      bucket: company-truststores
+      prefix: prod/
+  tags:
+    - production
+    - signed
+    - automated-build
+```
+
+targets:
+distribution:
+### Complete Example
+```yaml
+---
+name: Production
+description: Production environment with full certificate suite
+
+
+  internal-prod:
+    includes: [internal, mozilla]
+  mozilla-only:
+    includes: [mozilla]
+
+output_formats:
+  - pem
+  - p7b
+  - jks
+  - p12
+
+verify:
+  fail_on_expired: true
+  warn_days_before_expiry: 30
+
+filters:
+  unique_by_fingerprint: true
+  not_expired_only: true
+  ca_certs_only: true
+
+format_overrides:
+  jks:
+    storepass_env: TRUST_JKS_PASSWORD
+  pkcs12:
+    password_env: TRUST_P12_PASSWORD
+
+distribution_metadata:
+  # NOTE: BundleCraft CLI does NOT publish or upload bundles directly.
+  # This section provides metadata for CI/CD pipelines (e.g., GitHub Actions)
+  # to know where and how to distribute built bundles. Keys/values are flexible.
+  targets:
+    - type: github-release
+      enabled: true
+      description: Publish to GitHub Releases (handled by pipeline)
+      assets:
+        - bundlecraft-trust.tar.gz
+        - bundlecraft-trust-env-*.tar.gz
+    - type: artifactory
+      enabled: false
+      description: Example: JFrog Artifactory (not used currently)
+    - type: s3
+      enabled: false
+      description: Example: AWS S3 (not used currently)
+  tags:
+    - production
+    - signed
+    - ci-cd
+    - github-release
+
+metadata:
+  name: Production
+  contact: security@bundlecraft.io
+```
+---
+
+## 3) Defaults: `config/defaults.yaml`
+
+Global fallback settings applied before environment config.
+
+```yaml
+---
+output_formats:
+  - pem
+  - p7b
+  - jks
+  - p12
+
+verify:
+  fail_on_expired: true
+  warn_days_before_expiry: 30
+
+package: false
+
+pem:
+  include_subject_comments: true
+
+filters:
+  unique_by_fingerprint: true
+  not_expired_only: true
+  ca_certs_only: true
+
+format_overrides:
+  jks:
+    alias_format: '{subject.CN}-{serial}'
+  pkcs12:
+    filename: default-ca-bundle.p12
+
+metadata:
+  maintainer: pki-team@example.com
+  policy_version: 1.0
+```
 
 ---
 
-## 5) Precedence and overrides
+## Configuration Precedence
 
-1. **Defaults → Environment → Bundle**
-   - Environment config takes precedence for `output_formats`, `verify`, `pem`, and `format_overrides`.
-   - Bundle configs can still provide these settings, but environment-level settings override them.
-2. Composition uses the environment's `targets.<target>.includes` list to gather base bundle sources.
-3. Staged fetched sources are automatically included for each base bundle when present.
+**For build settings:** `built-in defaults` → `config/defaults.yaml` → `config/envs/<env>.yaml`
 
-**Best practice:** Define `output_formats` at the environment level to control build outputs consistently across all targets in that environment.
+**For sources:** Only `config/bundles/<bundle>.yaml` is consulted (no merging with env)
 
----
-
-## 6) CLI notes
-
-- Fetch first (optional): `bundlecraft fetch --env <env> --bundle <bundle>`
-- Build composed targets: `bundlecraft build --env <env> --bundle <target> --prefetch`
-- Offline build: `bundlecraft build --env <env> --bundle <target> --offline` (fails if fetch is required)
+**For composed targets:**
+- Environment defines `targets.<name>.includes: [bundle1, bundle2]`
+- Builder loads each bundle config and merges their `include` + `exclude` lists
+- Environment config controls ALL build behavior (formats, verification, etc.)
 
 ---
 
-## 7) Reserved / not currently consumed
+## CLI Integration
 
-- Environment:
-  - build_path (use CLI `--output-root` instead)
-  - publish_targets (may be implemented by a publishing step in the future)
+### Build
+```bash
+bundlecraft build --env prod --bundle internal-prod --prefetch
+```
+- Loads `config/envs/prod.yaml` for build settings
+- Composes sources from `internal` and `mozilla` bundle configs
+- Outputs to `dist/prod/internal-prod/` (or custom `build_path`)
+
+### Fetch
+```bash
+bundlecraft fetch --env prod --bundle mozilla
+```
+- Loads `config/bundles/mozilla.yaml` for fetch definitions
+- Stages to `sources/fetched/prod/mozilla/`
+
+### Offline Build
+```bash
+bundlecraft build --env prod --bundle internal-prod --offline
+```
+- Fails if any bundle requires fetch and sources aren't pre-staged
+
+---
+
+## Distribution Target Types
+
+Supported values for `distribution_metadata.targets[].type`:
+
+- **`github-release`**: GitHub Releases (current repo or external)
+- **`artifactory`**: JFrog Artifactory Maven/generic repository
+- **`s3`**: AWS S3 bucket
+- **`azure-blob`**: Azure Blob Storage
+- **`http-post`**: Generic HTTP POST to webhook/API
+- **`custom`**: User-defined (parsed by external tooling)
+
+**Note:** BundleCraft itself does NOT perform publishing. The `distribution_metadata` section provides hints for downstream CI/CD pipelines (e.g., GitHub Actions, GitLab CI).
+
+---
+
+## Migration Guide
+
+### Moving from old configs:
+
+**Bundle configs:**
+- ✅ Keep: `include`, `exclude`, `fetch`, `metadata`
+- ❌ Remove: `output_formats`, `verify`, `pem`, `filters`, `format_overrides`, `package`
+
+**Environment configs:**
+- ✅ Keep: `targets`, `output_formats`, `verify`, `filters`, `format_overrides`
+- ✅ Add: `distribution` section with targets and tags
+- ❌ Remove: `include`, `exclude`, `fetch` (belongs in bundles)
+
+---
+
+## Reserved Fields
+
+- `bundle_cfg.package`: reserved (may be used for bundle-level compression hints)
+- `env_cfg.publish_targets`: deprecated, use `distribution.targets` instead
+- `env_cfg.build_path`: supported but optional (CLI `--output-root` takes precedence)
+
+---
+
+## Security Best Practices
+
+1. **Fetch verification**: Always pin `sha256` for public/static sources (Mozilla)
+2. **TLS pinning**: Use `ca_file` and/or `tls_fingerprint_sha256` for API fetches
+3. **Secrets**: Never hardcode passwords; always use `*_env` keys to reference environment variables
+4. **Distribution**: Use `enabled: false` to disable distribution targets in lower environments
+5. **Tags**: Use environment tags to control CI/CD pipeline routing (e.g., only sign/publish `production` tagged envs)

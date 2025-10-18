@@ -1,15 +1,14 @@
 ---
 bundle_name: mozilla
-description: Trust bundle Mozilla containing publicly trusted CA certificates
+description: Mozilla NSS CA certificate program - publicly trusted root CAs
+include: []
+exclude: []
 fetch:
   - name: mozilla_roots
     type: url
     url: https://curl.se/ca/cacert.pem
-exclude: []
-# --- New options ---
-pem:
-  include_subject_comments: true  # Adds "# Subject:" above each PEM block
-verify:
-  fail_on_expired: true  # Fail build if any cert is expired
-  warn_days_before_expiry: 30  # Warn if cert expires within 30 days
-package: true  # Produce package.tar.gz
+metadata:
+  owner: mozilla-nss-maintainers
+  purpose: Public web PKI trust anchors
+  upstream: https://wiki.mozilla.org/CA
+  tags: [public, mozilla, web-pki]

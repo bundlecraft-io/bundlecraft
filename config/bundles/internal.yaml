@@ -1,12 +1,9 @@
 ---
 bundle_name: internal
-description: Trust bundle for internal PKI services
+description: Trust bundle for internal PKI services (root + issuing CAs)
 include: [sources/internal/rootCA.pem, sources/internal/issuingCA1.pem]
 exclude: []
-# --- New options ---
-pem:
-  include_subject_comments: true  # Adds "# Subject:" above each PEM block
-verify:
-  fail_on_expired: true  # Fail build if any cert is expired
-  warn_days_before_expiry: 30  # Warn if cert expires within 30 days
-package: true  # Produce package.tar.gz
+metadata:
+  owner: pki-team@example.com
+  purpose: Internal service authentication and TLS
+  tags: [internal, production]

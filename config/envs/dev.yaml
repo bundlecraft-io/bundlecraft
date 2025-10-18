@@ -1,34 +1,72 @@
 ---
-# Production environment configuration
-# Defines which target bundles to build in prod and how to handle formats/passwords.
-# High-importance: which targets to build and their composition
+# =====================================================================
+# Development Environment Configuration
+# =====================================================================
+# Environment configs define HOW to build and WHERE to distribute.
+# Controls output formats, verification, secrets, and deployment targets.
+# =====================================================================
+name: Development
+description: Development environment for testing and local builds
+# ---------------------------------------------------------------------
+# Bundle Composition
+# ---------------------------------------------------------------------
 targets:
   internal:
-    includes: [internal]
-# Output formats for this environment (falls back to defaults if omitted)
+    includes: [internal]  # Internal certs only for dev
+# ---------------------------------------------------------------------
+# Output Configuration
+# ---------------------------------------------------------------------
 output_formats:
-  - pem
-  - p7b
-  - jks
-  - p12
-# Format overrides: use env vars for secrets in CI/CD
+  - pem  # Canonical PEM bundle
+  - p7b  # PKCS#7 DER format
+  - jks  # Java KeyStore
+  - p12  # PKCS#12 / PFX
+package: true  # Create .tar.gz archives
+# ---------------------------------------------------------------------
+# Verification & Filtering
+# ---------------------------------------------------------------------
+verify:
+  fail_on_expired: false  # Don't abort on expired (dev tolerant)
+  warn_days_before_expiry: 30  # Still warn about expiration
+filters:
+  unique_by_fingerprint: true  # Deduplicate by SHA256
+  not_expired_only: false  # Allow expired certs in dev
+  ca_certs_only: true  # Only CA certificates
+pem:
+  include_subject_comments: true  # Add "# Subject:" comments
+# ---------------------------------------------------------------------
+# Format-Specific Configuration
+# ---------------------------------------------------------------------
 format_overrides:
   jks:
-    # Prefer environment variable for the keystore password
-    storepass_env: TRUST_JKS_PASSWORD
+    storepass_env: TRUST_JKS_PASSWORD  # Password from environment
+    alias_format: '{subject.CN}-{serial}'
   pkcs12:
-    # Prefer environment variable for PKCS#12 export password
-    password_env: TRUST_P12_PASSWORD
-# Verification policy
-verify:
-  fail_on_expired: true
-  warn_days_before_expiry: 30
-# Filtering rules
-filters:
-  unique_by_fingerprint: true
-  not_expired_only: true
-  ca_certs_only: true
-# Optional metadata
+    password_env: TRUST_P12_PASSWORD  # Password from environment
+## ---------------------------------------------------------------------
+# Distribution Metadata (for CI/CD pipeline use only)
+# ---------------------------------------------------------------------
+# NOTE: BundleCraft CLI does NOT publish or upload bundles directly.
+# This section provides metadata for CI/CD pipelines (e.g., GitHub Actions)
+# to know where and how to distribute built bundles. Keys/values are flexible.
+distribution_metadata:
+  targets:
+    - type: github-release
+      enabled: true  # Only used for testing in CI/CD
+      description: Publish to GitHub Releases (handled by pipeline)
+      assets: [bundlecraft-trust.tar.gz, bundlecraft-trust-env-*.tar.gz]
+    - type: artifactory
+      enabled: false
+      description: 'Example: JFrog Artifactory (not used currently)'
+  tags:
+    - development
+    - testing
+    - ci-cd
+    - github-release
+# ---------------------------------------------------------------------
+# Metadata
+# ---------------------------------------------------------------------
 metadata:
-  name: Development
   contact: security@bundlecraft.io
+  environment_tier: development
+  approval_required: false
