@@ -183,10 +183,16 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         comp_includes = entry.get("includes") or entry.get("compose") or []
 
     # Load bundle config; if this bundle is only an env-level composition target,
-    # allow the bundle file to be missing.
-    bundle_cfg = load_yaml(
-        CONFIG_DIR / "bundles" / f"{bundle}.yaml", required=not bool(comp_includes)
-    )
+    # allow the bundle file to be missing and use an empty dict.
+    bundle_cfg = None
+    bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle}.yaml"
+    if bundle_cfg_path.exists():
+        bundle_cfg = load_yaml(bundle_cfg_path, required=True)
+    elif comp_includes:
+        bundle_cfg = {}  # Use empty config for composed targets
+    else:
+        click.secho(f"[ERROR] Bundle config not found: {bundle_cfg_path}", fg="red")
+        sys.exit(2)
 
     # Optional prefetch step (no persistent cache; stages into sources/fetched/<env>/<bundle>)
     if offline and prefetch:
