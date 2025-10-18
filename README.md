@@ -74,9 +74,9 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 ```
 ├── sources/                # Certificate sources (roots, intermediates, vendor, etc.)
-├── config/                 # YAML configuration (defaults, environments, bundles)
+├── config/                 # YAML configuration (defaults, crafts, bundles)
 │   ├── defaults.yaml
-│   ├── envs/
+│   ├── crafts/
 │   └── bundles/
 ├── bundlecraft/            # Python scripts for build, verify, convert, helpers
 ├── dist/                   # Generated outputs (per environment/bundle)
@@ -100,8 +100,8 @@ fetch → build → verify → convert (CI orchestrates discover → build → c
 1. **Defaults** (`config/defaults.yaml`):
    Global settings (verification, filters, formats)
 
-2. **Environment** (`config/envs/<env>.yaml`):
-   Contextual overrides (paths, secrets, output formats)
+2. **Craft** (`config/crafts/<env>.yaml`):
+  Contextual overrides (paths, secrets, output formats)
 
 3. **Bundle** (`config/bundles/<bundle>.yaml`):
    Content definition (certificate sources to include/exclude)
@@ -121,11 +121,11 @@ fetch → build → verify → convert (CI orchestrates discover → build → c
 - Verify all outputs and cross-format consistency
 - Optionally sign and publish release artifacts
 
-### Environment composition (merge bundles per environment)
+### Craft composition (merge bundles per craft)
 
 Environments can define composed target bundles that merge one or more base bundles.
 
-In `config/envs/dev.yaml`:
+In `config/crafts/dev.yaml`:
 
 ```yaml
 targets:
@@ -177,12 +177,12 @@ verify:
 package: true  # produce package.tar.gz
 ```
 
-### Environment Config (`config/envs/*.yaml`)
+### Craft Config (`config/crafts/*.yaml`)
 
 Defines **how** bundles are built in a specific context, including secrets, output path, global filters, and format behavior.
 
 ```yaml
-name: Example Environment
+name: Example Craft
 build_path: dist/example/
 package: false
 verify:
@@ -345,7 +345,7 @@ For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/R
 
 ## 📐 Trust Matrix (Envs × Bundles)
 
-The release pipeline now publishes a trust matrix that shows which environments (rows) trust which bundles (columns), derived from `config/envs/*.yaml` composition (`targets.<name>.includes`).
+The release pipeline now publishes a trust matrix that shows which crafts (rows) trust which bundles (columns), derived from `config/crafts/*.yaml` composition (`targets.<name>.includes`).
 
 Artifacts attached to releases:
 - `TRUST_MATRIX.md` — Markdown table (human-readable)
@@ -378,7 +378,7 @@ The included workflows automate builds and fetch tests:
 - [test-bundlecraft-fetch.yaml](.github/workflows/test-bundlecraft-fetch.yaml): Fetch test suite (Vault, HTTP, API)
 
 - Discover → Build → Collect → Verify → Publish
-- Build per-environment “targets” declared in `config/envs/<env>.yaml` under `targets:` (composition-aware)
+- Build per-craft “targets” declared in `config/crafts/<env>.yaml` under `targets:` (composition-aware)
 - For each target, the job runs `bundlecraft build --prefetch` and respects `build_path` via `--output-root`
 - Uploads artifacts per target using the naming `trust-store-<env>-<target>`
 - Optionally signs and publishes a release tarball
@@ -585,7 +585,7 @@ bundlecraft convert --input bundlecraft-ca-trust.der --output-dir ./ --output-fo
 ### Configuration Files
 
 - `config/defaults.yaml` - Global baseline settings
-- `config/envs/*.yaml` - Environment-specific configs (dev, qa, prod)
+- `config/crafts/*.yaml` - Craft-specific configs (dev, qa, prod)
 - `config/bundles/*.yaml` - Bundle definitions (what certs to include)
 
 ### Output Artifacts

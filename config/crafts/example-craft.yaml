@@ -1,0 +1,15 @@
+---
+# =====================================================================
+# Example Craft Configuration for BundleCraft
+# =====================================================================
+# Location: config/crafts/example-craft.yaml
+#
+# Craft configs define HOW to build and WHERE to distribute.
+# This controls output formats, verification policies, secrets handling,
+# filtering rules, and distribution targets.
+#
+# Philosophy: Bundle configs define WHAT/WHERE (sources),
+#            Craft configs define HOW/WHERE (build & deploy).
+# =====================================================================
+name: Example Craft
+# ...existing code...

@@ -38,7 +38,7 @@ def temp_workspace(temp_dir, test_data_dir):
     This provides an isolated environment for each test.
     """
     # Create standard directory structure
-    dirs = ["sources/internal", "config/bundles", "config/envs", "build"]
+    dirs = ["sources/internal", "config/bundles", "config/crafts", "build"]
     for d in dirs:
         (temp_dir / d).mkdir(parents=True)
 

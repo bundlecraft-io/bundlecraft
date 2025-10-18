@@ -6,8 +6,8 @@ Quick catalog:
 
 | Script | Purpose |
 |---|---|
-| `detect_env_targets.py` | Discover environment targets from `config/envs/*.yaml` and emit a JSON matrix for CI |
-| `trust_matrix.py` | Build an Environment × Bundle trust matrix from env configs (table/markdown/csv/json) |
+| `detect_env_targets.py` | Discover craft targets from `config/crafts/*.yaml` (or legacy `config/envs/*.yaml`) and emit a JSON matrix for CI |
+| `trust_matrix.py` | Build a Craft × Bundle trust matrix from craft configs (table/markdown/csv/json) |
 | `generate_test_cas.py` | Generate self-signed test CA certificates with automatic private key disposal (TESTING ONLY) |
 | `test-server-local.py` | Local HTTPS test server for CI and development with Swagger UI |
 | `vault-local.py` | Spin up a local HashiCorp Vault dev instance for testing the Vault fetcher |
@@ -180,7 +180,7 @@ pip install -e ".[dev]"
 
 ## 🔎 detect_env_targets.py
 
-Parse `config/envs/*.yaml` and output a JSON array describing the CI build matrix.
+Parse `config/crafts/*.yaml` (or legacy `config/envs/*.yaml`) and output a JSON array describing the CI build matrix.
 
 
 Usage:
@@ -204,7 +204,7 @@ Notes:
 
 ## 📐 trust_matrix.py
 
-Generate a trust matrix showing which environments (rows) trust which bundles (columns), based on `targets.<name>.includes` in `config/envs/*.yaml`.
+Generate a trust matrix showing which crafts (rows) trust which bundles (columns), based on `targets.<name>.includes` in `config/crafts/*.yaml`.
 
 # Scripts
 
@@ -356,10 +356,10 @@ fetch:
     token_ref: VAULT_TOKEN
 ```
 
-And a minimal environment file:
+And a minimal craft file:
 
 ```yaml
-# config/envs/dev.yaml
+# config/crafts/dev.yaml
 name: Dev
 ```
 
@@ -368,7 +368,7 @@ Then run:
 ```bash
 export VAULT_ADDR="http://127.0.0.1:8200"
 export VAULT_TOKEN="root"
-bundlecraft fetch --env dev --bundle local-vault
+bundlecraft fetch --craft dev --bundle local-vault
 ```
 
 This will stage the local Vault-provided PEM under `sources/fetched/dev/local-vault/from_vault.pem`.
@@ -406,19 +406,19 @@ Quick catalog:
 
 | Script | Purpose |
 |---|---|
-| `detect_env_targets.py` | Discover environment targets from `config/envs/*.yaml` and emit a JSON matrix for CI |
-| `trust_matrix.py` | Build an Environment × Bundle trust matrix from env configs (table/markdown/csv/json) |
+| `detect_env_targets.py` | Discover craft targets from `config/crafts/*.yaml` (or legacy `config/envs/*.yaml`) and emit a JSON matrix for CI |
+| `trust_matrix.py` | Build a Craft × Bundle trust matrix from craft configs (table/markdown/csv/json) |
 | `vault-local.sh` | Spin up a local HashiCorp Vault dev instance for testing the Vault fetcher |
 
 ---
 
 ## 🔎 detect_env_targets.py
 
-Parse `config/envs/*.yaml` and output a JSON array describing the CI build matrix.
+Parse `config/crafts/*.yaml` (or legacy `config/envs/*.yaml`) and output a JSON array describing the CI build matrix.
 
-- Reads env files for `targets: <name>.includes: [...]`
-- Emits objects: `{ "env": "<env>", "target": "<target>", "output_root": "<build_path or dist>" }`
-- Used by GitHub Actions to build per environment/target
+- Reads craft files for `targets: <name>.includes: [...]`
+- Emits objects: `{ "env": "<craft>", "target": "<target>", "output_root": "<build_path or dist>" }`
+- Used by GitHub Actions to build per craft/target
 
 Usage:
 
@@ -437,20 +437,20 @@ Example output:
 ```
 
 Notes:
-- If an environment defines `build_path`, it is emitted as `output_root`.
-- Environments without `targets` are ignored.
+- If a craft defines `build_path`, it is emitted as `output_root`.
+- Crafts without `targets` are ignored.
 
 ---
 
 ## 📐 trust_matrix.py
 
-Generate a trust matrix showing which environments (rows) trust which bundles (columns), based on `targets.<name>.includes` in `config/envs/*.yaml`.
+Generate a trust matrix showing which crafts (rows) trust which bundles (columns), based on `targets.<name>.includes` in `config/crafts/*.yaml`.
 
 Supported formats:
 - `table`: Unicode box table for terminals
 - `markdown`: GitHub-friendly table
 - `csv`: numeric matrix (1/0)
-- `json`: structured data including per-env `targets` and `trusts`
+- `json`: structured data including per-craft `targets` and `trusts`
 
 Usage:
 
@@ -466,7 +466,7 @@ python scripts/trust_matrix.py --format json --output trust-matrix.json
 ```
 
 Notes:
-- Trust for an env = union of all bundles listed in its targets' `includes`.
+- Trust for a craft = union of all bundles listed in its targets' `includes`.
 - Legacy `bundle_targets: [...]` is supported and treated as trusted bundles.
 
 ---
@@ -620,10 +620,10 @@ fetch:
     token_ref: VAULT_TOKEN
 ```
 
-And a minimal environment file:
+And a minimal craft file:
 
 ```yaml
-# config/envs/dev.yaml
+# config/crafts/dev.yaml
 name: Dev
 ```
 
@@ -632,7 +632,7 @@ Then run:
 ```bash
 export VAULT_ADDR="http://127.0.0.1:8200"
 export VAULT_TOKEN="root"
-bundlecraft fetch --env dev --bundle local-vault
+bundlecraft fetch --craft dev --bundle local-vault
 ```
 
 This will stage the local Vault-provided PEM under `sources/fetched/dev/local-vault/from_vault.pem`.

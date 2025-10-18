@@ -3,7 +3,7 @@
 This document defines the configuration schema for BundleCraft, clearly separating concerns between:
 
 - **Bundle configs** (`config/bundles/*.yaml`) — Certificate sourcing and gathering
-- **Environment configs** (`config/envs/*.yaml`) — Build, output, and deployment configuration
+- **Craft configs** (`config/crafts/*.yaml`) — Build, output, and deployment configuration
 - **Defaults** (`config/defaults.yaml`) — Global fallback settings
 
 ---
@@ -21,7 +21,7 @@ This document defines the configuration schema for BundleCraft, clearly separati
 
 **Forbidden:** Output formats, build paths, passwords, verification policies
 
-### Environment Configs: Build & Deploy Layer
+### Craft Configs: Build & Deploy Layer
 **Purpose:** Define HOW to build and WHERE to distribute
 
 **Responsibilities:**
@@ -108,7 +108,7 @@ metadata:
 
 ---
 
-## 2) Environment Configuration: `config/envs/<env>.yaml`
+## 2) Craft Configuration: `config/crafts/<env>.yaml`
 
 Defines build behavior and deployment configuration for an environment.
 
@@ -250,7 +250,7 @@ metadata:
 
 ## 3) Defaults: `config/defaults.yaml`
 
-Global fallback settings applied before environment config.
+Global fallback settings applied before craft config.
 
 ```yaml
 ---
@@ -289,7 +289,7 @@ metadata:
 
 ## Configuration Precedence
 
-**For build settings:** `built-in defaults` → `config/defaults.yaml` → `config/envs/<env>.yaml`
+**For build settings:** `built-in defaults` → `config/defaults.yaml` → `config/crafts/<env>.yaml`
 
 **For sources:** Only `config/bundles/<bundle>.yaml` is consulted (no merging with env)
 
@@ -306,7 +306,7 @@ metadata:
 ```bash
 bundlecraft build --env prod --bundle internal-prod --prefetch
 ```
-- Loads `config/envs/prod.yaml` for build settings
+- Loads `config/crafts/prod.yaml` for build settings
 - Composes sources from `internal` and `mozilla` bundle configs
 - Outputs to `dist/prod/internal-prod/` (or custom `build_path`)
 
@@ -348,7 +348,7 @@ Supported values for `distribution_metadata.targets[].type`:
 - ✅ Keep: `include`, `exclude`, `fetch`, `metadata`
 - ❌ Remove: `output_formats`, `verify`, `pem`, `filters`, `format_overrides`, `package`
 
-**Environment configs:**
+**Craft configs:**
 - ✅ Keep: `targets`, `output_formats`, `verify`, `filters`, `format_overrides`
 - ✅ Add: `distribution` section with targets and tags
 - ❌ Remove: `include`, `exclude`, `fetch` (belongs in bundles)

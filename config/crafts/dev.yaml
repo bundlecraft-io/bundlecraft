@@ -1,0 +1,72 @@
+---
+# =====================================================================
+# Development Craft Configuration
+# =====================================================================
+# Craft configs define HOW to build and WHERE to distribute.
+# Controls output formats, verification, secrets, and deployment targets.
+# =====================================================================
+name: Development
+description: Development environment for testing and local builds
+# ---------------------------------------------------------------------
+# Bundle Composition
+# ---------------------------------------------------------------------
+targets:
+  internal:
+    includes: [internal]  # Internal certs only for dev
+# ---------------------------------------------------------------------
+# Output Configuration
+# ---------------------------------------------------------------------
+output_formats:
+  - pem  # Canonical PEM bundle
+  - p7b  # PKCS#7 DER format
+  - jks  # Java KeyStore
+  - p12  # PKCS#12 / PFX
+package: true  # Create .tar.gz archives
+# ---------------------------------------------------------------------
+# Verification & Filtering
+# ---------------------------------------------------------------------
+verify:
+  fail_on_expired: false  # Don't abort on expired (dev tolerant)
+  warn_days_before_expiry: 30  # Still warn about expiration
+filters:
+  unique_by_fingerprint: true  # Deduplicate by SHA256
+  not_expired_only: false  # Allow expired certs in dev
+  ca_certs_only: true  # Only CA certificates
+pem:
+  include_subject_comments: true  # Add "# Subject:" comments
+# ---------------------------------------------------------------------
+# Format-Specific Configuration
+# ---------------------------------------------------------------------
+format_overrides:
+  jks:
+    storepass_env: TRUST_JKS_PASSWORD  # Password from environment
+    alias_format: '{subject.CN}-{serial}'
+  pkcs12:
+    password_env: TRUST_P12_PASSWORD  # Password from environment
+## ---------------------------------------------------------------------
+# Distribution Metadata (for CI/CD pipeline use only)
+# ---------------------------------------------------------------------
+# NOTE: BundleCraft CLI does NOT publish or upload bundles directly.
+# This section provides metadata for CI/CD pipelines (e.g., GitHub Actions)
+# to know where and how to distribute built bundles. Keys/values are flexible.
+distribution_metadata:
+  targets:
+    - type: github-release
+      enabled: true  # Only used for testing in CI/CD
+      description: Publish to GitHub Releases (handled by pipeline)
+      assets: [bundlecraft-trust.tar.gz, bundlecraft-trust-env-*.tar.gz]
+    - type: artifactory
+      enabled: false
+      description: 'Example: JFrog Artifactory (not used currently)'
+  tags:
+    - development
+    - testing
+    - ci-cd
+    - github-release
+# ---------------------------------------------------------------------
+# Metadata
+# ---------------------------------------------------------------------
+metadata:
+  contact: security@bundlecraft.io
+  environment_tier: development
+  approval_required: false

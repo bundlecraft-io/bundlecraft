@@ -2,8 +2,8 @@
 """
 trust_matrix.py
 
-Generate a trust matrix showing which environments (rows) trust which bundles (columns),
-based on environment composition defined in config/envs/*.yaml.
+Generate a trust matrix showing which crafts (rows) trust which bundles (columns),
+based on composition defined in config/crafts/*.yaml (or legacy config/envs/*.yaml).
 
 Trust = union of all bundles referenced by any target in an environment's `targets.<name>.includes`.
 
@@ -49,14 +49,16 @@ def load_yaml(path: Path) -> dict:
 def collect_env_trust(
     config_dir: Path,
 ) -> tuple[list[str], list[str], dict[str, set[str]], dict[str, dict[str, list[str]]]]:
+    crafts_dir = config_dir / "crafts"
     envs_dir = config_dir / "envs"
-    if not envs_dir.exists():
-        raise FileNotFoundError(f"Missing envs directory: {envs_dir}")
+    scan_dir = crafts_dir if crafts_dir.exists() else envs_dir
+    if not scan_dir.exists():
+        raise FileNotFoundError(f"Missing crafts/envs directory: {scan_dir}")
 
     env_to_bundles: dict[str, set[str]] = {}
     env_to_targets: dict[str, dict[str, list[str]]] = {}
 
-    for env_path in sorted(envs_dir.glob("*.yaml")):
+    for env_path in sorted(scan_dir.glob("*.yaml")):
         env_name = env_path.stem
         data = load_yaml(env_path)
         bundles_for_env: set[str] = set()
@@ -95,7 +97,7 @@ def render_table(envs: list[str], bundles: list[str], env_to_bundles: dict[str, 
         return "(no data)"
 
     # Build rows
-    header = ["environment \\ bundle"] + bundles
+    header = ["craft \\ bundle"] + bundles
     rows: list[list[str]] = [header]
     for env in envs:
         row = [env]

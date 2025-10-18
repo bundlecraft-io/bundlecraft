@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Detect environment targets from config/envs/*.yaml and emit JSON for CI matrix.
+Detect craft targets from config/crafts/*.yaml (preferred) or legacy config/envs/*.yaml and emit JSON for CI matrix.
 
 Output format: a JSON array of objects with keys { env, target, output_root }.
 """
@@ -24,16 +24,26 @@ def parse_envs(arg: str | None) -> set[str]:
 
 
 def main() -> None:
-    # Optional filtering: --envs "dev,qa,prod"
+    # Optional flags:
+    #   --envs "dev,qa,prod" to select a subset
+    #   --github-release-only to include only crafts with github-release enabled
     sel_envs: set[str] = set()
+    github_release_only = False
     args = sys.argv[1:]
-    if args and args[0] == "--envs":
-        if len(args) < 2:
+    # Parse --envs
+    if "--envs" in args:
+        try:
+            idx = args.index("--envs")
+            sel_envs = parse_envs(args[idx + 1])
+        except Exception:
             print("::warning::--envs requires a comma-separated value (e.g., dev,qa)")
-        else:
-            sel_envs = parse_envs(args[1])
+    # Parse --github-release-only
+    if "--github-release-only" in args:
+        github_release_only = True
     env_targets: list[dict[str, str]] = []
-    for path in sorted(glob.glob("config/envs/*.yaml")):
+    # Prefer crafts; also include legacy envs for back-compat
+    paths = sorted(glob.glob("config/crafts/*.yaml")) or sorted(glob.glob("config/envs/*.yaml"))
+    for path in paths:
         base = os.path.basename(path)
         if base.startswith("example"):
             continue
@@ -46,6 +56,18 @@ def main() -> None:
         except Exception as e:
             print(f"::warning::Failed to parse {path}: {e}")
             cfg = {}
+
+        if github_release_only:
+            dist = cfg.get("distribution_metadata") or cfg.get("distribution") or {}
+            targets = dist.get("targets", []) if isinstance(dist, dict) else []
+            enabled = any(
+                isinstance(t, dict)
+                and t.get("type") == "github-release"
+                and (t.get("enabled") is True)
+                for t in targets
+            )
+            if not enabled:
+                continue
 
         targets = cfg.get("targets") or {}
         output_root = cfg.get("build_path") or "dist"

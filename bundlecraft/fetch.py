@@ -199,7 +199,12 @@ def run_fetch(
 
     # Load config
     logger.info(f"Loading config for env={env}, bundle={bundle}")
-    _ = load_yaml(config_dir / "envs" / f"{env}.yaml", required=True)
+    cfg_path = (
+        (config_dir / "crafts" / f"{env}.yaml")
+        if (config_dir / "crafts" / f"{env}.yaml").exists()
+        else (config_dir / "envs" / f"{env}.yaml")
+    )
+    _ = load_yaml(cfg_path, required=True)
     bundle_cfg = load_yaml(config_dir / "bundles" / f"{bundle}.yaml", required=True)
     fetch_cfg = bundle_cfg.get("fetch") or []
     if not isinstance(fetch_cfg, list):
@@ -228,11 +233,11 @@ def run_fetch(
     type=click.Path(exists=True, dir_okay=False, file_okay=True, path_type=Path),
     help=(
         "Optional: Path to a single bundle config YAML to fetch from directly. When provided,"
-        " --env/--bundle are optional; env defaults to 'ci' and bundle name is derived from"
+        " --env/--bundle (or --craft/--bundle) are optional; env defaults to 'ci' and bundle name is derived from"
         " the config 'id' or filename."
     ),
 )
-@click.option("--env", required=False, help="Environment name (e.g., dev, prod, dmz)")
+@click.option("--env", "--craft", "env", required=False, help="Craft name (e.g., dev, prod, dmz)")
 @click.option("--bundle", required=False, help="Bundle name (e.g., internal, external)")
 @click.option(
     "--workspace-root",

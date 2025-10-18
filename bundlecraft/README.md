@@ -60,12 +60,12 @@ Commands:
 
 ### 🌐 `bundlecraft fetch`
 
-Purpose: Reach out to preconfigured and trusted certificate sources at build-time, verify content, and stage PEMs for the builder. No persistent caching; artifacts are written to `sources/fetched/<env>/<bundle>/` and cleaned on each run by default.
+Purpose: Reach out to preconfigured and trusted certificate sources at build-time, verify content, and stage PEMs for the builder. No persistent caching; artifacts are written to `sources/fetched/<craft>/<bundle>/` and cleaned on each run by default.
 
 Usage:
 
 ```bash
-bundlecraft fetch --env <environment> --bundle <bundle_name> [--workspace-root <dir>] [--no-clean] [--offline]
+bundlecraft fetch --craft <craft> --bundle <bundle_name> [--workspace-root <dir>] [--no-clean] [--offline]
 ```
 
 Config excerpts (in `config/bundles/<bundle>.yaml`):
@@ -175,14 +175,14 @@ Troubleshooting highlights:
 **Usage:**
 
 ```bash
-bundlecraft build --env <environment> --bundle <bundle_name> [OPTIONS]
+bundlecraft build --craft <craft> --bundle <bundle_name> [OPTIONS]
 ```
 
 **Options:**
 
 | Option          | Description                                              |
 | --------------- | -------------------------------------------------------- |
-| `--env`         | Environment name (e.g., `dev`, `prod`, `dmz`). Required. |
+| `--craft`       | Craft name (e.g., `dev`, `prod`, `dmz`). Required. |
 | `--bundle`      | Bundle name (e.g., `internal`, `external`). Required.    |
 | `--package`     | Also create a `.tar.gz` archive of the build folder.     |
 | `--verify-only` | Skip build; verify certificates only.                    |

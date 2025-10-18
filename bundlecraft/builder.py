@@ -135,7 +135,13 @@ def package_tar(build_path: Path) -> Path:
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("--env", required=True, help="Environment name (e.g., dev, prod, dmz)")
+@click.option(
+    "--env",
+    "--craft",
+    "env",
+    required=True,
+    help="Craft name (e.g., dev, prod, dmz)",
+)
 @click.option("--bundle", required=True, help="Bundle name (e.g., internal, external)")
 @click.option("--package", is_flag=True, help="Also create a .tar.gz of the build folder")
 @click.option("--verify-only", is_flag=True, help="Only verify certificates; skip build")
@@ -165,7 +171,11 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
 
     # defaults is currently unused, to be refactored when the config structure is revalidated
     # defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False) or {}
-    env_cfg = load_yaml(CONFIG_DIR / "envs" / f"{env}.yaml", required=True)
+    # Prefer crafts configs, fall back to legacy envs for backward compatibility
+    craft_path = CONFIG_DIR / "crafts" / f"{env}.yaml"
+    legacy_env_path = CONFIG_DIR / "envs" / f"{env}.yaml"
+    cfg_path = craft_path if craft_path.exists() else legacy_env_path
+    env_cfg = load_yaml(cfg_path, required=True)
 
     # Environment-driven composition support: env can define targets mapping
     # a target bundle name to one or more base bundle configs to include/merge.
