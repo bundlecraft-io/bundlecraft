@@ -3,8 +3,8 @@
 # Example bundle configuration for BundleCraft
 # Location: config/bundles/example.yaml
 #
-# Defines WHAT certificates to include, HOW they should be filtered,
-# and which output formats to build for this specific trust bundle.
+# Defines WHAT certificates to include and HOW they should be filtered.
+# Output formats are now controlled at the environment level.
 # =====================================================================
 
 # ---------------------------------------------------------------------
@@ -16,10 +16,10 @@ description: >
   Demonstration of all supported keys and options for a trust bundle.
   Each file in config/bundles/ defines one trust bundle (e.g. internal,
   external, partners). Bundles describe content, not environment-specific
-  behavior like passwords.
+  behavior like passwords or output formats.
 
 # ---------------------------------------------------------------------
-# High-importance: Source inputs and formats
+# High-importance: Source inputs
 # ---------------------------------------------------------------------
 include:  # Relative paths (from repo root) to include
   - sources/example/roots/  # All .pem files in this folder
@@ -27,11 +27,6 @@ include:  # Relative paths (from repo root) to include
   - sources/example/special.pem  # You can list single files too
 exclude:  # Optional explicit exclusions
   - sources/example/intermediates/old-ca.pem  # Path relative to repo root
-output_formats:  # Which formats to produce for this bundle
-  - pem  # Always produced; canonical concatenated PEM
-  - p7b  # PKCS#7 (.p7b, DER)
-  - jks  # Java KeyStore (.jks)
-  - p12  # PKCS#12 (.p12/.pfx)
 package: false  # Whether to also produce a .tar.gz of all outputs
 # Optional: Fetch remote sources securely (staged to sources/fetched/<env>/<bundle>)
 fetch:
@@ -61,6 +56,8 @@ filters:
   ca_certs_only: true  # Include only CA certificates (BasicConstraints CA=TRUE)
 # ---------------------------------------------------------------------
 # Optional per-format overrides (bundle-specific)
+# NOTE: output_formats are now defined at the environment level.
+# These overrides only affect format-specific settings like alias patterns.
 # ---------------------------------------------------------------------
 format_overrides:
   jks:

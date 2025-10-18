@@ -3,11 +3,6 @@ bundle_name: internal
 description: Trust bundle for internal PKI services
 include: [sources/internal/rootCA.pem, sources/internal/issuingCA1.pem]
 exclude: []
-output_formats:
-  - pem
-  - jks
-  - p7b
-  - p12
 # --- New options ---
 pem:
   include_subject_comments: true  # Adds "# Subject:" above each PEM block

@@ -11,11 +11,6 @@ fetch:
     pem_field: pem
     addr: http://127.0.0.1:8200
     token_ref: VAULT_TOKEN
-output_formats:
-  - pem
-  - jks
-  - p7b
-  - p12
 # --- New options ---
 pem:
   include_subject_comments: true  # Adds "# Subject:" above each PEM block

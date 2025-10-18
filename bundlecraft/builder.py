@@ -215,7 +215,8 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
             click.secho(f"[ERROR] Prefetch failed: {e}", fg="red")
             sys.exit(2)
 
-    verify_cfg = bundle_cfg.get("verify", True)
+    # Prefer env-level verify config, fall back to bundle-level
+    verify_cfg = env_cfg.get("verify") or bundle_cfg.get("verify", True)
     fail_on_expired = (
         verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
     )
@@ -223,10 +224,12 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         verify_cfg.get("warn_days_before_expiry", 30) if isinstance(verify_cfg, dict) else 30
     )
 
-    pem_cfg = bundle_cfg.get("pem", {})
+    # Prefer env-level pem config, fall back to bundle-level
+    pem_cfg = env_cfg.get("pem") or bundle_cfg.get("pem", {})
     include_subject_comments = pem_cfg.get("include_subject_comments", True)
 
-    output_formats = bundle_cfg.get("output_formats", ["pem"])
+    # Prefer env-level output_formats, fall back to bundle-level, then default to ["pem"]
+    output_formats = env_cfg.get("output_formats") or bundle_cfg.get("output_formats", ["pem"])
     do_package = bool(package or bundle_cfg.get("package", False))
 
     BUILD_DIR = Path(output_root)

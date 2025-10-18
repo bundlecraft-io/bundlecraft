@@ -6,11 +6,6 @@ fetch:
     type: url
     url: https://curl.se/ca/cacert.pem
 exclude: []
-output_formats:
-  - pem
-  - jks
-  - p7b
-  - p12
 # --- New options ---
 pem:
   include_subject_comments: true  # Adds "# Subject:" above each PEM block

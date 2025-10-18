@@ -180,10 +180,13 @@ Security posture:
 
 ## 5) Precedence and overrides
 
-1. Defaults → Environment → Bundle
-   - Later layers override earlier ones for common keys (e.g., output_formats).
-2. Composition uses the environment’s `targets.<target>.includes` list to gather base bundle sources.
+1. **Defaults → Environment → Bundle**
+   - Environment config takes precedence for `output_formats`, `verify`, `pem`, and `format_overrides`.
+   - Bundle configs can still provide these settings, but environment-level settings override them.
+2. Composition uses the environment's `targets.<target>.includes` list to gather base bundle sources.
 3. Staged fetched sources are automatically included for each base bundle when present.
+
+**Best practice:** Define `output_formats` at the environment level to control build outputs consistently across all targets in that environment.
 
 ---
 
