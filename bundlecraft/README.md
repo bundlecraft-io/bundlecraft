@@ -393,7 +393,7 @@ Local validation (editable mode):
 ```bash
 bundlecraft build --env dev --bundle internal
 bundlecraft verify --target dist/dev/internal
-bundlecraft convert --pem-file dist/dev/internal/ca-trust.pem --output-dir dist/dev/internal/
+bundlecraft convert --pem-file dist/dev/internal/bundlecraft-ca-trust.pem --output-dir dist/dev/internal/
 ```
 
 Automated CI/CD (non-editable install):
