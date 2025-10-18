@@ -369,7 +369,7 @@ jobs:
           if command -v numfmt >/dev/null 2>&1; then has_numfmt=1; fi
           human() {
             if [ $has_numfmt -eq 1 ]; then
-              numfmt --to=iec --suffix=B --padding=0 "$1"
+              numfmt --to=iec --suffix=B "$1"
             else
               echo "$1 bytes"
             fi
