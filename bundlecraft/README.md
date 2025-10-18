@@ -192,10 +192,10 @@ bundlecraft build --env <environment> --bundle <bundle_name> [OPTIONS]
 
 **Outputs:**
 
-* `ca-trust.pem`: canonical PEM bundle
-* `ca-trust.jks`: Java KeyStore bundle
-* `ca-trust.p12`: PKCS#12 bundle
-* `ca-trust.p7b`: PKCS#7 bundle
+* `bundlecraft-ca-trust.pem`: canonical PEM bundle
+* `bundlecraft-ca-trust.jks`: Java KeyStore bundle
+* `bundlecraft-ca-trust.p12`: PKCS#12 bundle
+* `bundlecraft-ca-trust.p7b`: PKCS#7 bundle
 * `checksums.sha256`: per-file integrity manifest
 * `manifest.json`: build metadata summary
 
@@ -283,13 +283,13 @@ bundlecraft convert --input <input_file> --output-dir <output_path> --output-for
 
 ```bash
 # Convert DER to PEM
-bundlecraft convert --input dist/prod/internal/ca-trust.der --output-dir dist/prod/internal/ --output-format pem
+bundlecraft convert --input dist/prod/internal/bundlecraft-ca-trust.der --output-dir dist/prod/internal/ --output-format pem
 
 # Convert PEM to P7B (with force overwrite)
-bundlecraft convert --input dist/prod/internal/ca-trust.pem --output-dir dist/prod/internal/ --output-format p7b --force
+bundlecraft convert --input dist/prod/internal/bundlecraft-ca-trust.pem --output-dir dist/prod/internal/ --output-format p7b --force
 
 # Convert to ZIP (tarball of PEMs)
-bundlecraft convert --input dist/prod/internal/ca-trust.pem --output-dir dist/prod/internal/ --output-format zip
+bundlecraft convert --input dist/prod/internal/bundlecraft-ca-trust.pem --output-dir dist/prod/internal/ --output-format zip
 ```
 
 **Output Filenames:**
@@ -332,7 +332,7 @@ bundlecraft [COMMAND] [OPTIONS]
 ```bash
 bundlecraft build --env prod --bundle internal
 bundlecraft verify --target dist/prod/internal --verify-all
-bundlecraft convert --pem-file dist/prod/internal/ca-trust.pem --output-dir dist/prod/internal/
+bundlecraft convert --pem-file dist/prod/internal/bundlecraft-ca-trust.pem --output-dir dist/prod/internal/
 ```
 
 **Help:**
