@@ -178,20 +178,14 @@ jobs:
           sha256sum bundlecraft-trust.tar.gz > bundlecraft-trust.sha256
           echo "Created tarball and checksum:"
           sha256sum bundlecraft-trust.tar.gz
-          echo "=== Creating per-target tarballs (root=certs) ==="
-          mapfile -t TARGETS < <(find pki-ca-trust -mindepth 2 -maxdepth 2 -type d | sort)
-          for dir in "${TARGETS[@]}"; do
-            env="$(echo "$dir" | awk -F/ '{print $2}')"
-            bundle="$(echo "$dir" | awk -F/ '{print $3}')"
-            name="bundlecraft-trust-env-${env}-bundle-${bundle}.tar.gz"
-            if [ -d "$dir/certs" ]; then
-              tar -czf "$name" -C "$dir" certs
-            else
-              # Fallback: if certs/ missing, include full target directory (keeps structure)
-              tar -czf "$name" -C "pki-ca-trust/${env}" "$bundle"
-            fi
+          echo "=== Creating per-environment tarballs (all formats, root=pki-ca-trust/<env>/) ==="
+          for envdir in pki-ca-trust/*; do
+            [ -d "$envdir" ] || continue
+            env="$(basename "$envdir")"
+            name="bundlecraft-trust-env-${env}.tar.gz"
+            tar -czf "$name" -C pki-ca-trust "$env"
             sha256sum "$name" > "${name%.tar.gz}.sha256"
-            echo "Created per-target tarball: $name"
+            echo "Created per-env tarball: $name"
           done
       - name: Upload combined directory
         uses: actions/upload-artifact@v4
@@ -205,13 +199,13 @@ jobs:
           path: |
             bundlecraft-trust.tar.gz
             bundlecraft-trust.sha256
-      - name: Upload per-target tarballs
+      - name: Upload per-environment tarballs
         uses: actions/upload-artifact@v4
         with:
-          name: truststore-target-bundles
+          name: truststore-env-bundles
           path: |
-            bundlecraft-trust-env-*-bundle-*.tar.gz
-            bundlecraft-trust-env-*-bundle-*.sha256
+            bundlecraft-trust-env-*.tar.gz
+            bundlecraft-trust-env-*.sha256
   verify:
     name: Verify builds and tarball
     needs: collect
@@ -292,10 +286,10 @@ jobs:
         with:
           name: truststore-bundle
           path: release/
-      - name: Download per-target artifacts
+      - name: Download per-environment artifacts
         uses: actions/download-artifact@v4
         with:
-          name: truststore-target-bundles
+          name: truststore-env-bundles
           path: release/
       - name: Generate release tag and name
         id: version
@@ -397,7 +391,7 @@ jobs:
           fi
           perenv_md=""
           shopt -s nullglob
-          files=(release/bundlecraft-trust-env-*-bundle-*.tar.gz)
+          files=(release/bundlecraft-trust-env-*.tar.gz)
           if [ ${#files[@]} -eq 0 ]; then
             perenv_md="(none)\n"
           else
@@ -427,7 +421,7 @@ jobs:
             sha_lines+=$(cat release/bundlecraft-trust.sha256)
             sha_lines+=$'\n'
           fi
-          for s in release/bundlecraft-trust-env-*-bundle-*.sha256; do
+          for s in release/bundlecraft-trust-env-*.sha256; do
             [ -f "$s" ] || continue
             sha_lines+=$(cat "$s")
             sha_lines+=$'\n'
@@ -453,14 +447,13 @@ jobs:
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          mapfile -t PAIRS < <(printf "%s\n" "${files[@]}" | sed -E 's#^.*/bundlecraft-trust-env-([^/]+)-bundle-(.+)\.tar\.gz$#\1/\2#' | sort)
-          count=${#PAIRS[@]}
+          mapfile -t ENVS < <(printf "%s\n" "${files[@]}" | sed -E 's#^.*/bundlecraft-trust-env-([^./]+)\.tar\.gz$#\1#' | sort -u)
+          count=${#ENVS[@]}
           echo "env_count=$count" >> "$GITHUB_OUTPUT"
           {
             echo "env_list_markdown<<EOF"
-            for p in "${PAIRS[@]}"; do
-              env="${p%%/*}"; bundle="${p#*/}"
-              echo "- ${env}/${bundle} (bundlecraft-trust-env-${env}-bundle-${bundle}.tar.gz)"
+            for e in "${ENVS[@]}"; do
+              echo "- ${e} (bundlecraft-trust-env-${e}.tar.gz)"
             done
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
