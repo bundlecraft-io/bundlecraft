@@ -1,21 +1,14 @@
-# The usual suspects
-__pycache__/
-venv/
-build/
-dist/
-personal*/
-*_cache
-.coverage
-.cov
+########################################
+# Project-specific ignores
+########################################
 
-# Fetch directory should not be committed
+# Staged fetch directory (ephemeral)
 sources/fetched/
 
-# Dist
-*.egg-info/
-*.pyc
+# Personal/local test folders
+personal*/
 
-# Never Save Non PEM certificates
+# Non-PEM certificate formats and generated artifacts
 *.crt
 *.cer
 *.jks
@@ -25,8 +18,191 @@ sources/fetched/
 *.hash
 *.p7b
 
-# Never commit private keys (even for testing)
+# Private keys (never commit, even for testing)
 *-key.pem
 *_key.pem
 */key.pem
 *.key
+
+########################################
+# Python cache and bytecode
+########################################
+__pycache__/
+*.py[cod]
+*$py.class
+
+########################################
+# C extensions
+########################################
+*.so
+
+########################################
+# Distribution and packaging
+########################################
+.Python
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+########################################
+# PyInstaller
+########################################
+*.manifest
+*.spec
+
+########################################
+# Installer logs
+########################################
+pip-log.txt
+pip-delete-this-directory.txt
+
+########################################
+# Unit test and coverage reports
+########################################
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+########################################
+# Translations
+########################################
+*.mo
+*.pot
+
+########################################
+# Framework and tool specifics
+########################################
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Sphinx
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+########################################
+# Environment and virtualenvs
+########################################
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+########################################
+# Dependency managers
+########################################
+# pyenv
+# .python-version
+
+# pipenv
+# Pipfile.lock
+
+# uv
+# uv.lock
+
+# poetry
+# poetry.lock
+# poetry.toml
+
+# pdm
+# pdm.lock
+# pdm.toml
+.pdm-python
+.pdm-build/
+
+# pixi
+# pixi.lock
+.pixi
+
+# PEP 582
+__pypackages__/
+
+########################################
+# Task runners and background tools
+########################################
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+########################################
+# Static analysis and typing
+########################################
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+cython_debug/
+
+########################################
+# IDEs and editors
+########################################
+# PyCharm
+# .idea/
+
+# Visual Studio Code
+# See https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
+# .vscode/
+
+########################################
+# Misc tooling
+########################################
+.ruff_cache/
+.pypirc
+.cursorignore
+.cursorindexingignore
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/

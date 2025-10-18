@@ -8,8 +8,175 @@ Quick catalog:
 |---|---|
 | `detect_env_targets.py` | Discover environment targets from `config/envs/*.yaml` and emit a JSON matrix for CI |
 | `trust_matrix.py` | Build an Environment × Bundle trust matrix from env configs (table/markdown/csv/json) |
-| `vault-local.sh` | Spin up a local HashiCorp Vault dev instance for testing the Vault fetcher |
+| `generate_test_cas.py` | Generate self-signed test CA certificates with automatic private key disposal (TESTING ONLY) |
+| `test-server-local.py` | Local HTTPS test server for CI and development with Swagger UI |
+| `vault-local.py` | Spin up a local HashiCorp Vault dev instance for testing the Vault fetcher |
 
+---
+
+## 🔐 generate_test_cas.py
+
+⚠️ **TESTING ONLY - DO NOT USE FOR PRODUCTION** ⚠️
+
+Generate self-signed root CAs and subordinate certificate chains for testing. Automatically disposes of all private key material after certificate generation.
+
+### Security Features
+
+- **Zero key persistence**: Private keys are NEVER written to disk
+- **Immediate disposal**: Keys are zeroed in memory after certificate generation
+- **No export capability**: Intentionally prevents key export (aligns with BundleCraft's trust-only principle)
+- **Interactive warning**: Requires typing "I UNDERSTAND" before generation (skip with `--no-warning` for automation)
+
+### Quick Start
+
+```bash
+# Single root CA (outputs to ./generated-test-cas/)
+python scripts/generate_test_cas.py --name my-test-root --no-warning
+
+# Root with 2-tier subordinate chain
+python scripts/generate_test_cas.py --name dev-root --depth 2 --env dev --boundary internal --no-warning
+
+# Custom output directory
+python scripts/generate_test_cas.py --name prod-root --output-dir /tmp/test-cas --no-warning
+
+# Batch generation from config
+python scripts/generate_test_cas.py --config scripts/example_ca_config.json --no-warning
+```
+
+### CLI Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--name` | Root CA common name | *(required unless --config)* |
+| `--depth` | Subordinate tiers (0-10) | 0 (root only) |
+| `--env` | Environment label (dev/qa/prod) | None |
+| `--boundary` | Network boundary (internal/dmz/external) | None |
+| `--key-size` | RSA key size in bits | 2048 |
+| `--validity` | Certificate validity (days) | 365 |
+| `--output-dir` | Root output directory | `./generated-test-cas` |
+| `--config` | JSON config for batch mode | None |
+| `--no-warning` | Skip security confirmation | False |
+
+### Output Structure
+
+Certificates are organized hierarchically within the output directory:
+
+```
+generated-test-cas/
+├── <env>/
+│   └── <boundary>/
+│       ├── root/
+│       │   └── <name>.pem
+│       ├── tier1/
+│       │   └── <name>-sub1.pem
+│       └── tier2/
+│           └── <name>-sub2.pem
+```
+
+Or for a simple root-only CA without env/boundary:
+
+```
+generated-test-cas/
+└── root/
+    └── <name>.pem
+```
+
+### Example: Generate Test Chain
+
+```bash
+python scripts/generate_test_cas.py \
+  --name dev-internal-root \
+  --depth 3 \
+  --env dev \
+  --boundary internal \
+  --key-size 2048 \
+  --validity 365 \
+  --no-warning
+```
+
+Output:
+- `generated-test-cas/dev/internal/root/dev-internal-root.pem`
+- `generated-test-cas/dev/internal/tier1/dev-internal-root-sub1.pem`
+- `generated-test-cas/dev/internal/tier2/dev-internal-root-sub2.pem`
+- `generated-test-cas/dev/internal/tier3/dev-internal-root-sub3.pem`
+
+### Batch Generation
+
+Create a config file (e.g., `my_hierarchies.json`):
+
+```json
+[
+  {
+    "root_name": "test-root-a",
+    "depth": 1,
+    "env": "test",
+    "boundary": "internal"
+  },
+  {
+    "root_name": "test-root-b",
+    "depth": 2,
+    "env": "test",
+    "boundary": "dmz",
+    "key_size": 4096,
+    "validity_days": 730
+  }
+]
+```
+
+Run:
+
+```bash
+python scripts/generate_test_cas.py --config my_hierarchies.json --no-warning
+```
+
+### Integration with BundleCraft
+
+Generated certificates can be used in BundleCraft configs:
+
+```yaml
+# config/bundles/test-bundle.yaml
+id: test-internal
+description: Test bundle with generated CAs
+include:
+  - generated-test-cas/dev/internal/root/dev-root.pem
+  - generated-test-cas/dev/internal/tier1/dev-root-sub1.pem
+output_formats:
+  - pem
+```
+
+Then build:
+
+```bash
+bundlecraft build --env dev --bundle test-internal
+```
+
+### Use Cases
+
+✅ **Appropriate:**
+- BundleCraft development and testing
+- CI/CD pipeline certificate verification
+- Local test environments
+- PoC certificate chain validation
+
+❌ **Inappropriate:**
+- Production certificate generation
+- Issuing certificates for live services
+- Long-term key storage
+- Personal CA infrastructure
+
+### Requirements
+
+```bash
+pip install cryptography
+```
+
+Or install BundleCraft with dev dependencies:
+
+```bash
+pip install -e ".[dev]"
+```
+
+---
 
 ## 🔎 detect_env_targets.py
 

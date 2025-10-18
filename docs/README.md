@@ -15,9 +15,10 @@ Each document describes a specific layer of the system — from goals and design
 5. [Configuration Design](04-config-design.md)
 6. [Scripts & Components](05-scripts-and-components.md)
 7. [ADR-0002: Fetch Layer](adr-0002-fetch.md)
-8. [Troubleshooting](troubleshooting.md)
-9. [Configuration Spec](CONFIG-SPEC.md)
-10. [API Fetcher and Local Mock](fetcher-apis.md)
+8. [Test CA Certificate Generator](test-ca-generator.md)
+9. [Troubleshooting](troubleshooting.md)
+10. [Configuration Spec](CONFIG-SPEC.md)
+11. [API Fetcher and Local Mock](fetcher-apis.md)
 
 ---
 
