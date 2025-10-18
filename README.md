@@ -2,9 +2,9 @@
 
 ## Overview
 
-![GitHub license](https://img.shields.io/github/license/chrisjpich/bundlecraft)
-![GitHub release](https://img.shields.io/github/v/release/chrisjpich/bundlecraft)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/chrisjpich/bundlecraft/bundlecraft.yaml)
+![GitHub license](https://img.shields.io/github/license/bundlecraft-io/bundlecraft)
+![GitHub release](https://img.shields.io/github/v/release/bundlecraft-io/bundlecraft)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/bundlecraft-io/bundlecraft/bundlecraft.yaml)
 
 ---
 
@@ -372,7 +372,10 @@ Notes:
 
 ## 🏭 CI/CD Pipeline
 
-The included [GitHub Actions workflow](.github/workflows/bundlecraft.yaml) automates:
+The included workflows automate builds and fetch tests:
+
+- [bundlecraft.yaml](.github/workflows/bundlecraft.yaml): Build/verify/publish
+- [test-bundlecraft-fetch.yaml](.github/workflows/test-bundlecraft-fetch.yaml): Fetch test suite (Vault, HTTP, API)
 
 - Discover → Build → Collect → Verify → Publish
 - Build per-environment “targets” declared in `config/envs/<env>.yaml` under `targets:` (composition-aware)
@@ -384,6 +387,12 @@ The included [GitHub Actions workflow](.github/workflows/bundlecraft.yaml) autom
 Notes:
 - Prefer declaring composed targets in env files (for example: `internal-dev` includes `[internal, mozilla]`).
 - If you want bundles to build offline, pre-stage with `bundlecraft fetch` in a connected job, then run build with `--offline`.
+
+Test server used in CI:
+- HTTP and API fetch tests start `scripts/test-server-local.py` on port 8443, then trust the ephemeral CA at `<data_dir>/server.crt`.
+- The script prints the data dir path and stores it at `/tmp/test-server-local-latest` to make CI trust setup easy.
+
+More details in [`scripts/README.md`](scripts/README.md).
 
 Manual trigger:
 You can dispatch builds from the Actions tab for custom scenarios.

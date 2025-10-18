@@ -39,48 +39,49 @@ Notes:
 
 Generate a trust matrix showing which environments (rows) trust which bundles (columns), based on `targets.<name>.includes` in `config/envs/*.yaml`.
 
-Supported formats:
+# Scripts
 
-Usage:
+Local helper scripts for development and CI.
 
-```bash
-# Terminal table
-python scripts/trust_matrix.py --config-dir config --format table
+## test-server-local.py
 
-# Markdown
-python scripts/trust_matrix.py --format markdown --output TRUST_MATRIX.md
+A self-contained HTTPS Flask server used for local testing and CI. It provides:
 
-# JSON
-python scripts/trust_matrix.py --format json --output trust-matrix.json
-```
+- A friendly HTML homepage at `/` with quick usage tips and a link to BundleCraft
+- A plain HTTP download endpoint at `/test-cert.pem`
+- A token-protected API endpoint at `/Certificates/Download` (Keyfactor-like)
+- Built-in Swagger UI at `/apidocs`
 
-Notes:
+Key features:
+- Generates ephemeral TLS cert/key and stores them in a temp dir
+- Prints the homepage URL first for convenience
+- Runs Flask in its own process group for reliable shutdown
+- Uses your project virtualenv Python if available
 
+Usage
 
-## 🔐 BundleCraft: Local Vault Test Environment
+- Start in background (default):
 
-This section explains how to spin up a **local HashiCorp Vault instance** for testing BundleCraft’s Vault fetch integration.
+  ./scripts/test-server-local.py up --port 8443 --token mock-token-12345
 
-It supports two methods:
-1. **Direct binary mode (recommended)** — runs the Vault binary directly on your system in dev mode.
-2. **Container mode (optional)** — runs Vault in a rootless Podman container.
+- Stop background server:
 
+  ./scripts/test-server-local.py down
 
-### 🚀 Overview
+- Run in foreground:
 
-This test environment:
+  ./scripts/test-server-local.py serve --port 8443 --token mock-token-12345
 
+Notes
 
-### 🧰 Requirements
+- TLS material and a small flask log file are stored under `/tmp/test-server-local-<random>`.
+- The latest instance directory is tracked at `/tmp/test-server-local-latest`.
+- The CA certificate is at `<data_dir>/server.crt` for trusting the server in tests.
+- The API expects `Authorization: Bearer <TOKEN>` and a JSON body like `{ "CertID": 12345, "CertificateFormat": "PEM", "IncludeChain": true }`.
 
-#### Option 1: Direct Binary (Recommended)
+## vault-local.py
 
-Install Vault natively:
-
-```bash
-# Debian / Ubuntu
-sudo apt-get update
-sudo apt-get install -y wget gpg
+Helper to run a local Vault dev server using Podman during CI, with an option to run a post-start CI command.
 
 # Add HashiCorp repo
 wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg

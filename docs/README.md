@@ -17,6 +17,7 @@ Each document describes a specific layer of the system — from goals and design
 7. [ADR-0002: Fetch Layer](adr-0002-fetch.md)
 8. [Troubleshooting](troubleshooting.md)
 9. [Configuration Spec](CONFIG-SPEC.md)
+10. [API Fetcher and Local Mock](fetcher-apis.md)
 
 ---
 

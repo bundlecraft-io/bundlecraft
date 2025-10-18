@@ -67,7 +67,7 @@ jobs:
             local_vault_artifacts/**
             ci-test-vault.yaml
   http-fetch:
-    name: 'Test: HTTP Fetcher (Nginx with pinning)'
+    name: 'Test: HTTP Fetcher (Local Test Server with pinning)'
     runs-on: ubuntu-latest
     if: >-
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 'http') }}
@@ -78,100 +78,24 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install BundleCraft
+      - name: Install BundleCraft and test server deps
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev,fetchers]"
-      - name: Generate test certificate and content for HTTPS server
+          pip install flask flasgger
+      - name: Start local test server (HTTPS)
+        run: |
+          chmod +x scripts/test-server-local.py
+          ./scripts/test-server-local.py up --port 8443 --token mock-token-12345
+          # Wait for readiness
+          for i in {1..30}; do
+            if curl -sk https://127.0.0.1:8443/test-cert.pem >/dev/null; then echo "Server ready"; break; fi; sleep 1; done
+          curl -sk https://127.0.0.1:8443/test-cert.pem >/dev/null || { echo "Server did not become ready"; exit 1; }
+          echo "DATA_DIR=$(cat /tmp/test-server-local-latest)" >> "$GITHUB_ENV"
+      - name: Prepare trust and generate HTTP fetch config (ci-test-http.yaml)
         run: |
           mkdir -p ci-http-test
-          # Generate a local CA
-          openssl req -x509 -newkey rsa:2048 -nodes \
-            -keyout ci-http-test/ca.key -out ci-http-test/ca.crt \
-            -days 2 -subj "/CN=BundleCraft Test CA" \
-            -addext "basicConstraints=critical,CA:TRUE"
-          # Generate server key and CSR with SAN for 127.0.0.1
-          openssl genrsa -out ci-http-test/server.key 2048
-          cat > ci-http-test/server.cnf <<'CNF'
-          [req]
-          prompt = no
-          distinguished_name = dn
-          req_extensions = v3_req
-          [dn]
-          CN = localhost
-          [v3_req]
-          subjectAltName = @alt_names
-          [alt_names]
-          DNS.1 = localhost
-          IP.1 = 127.0.0.1
-          CNF
-          openssl req -new -key ci-http-test/server.key -out ci-http-test/server.csr -config ci-http-test/server.cnf
-          # Sign server cert with local CA (includes SAN)
-          cat > ci-http-test/server.ext <<'EXT'
-          basicConstraints=CA:FALSE
-          keyUsage = digitalSignature, keyEncipherment
-          extendedKeyUsage = serverAuth
-          subjectAltName = @alt_names
-          [alt_names]
-          DNS.1 = localhost
-          IP.1 = 127.0.0.1
-          EXT
-          openssl x509 -req -in ci-http-test/server.csr -CA ci-http-test/ca.crt -CAkey ci-http-test/ca.key -CAcreateserial \
-            -out ci-http-test/server.crt -days 1 -extfile ci-http-test/server.ext
-
-          # Create a test PEM to serve
-          cat > ci-http-test/test-cert.pem <<'PEM'
-          -----BEGIN CERTIFICATE-----
-          MIICxjCCAa6gAwIBAgIUTest123456789ABCDEFGHIJKLMN0wDQYJKoZIhvcNAQEL
-          BQAwDzENMAsGA1UEAwwEVEVTVDAeFw0yNTAxMDEwMDAwMDBaFw0zNTAxMDEwMDAw
-          MDBaMA8xDTALBgNVBAMMBFRFU1QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
-          AoIBAQDExampleCertDataHere123456789ABCDEFGHIJKLMNOP
-          -----END CERTIFICATE-----
-          PEM
-
-          # Compute SHA256 of server cert for pinning test
-          openssl x509 -in ci-http-test/server.crt -outform DER | sha256sum | awk '{print $1}' > ci-http-test/fingerprint.txt
-          echo "Server cert fingerprint: $(cat ci-http-test/fingerprint.txt)"
-
-          # Create nginx config for HTTPS
-          cat > ci-http-test/nginx.conf <<'NGINX'
-          events {
-            worker_connections 1024;
-          }
-          http {
-            server {
-              listen 8443 ssl;
-              ssl_certificate /etc/nginx/certs/server.crt;
-              ssl_certificate_key /etc/nginx/certs/server.key;
-              location /test-cert.pem {
-                root /usr/share/nginx/html;
-                add_header Content-Type application/x-pem-file;
-              }
-            }
-          }
-          NGINX
-      - name: Start HTTPS server in Podman
-        run: |
-          # Run nginx container with our certs and config
-          podman run -d \
-            --name bundlecraft-https-test \
-            -p 8443:8443 \
-            -v "$(pwd)/ci-http-test/server.crt:/etc/nginx/certs/server.crt:ro,Z" \
-            -v "$(pwd)/ci-http-test/server.key:/etc/nginx/certs/server.key:ro,Z" \
-            -v "$(pwd)/ci-http-test/test-cert.pem:/usr/share/nginx/html/test-cert.pem:ro,Z" \
-            -v "$(pwd)/ci-http-test/nginx.conf:/etc/nginx/nginx.conf:ro,Z" \
-            docker.io/library/nginx:alpine
-          sleep 2
-            # Wait for HTTPS to be ready
-            for i in {1..20}; do
-              if curl -sk --cacert ci-http-test/ca.crt https://127.0.0.1:8443/test-cert.pem >/dev/null; then
-                echo "HTTPS endpoint is ready"; break; fi; sleep 1; done
-            curl -sk --cacert ci-http-test/ca.crt https://127.0.0.1:8443/test-cert.pem >/dev/null || { echo "Server did not become ready"; exit 1; }
-          echo "HTTPS server started on https://127.0.0.1:8443"
-      - name: Generate HTTP fetch config (ci-test-http.yaml)
-        run: |
-          FINGERPRINT=$(cat ci-http-test/fingerprint.txt)
-          # Use absolute path for ca_file
+          cp "$DATA_DIR/server.crt" ci-http-test/ca.crt
           CA_FILE="$(pwd)/ci-http-test/ca.crt"
           cat > ci-test-http.yaml <<YAML
           id: ci-http-test
@@ -182,10 +106,8 @@ jobs:
               url: https://127.0.0.1:8443/test-cert.pem
               verify:
                 ca_file: ${CA_FILE}
-                ca_file: ${CA_FILE}
-                tls_fingerprint_sha256: "$FINGERPRINT"
           YAML
-          echo "Generated ci-test-http.yaml with CA trust and fingerprint pinning"
+          echo "Generated ci-test-http.yaml with CA trust"
       - name: Run HTTP fetch with pinning
         run: |
           bundlecraft fetch --verbose --config-file ci-test-http.yaml
@@ -212,9 +134,9 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          podman rm -f bundlecraft-https-test || true
+          ./scripts/test-server-local.py down || true
   api-fetch:
-    name: 'Test: API Fetcher (Keyfactor API Mock)'
+    name: 'Test: API Fetcher (Local Test Server)'
     runs-on: ubuntu-latest
     if: >-
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 'api') }}
@@ -225,84 +147,32 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install BundleCraft
+      - name: Install BundleCraft and test server deps
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev,fetchers]"
-      - name: Generate self-signed cert and mock API server
+          pip install flask flasgger
+      - name: Start local API (test server)
+        env:
+          KEYFACTOR_TOKEN: ${{ secrets.KEYFACTOR_TOKEN }}
         run: |
-          mkdir -p ci-api-test
-
-          # Self-signed cert for HTTPS
-          openssl req -x509 -newkey rsa:2048 -nodes \
-            -keyout ci-api-test/api.key -out ci-api-test/api.crt -days 1 \
-            -subj "/CN=localhost" \
-            -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
-
-          # Create mock certificate to return from API
-          cat > ci-api-test/mock-ca.pem <<'PEM'
-          -----BEGIN CERTIFICATE-----
-          MIICxjCCAa6gAwIBAgIUMockKeyfactorCA123456789ABCDEF0wDQYJKoZIhvcN
-          AQELBQAwFTETMBEGA1UEAwwKS2V5ZmFjdG9yQ0EwHhcNMjUwMTAxMDAwMDAwWhcN
-          MzUwMTAxMDAwMDAwWjAVMRMwEQYDVQQDDApLZXlmYWN0b3JDQTCCASIwDQYJKoZI
-          hvcNAQEBBQADggEPADCCAQoCggEBAMockDataForTestingOnly
-          -----END CERTIFICATE-----
-          PEM
-
-          # Create simple Flask mock API server
-          cat > ci-api-test/mock_api.py <<'PYCODE'
-          from flask import Flask, Response, request
-          import ssl
-          app = Flask(__name__)
-          @app.route('/KeyfactorAPI/CertificateAuthority/Download')
-          def download_cert():
-              # Verify bearer token
-              auth = request.headers.get('Authorization', '')
-              if not auth.startswith('Bearer '):
-                  return Response('Unauthorized', status=401)
-
-              # Return mock certificate
-              with open('mock-ca.pem', 'r') as f:
-                  cert_data = f.read()
-              return Response(cert_data, mimetype='application/x-pem-file')
-          if __name__ == '__main__':
-              context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-              context.load_cert_chain('api.crt', 'api.key')
-              app.run(host='0.0.0.0', port=8443, ssl_context=context)
-          PYCODE
-
-          # Create Dockerfile for the mock API
-          cat > ci-api-test/Dockerfile <<'DOCKERFILE'
-          FROM python:3.11-alpine
-          WORKDIR /app
-          RUN pip install --no-cache-dir flask
-          COPY mock_api.py api.crt api.key mock-ca.pem ./
-          EXPOSE 8443
-          CMD ["python", "mock_api.py"]
-          DOCKERFILE
-      - name: Build and start mock API container
-        run: |
-          cd ci-api-test
-          # Build container image
-          podman build -t bundlecraft-api-mock .
-
-          # Run container
-          podman run -d \
-            --name bundlecraft-api-test \
-            -p 8443:8443 \
-            bundlecraft-api-mock
-          sleep 3
-          # Wait for HTTPS to be ready
-          for i in {1..20}; do
-            if curl -sk --cacert ../ci-api-test/api.crt https://127.0.0.1:8443/KeyfactorAPI/CertificateAuthority/Download >/dev/null; then
-              echo "API endpoint is ready"; break; fi; sleep 1; done
-          curl -sk --cacert ../ci-api-test/api.crt https://127.0.0.1:8443/KeyfactorAPI/CertificateAuthority/Download >/dev/null || { echo "API did not become ready"; exit 1; }
-          echo "Mock API started on https://127.0.0.1:8443"
-          sleep 3
-          echo "Mock API started on https://127.0.0.1:8443"
+          if [ -z "${KEYFACTOR_TOKEN:-}" ]; then KEYFACTOR_TOKEN=mock-token-12345; fi
+          export KEYFACTOR_TOKEN
+          chmod +x scripts/test-server-local.py
+          ./scripts/test-server-local.py up --port 8443 --token "$KEYFACTOR_TOKEN"
+          # Wait for readiness
+          for i in {1..30}; do
+            if curl -sk https://127.0.0.1:8443/test-cert.pem >/dev/null; then echo "Server ready"; break; fi; sleep 1; done
+          curl -sk https://127.0.0.1:8443/test-cert.pem >/dev/null || { echo "Server did not become ready"; exit 1; }
+          echo "DATA_DIR=$(cat /tmp/test-server-local-latest)" >> "$GITHUB_ENV"
       - name: Generate API fetch config (ci-test-api.yaml)
+        env:
+          KEYFACTOR_TOKEN: ${{ secrets.KEYFACTOR_TOKEN }}
         run: |
-          # Use absolute path for ca_file
+          if [ -z "${KEYFACTOR_TOKEN:-}" ]; then KEYFACTOR_TOKEN=mock-token-12345; fi
+          export KEYFACTOR_TOKEN
+          mkdir -p ci-api-test
+          cp "$DATA_DIR/server.crt" ci-api-test/api.crt
           CA_FILE="$(pwd)/ci-api-test/api.crt"
           cat > ci-test-api.yaml <<YAML
           id: ci-api-test
@@ -310,17 +180,23 @@ jobs:
           fetch:
             - name: from_keyfactor_mock
               type: api
-              endpoint: https://127.0.0.1:8443/KeyfactorAPI/CertificateAuthority/Download
+              endpoint: https://127.0.0.1:8443/Certificates/Download
               provider: keyfactor
               token_ref: KEYFACTOR_TOKEN
               verify:
                 ca_file: ${CA_FILE}
           YAML
           echo "Generated ci-test-api.yaml"
-      - name: Run API fetch
+      - name: Run API fetch (redundant safety)
         env:
-          KEYFACTOR_TOKEN: mock-token-12345
+          KEYFACTOR_TOKEN: ${{ secrets.KEYFACTOR_TOKEN }}
         run: |
+          if [ -z "${KEYFACTOR_TOKEN:-}" ]; then KEYFACTOR_TOKEN=mock-token-12345; fi
+          export KEYFACTOR_TOKEN
+          if [ -z "${KEYFACTOR_TOKEN:-}" ]; then
+            echo "❌ Missing KEYFACTOR_TOKEN (set repository secret)" >&2
+            exit 2
+          fi
           bundlecraft fetch --verbose --config-file ci-test-api.yaml
       - name: Verify API fetch outputs
         run: |-
@@ -331,7 +207,7 @@ jobs:
       - name: API job summary
         run: |
           echo "## API fetcher" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Endpoint: https://127.0.0.1:8443/KeyfactorAPI/CertificateAuthority/Download" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Endpoint: https://127.0.0.1:8443/Certificates/Download" >> "$GITHUB_STEP_SUMMARY"
           echo "- Used CA file: ci-api-test/api.crt" >> "$GITHUB_STEP_SUMMARY"
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload API job artifacts
@@ -345,4 +221,4 @@ jobs:
       - name: Cleanup
         if: always()
         run: |-
-          podman rm -f bundlecraft-api-test || true
+          ./scripts/test-server-local.py down || true
