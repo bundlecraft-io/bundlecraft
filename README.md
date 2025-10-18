@@ -260,10 +260,10 @@ bundlecraft build --env prod --bundle internal
 ```
 - Produces artifacts in `dist/prod/internal/`:
   ```
-  ca-trust.pem
-  ca-trust.p7b
-  ca-trust.jks
-  ca-trust.p12
+  bundlecraft-ca-trust.pem
+  bundlecraft-ca-trust.p7b
+  bundlecraft-ca-trust.jks
+  bundlecraft-ca-trust.p12
   manifest.json
   checksums.sha256
   package.tar.gz  # if enabled
@@ -337,7 +337,7 @@ BundleCraft supports the following environment variables for configuration:
 | `bundlecraft.fetch` (CLI: `bundlecraft fetch`) | Securely fetch remote sources and stage them (no persistent cache) | `bundlecraft fetch --env prod --bundle internal` |
 | `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --env prod --bundle internal` |
 | `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify dist/prod/internal/` |
-| `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert any supported input to any supported output (PEM, P7B, JKS, P12, ZIP) | `bundlecraft convert --input dist/prod/internal/ca-trust.pem --output-dir dist/prod/internal/ --output-format jks` |
+| `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert any supported input to any supported output (PEM, P7B, JKS, P12, ZIP) | `bundlecraft convert --input dist/prod/internal/bundlecraft-ca-trust.pem --output-dir dist/prod/internal/ --output-format jks` |
 
 For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/README.md).
 
@@ -558,13 +558,13 @@ bundlecraft build --env prod --bundle internal
 bundlecraft verify --target dist/prod/internal --verify-all
 
 # Convert formats
-bundlecraft convert --input ca-trust.pem --output-dir ./ --output-format jks
+bundlecraft convert --input bundlecraft-ca-trust.pem --output-dir ./ --output-format jks
 
 # Build with packaging
 bundlecraft build --env prod --bundle internal --package
 
 # Force overwrite during conversion
-bundlecraft convert --input ca-trust.der --output-dir ./ --output-format pem --force
+bundlecraft convert --input bundlecraft-ca-trust.der --output-dir ./ --output-format pem --force
 ```
 
 ### Configuration Files
@@ -576,10 +576,10 @@ bundlecraft convert --input ca-trust.der --output-dir ./ --output-format pem --f
 ### Output Artifacts
 
 Every build produces:
-- `ca-trust.pem` - Canonical PEM bundle
-- `ca-trust.p7b` - PKCS#7 binary bundle
-- `ca-trust.jks` - Java KeyStore
-- `ca-trust.p12` - PKCS#12 bundle
+- `bundlecraft-ca-trust.pem` - Canonical PEM bundle
+- `bundlecraft-ca-trust.p7b` - PKCS#7 binary bundle
+- `bundlecraft-ca-trust.jks` - Java KeyStore
+- `bundlecraft-ca-trust.p12` - PKCS#12 bundle
 - `manifest.json` - Build metadata
 - `checksums.sha256` - File integrity hashes
 - `package.tar.gz` - Complete bundle archive (if `--package` used)

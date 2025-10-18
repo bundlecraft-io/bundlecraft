@@ -279,7 +279,7 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
     # Verify-only mode
     # -----------------------
     if verify_only:
-        pem_path = build_root / "ca-trust.pem"
+        pem_path = build_root / "bundlecraft-ca-trust.pem"
         if pem_path.exists():
             click.secho(f"[INFO] Verifying existing PEM bundle: {pem_path}", fg="blue")
             code = verifier(pem_path, warn_days, fail_on_expired)
@@ -338,7 +338,7 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
     # -----------------------
     # Write canonical PEM
     # -----------------------
-    pem_out = build_root / "ca-trust.pem"
+    pem_out = build_root / "bundlecraft-ca-trust.pem"
     write_canonical_pem(pem_out, pem_blocks, include_subject_comments)
     click.secho(f"[INFO] Wrote canonical PEM: {pem_out}", fg="green")
 
