@@ -154,8 +154,10 @@ jobs:
           pip install flask flasgger
       - name: Start local API (test server)
         env:
-          KEYFACTOR_TOKEN: mock-token-12345
+          KEYFACTOR_TOKEN: ${{ secrets.KEYFACTOR_TOKEN }}
         run: |
+          if [ -z "${KEYFACTOR_TOKEN:-}" ]; then KEYFACTOR_TOKEN=mock-token-12345; fi
+          export KEYFACTOR_TOKEN
           chmod +x scripts/test-server-local.py
           ./scripts/test-server-local.py up --port 8443 --token "$KEYFACTOR_TOKEN"
           # Wait for readiness
@@ -165,8 +167,10 @@ jobs:
           echo "DATA_DIR=$(cat /tmp/test-server-local-latest)" >> "$GITHUB_ENV"
       - name: Generate API fetch config (ci-test-api.yaml)
         env:
-          KEYFACTOR_TOKEN: mock-token-12345
+          KEYFACTOR_TOKEN: ${{ secrets.KEYFACTOR_TOKEN }}
         run: |
+          if [ -z "${KEYFACTOR_TOKEN:-}" ]; then KEYFACTOR_TOKEN=mock-token-12345; fi
+          export KEYFACTOR_TOKEN
           mkdir -p ci-api-test
           cp "$DATA_DIR/server.crt" ci-api-test/api.crt
           CA_FILE="$(pwd)/ci-api-test/api.crt"
@@ -185,8 +189,14 @@ jobs:
           echo "Generated ci-test-api.yaml"
       - name: Run API fetch (redundant safety)
         env:
-          KEYFACTOR_TOKEN: mock-token-12345
+          KEYFACTOR_TOKEN: ${{ secrets.KEYFACTOR_TOKEN }}
         run: |
+          if [ -z "${KEYFACTOR_TOKEN:-}" ]; then KEYFACTOR_TOKEN=mock-token-12345; fi
+          export KEYFACTOR_TOKEN
+          if [ -z "${KEYFACTOR_TOKEN:-}" ]; then
+            echo "❌ Missing KEYFACTOR_TOKEN (set repository secret)" >&2
+            exit 2
+          fi
           bundlecraft fetch --verbose --config-file ci-test-api.yaml
       - name: Verify API fetch outputs
         run: |-

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 import socket
 import ssl
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -49,6 +51,10 @@ def fetch_api(
     token = None
     if token_ref:
         token = os.environ.get(token_ref)
+        if token is None:
+            raise click.ClickException(
+                f"Missing API token: environment variable '{token_ref}' is not set"
+            )
     if token:
         hdrs["Authorization"] = f"Bearer {token}"
 
@@ -72,8 +78,35 @@ def fetch_api(
                 f"TLS fingerprint mismatch for {host}:{port}: expected {tls_fingerprint}, got {actual_fp}"
             )
 
-    req = urllib.request.Request(endpoint, headers=hdrs)
-    with urllib.request.urlopen(req, timeout=30, context=context) as resp:
-        data = resp.read()
+    # Choose method and body
+    data_bytes: bytes | None = None
+    if (provider or "").lower() == "keyfactor":
+        # Default Keyfactor-like request body
+        body = {"CertID": 12345, "CertificateFormat": "PEM", "IncludeChain": True}
+        data_bytes = json.dumps(body).encode("utf-8")
+        hdrs.setdefault("Content-Type", "application/json")
+
+    req = urllib.request.Request(endpoint, headers=hdrs, data=data_bytes)
+    try:
+        with urllib.request.urlopen(req, timeout=30, context=context) as resp:
+            data = resp.read()
+    except urllib.error.HTTPError as e:
+        # Improve diagnostics for common API mistakes
+        hint = None
+        if e.code == 405:
+            meth = "POST" if data_bytes is not None else "GET"
+            hint = (
+                f"Endpoint rejected {meth}. If this is a Keyfactor-like API, it typically requires POST "
+                f"with JSON body and a Bearer token. Ensure provider=keyfactor and token_ref is set."
+            )
+        elif e.code in (401, 403):
+            hint = (
+                f"Authentication failed (HTTP {e.code}). Check that the token env variable '{token_ref}' is set "
+                f"and correct, and that the 'Authorization: Bearer' header is being sent."
+            )
+        msg = f"HTTP Error {e.code}: {e.reason} for {endpoint}"
+        if hint:
+            msg = msg + f"\nHint: {hint}"
+        raise click.ClickException(msg) from e
     out_path.write_bytes(data)
     return out_path
