@@ -397,6 +397,12 @@ More details in [`scripts/README.md`](scripts/README.md).
 Manual trigger:
 You can dispatch builds from the Actions tab for custom scenarios.
 
+When triggering manually, you can optionally filter environments:
+- Input: environments (comma-separated), e.g. `dev,qa`
+- Default: empty = build all environments
+- The workflow prints a selection summary (selected, available, filtered, target count)
+- Validation: unknown environments or an empty result after filtering will fail fast with a clear error
+
 ---
 
 ## 📝 Documentation
