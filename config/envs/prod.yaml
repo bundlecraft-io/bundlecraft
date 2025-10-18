@@ -3,10 +3,8 @@
 # Defines which target bundles to build in prod and how to handle formats/passwords.
 # High-importance: which targets to build and their composition
 targets:
-  mozilla:
-    includes: [mozilla]
-  internal:
-    includes: [internal]
+  internal-prod:
+    includes: [mozilla, internal]
 # Output formats for this environment (falls back to defaults if omitted)
 output_formats:
   - pem

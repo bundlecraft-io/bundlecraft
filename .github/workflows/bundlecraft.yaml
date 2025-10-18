@@ -178,13 +178,20 @@ jobs:
           sha256sum bundlecraft-trust.tar.gz > bundlecraft-trust.sha256
           echo "Created tarball and checksum:"
           sha256sum bundlecraft-trust.tar.gz
-          echo "=== Creating per-environment tarballs ==="
-          for envdir in pki-ca-trust/*; do
-            [ -d "$envdir" ] || continue
-            env="$(basename "$envdir")"
-            tar -czf "bundlecraft-trust-env-${env}.tar.gz" -C . "pki-ca-trust/${env}"
-            sha256sum "bundlecraft-trust-env-${env}.tar.gz" > "bundlecraft-trust-env-${env}.sha256"
-            echo "Created per-env tarball: bundlecraft-trust-env-${env}.tar.gz"
+          echo "=== Creating per-target tarballs (root=certs) ==="
+          mapfile -t TARGETS < <(find pki-ca-trust -mindepth 2 -maxdepth 2 -type d | sort)
+          for dir in "${TARGETS[@]}"; do
+            env="$(echo "$dir" | awk -F/ '{print $2}')"
+            bundle="$(echo "$dir" | awk -F/ '{print $3}')"
+            name="bundlecraft-trust-env-${env}-bundle-${bundle}.tar.gz"
+            if [ -d "$dir/certs" ]; then
+              tar -czf "$name" -C "$dir" certs
+            else
+              # Fallback: if certs/ missing, include full target directory (keeps structure)
+              tar -czf "$name" -C "pki-ca-trust/${env}" "$bundle"
+            fi
+            sha256sum "$name" > "${name%.tar.gz}.sha256"
+            echo "Created per-target tarball: $name"
           done
       - name: Upload combined directory
         uses: actions/upload-artifact@v4
@@ -198,13 +205,13 @@ jobs:
           path: |
             bundlecraft-trust.tar.gz
             bundlecraft-trust.sha256
-      - name: Upload per-environment tarballs
+      - name: Upload per-target tarballs
         uses: actions/upload-artifact@v4
         with:
-          name: truststore-env-bundles
+          name: truststore-target-bundles
           path: |
-            bundlecraft-trust-env-*.tar.gz
-            bundlecraft-trust-env-*.sha256
+            bundlecraft-trust-env-*-bundle-*.tar.gz
+            bundlecraft-trust-env-*-bundle-*.sha256
   verify:
     name: Verify builds and tarball
     needs: collect
@@ -285,10 +292,10 @@ jobs:
         with:
           name: truststore-bundle
           path: release/
-      - name: Download per-environment artifacts
+      - name: Download per-target artifacts
         uses: actions/download-artifact@v4
         with:
-          name: truststore-env-bundles
+          name: truststore-target-bundles
           path: release/
       - name: Generate release tag and name
         id: version
@@ -390,7 +397,7 @@ jobs:
           fi
           perenv_md=""
           shopt -s nullglob
-          files=(release/bundlecraft-trust-env-*.tar.gz)
+          files=(release/bundlecraft-trust-env-*-bundle-*.tar.gz)
           if [ ${#files[@]} -eq 0 ]; then
             perenv_md="(none)\n"
           else
@@ -420,7 +427,7 @@ jobs:
             sha_lines+=$(cat release/bundlecraft-trust.sha256)
             sha_lines+=$'\n'
           fi
-          for s in release/bundlecraft-trust-env-*.sha256; do
+          for s in release/bundlecraft-trust-env-*-bundle-*.sha256; do
             [ -f "$s" ] || continue
             sha_lines+=$(cat "$s")
             sha_lines+=$'\n'
@@ -430,13 +437,13 @@ jobs:
             printf "%b" "$sha_lines"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-      - name: Summarize per-environment assets
+      - name: Summarize per-target assets
         id: perenv
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-          files=(release/bundlecraft-trust-env-*.tar.gz)
+          files=(release/bundlecraft-trust-env-*-bundle-*.tar.gz)
           if [ ${#files[@]} -eq 0 ]; then
             echo "env_count=0" >> "$GITHUB_OUTPUT"
             {
@@ -446,13 +453,14 @@ jobs:
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          mapfile -t ENVS < <(printf "%s\n" "${files[@]}" | sed -E 's#^.*/bundlecraft-trust-env-([^./]+)\.tar\.gz$#\1#' | sort -u)
-          count=${#ENVS[@]}
+          mapfile -t PAIRS < <(printf "%s\n" "${files[@]}" | sed -E 's#^.*/bundlecraft-trust-env-([^/]+)-bundle-(.+)\.tar\.gz$#\1/\2#' | sort)
+          count=${#PAIRS[@]}
           echo "env_count=$count" >> "$GITHUB_OUTPUT"
           {
             echo "env_list_markdown<<EOF"
-            for e in "${ENVS[@]}"; do
-              echo "- ${e} (bundlecraft-trust-env-${e}.tar.gz)"
+            for p in "${PAIRS[@]}"; do
+              env="${p%%/*}"; bundle="${p#*/}"
+              echo "- ${env}/${bundle} (bundlecraft-trust-env-${env}-bundle-${bundle}.tar.gz)"
             done
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
@@ -478,7 +486,7 @@ jobs:
             ### Download assets
             - Combined (all envs):
             ${{ steps.assets.outputs.assets_combined_markdown }}
-            - Per-environment bundles:
+            - Per-target bundles:
             ${{ steps.assets.outputs.assets_perenv_markdown }}
 
             ### SHA256 checksums
@@ -501,16 +509,16 @@ jobs:
             If you do not see 'Good signature', the artifact may be tampered with.
 
             ### Consumers: quick start
-            Per-environment bundle (recommended for targeted usage):
+            Per-target bundle (recommended for targeted usage):
             ```bash
             # Verify checksum
-            sha256sum -c bundlecraft-trust-env-<env>.sha256
+            sha256sum -c bundlecraft-trust-env-<env>-bundle-<bundle>.sha256
 
             # Extract into current directory
-            tar -xzf bundlecraft-trust-env-<env>.tar.gz
+            tar -xzf bundlecraft-trust-env-<env>-bundle-<bundle>.tar.gz
 
             # Explore
-            ls -R pki-ca-trust/<env>/
+            ls -R certs/
             ```
             Combined bundle (all environments):
             ```bash
@@ -525,8 +533,8 @@ jobs:
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
             release/bundlecraft-trust.tar.gz.asc
-            release/bundlecraft-trust-env-*.tar.gz
-            release/bundlecraft-trust-env-*.sha256
+            release/bundlecraft-trust-env-*-bundle-*.tar.gz
+            release/bundlecraft-trust-env-*-bundle-*.sha256
             release/TRUST_MATRIX.md
             release/trust-matrix.json
       - name: Create GitHub Release (unsigned)
@@ -551,7 +559,7 @@ jobs:
             ### Download assets
             - Combined (all envs):
             ${{ steps.assets.outputs.assets_combined_markdown }}
-            - Per-environment bundles:
+            - Per-target bundles:
             ${{ steps.assets.outputs.assets_perenv_markdown }}
 
             ### SHA256 checksums
@@ -566,16 +574,16 @@ jobs:
             - manifest.json
 
             ### Consumers: quick start
-            Per-environment bundle (recommended for targeted usage):
+            Per-target bundle (recommended for targeted usage):
             ```bash
             # Verify checksum
-            sha256sum -c bundlecraft-trust-env-<env>.sha256
+            sha256sum -c bundlecraft-trust-env-<env>-bundle-<bundle>.sha256
 
             # Extract into current directory
-            tar -xzf bundlecraft-trust-env-<env>.tar.gz
+            tar -xzf bundlecraft-trust-env-<env>-bundle-<bundle>.tar.gz
 
             # Explore
-            ls -R pki-ca-trust/<env>/
+            ls -R certs/
             ```
             Combined bundle (all environments):
             ```bash
@@ -588,7 +596,7 @@ jobs:
           files: |-
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
-            release/bundlecraft-trust-env-*.tar.gz
-            release/bundlecraft-trust-env-*.sha256
+            release/bundlecraft-trust-env-*-bundle-*.tar.gz
+            release/bundlecraft-trust-env-*-bundle-*.sha256
             release/TRUST_MATRIX.md
             release/trust-matrix.json
