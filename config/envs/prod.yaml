@@ -4,7 +4,9 @@
 # High-importance: which targets to build and their composition
 targets:
   internal-prod:
-    includes: [mozilla, internal]
+    includes: [internal, mozilla]
+  mozilla-only:
+    includes: [mozilla]
 # Output formats for this environment (falls back to defaults if omitted)
 output_formats:
   - pem
