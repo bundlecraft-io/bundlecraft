@@ -42,7 +42,7 @@ class TestVerifier:
         # Copy valid cert
         import shutil
 
-        shutil.copy(sample_cert_path, bundle_dir / "ca-trust.pem")
+        shutil.copy(sample_cert_path, bundle_dir / "bundlecraft-ca-trust.pem")
 
         # Create minimal manifest
         (bundle_dir / "manifest.json").write_text('{"bundle": "test"}')
@@ -68,7 +68,7 @@ class TestVerifier:
         bundle_dir.mkdir(parents=True)
 
         # Create empty files
-        (bundle_dir / "ca-trust.pem").touch()
+        (bundle_dir / "bundlecraft-ca-trust.pem").touch()
         (bundle_dir / "manifest.json").write_text("{}")
 
         result = cli_runner.invoke(verify_main, ["--target", str(bundle_dir)])
@@ -92,10 +92,10 @@ class TestVerifier:
         # Copy valid PEM
         import shutil
 
-        shutil.copy(sample_cert_path, bundle_dir / "ca-trust.pem")
+        shutil.copy(sample_cert_path, bundle_dir / "bundlecraft-ca-trust.pem")
 
         # Create placeholder for other format (won't be valid but tests the check)
-        (bundle_dir / f"ca-trust.{format_ext}").touch()
+        (bundle_dir / f"bundlecraft-ca-trust.{format_ext}").touch()
         (bundle_dir / "manifest.json").write_text('{"bundle": "test"}')
 
         result = cli_runner.invoke(verify_main, ["--target", str(bundle_dir)])
