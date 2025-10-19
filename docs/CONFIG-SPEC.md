@@ -134,13 +134,29 @@ Defines build behavior and deployment configuration for an environment.
 
 ### Bundle Composition
 
+Craft configs can define targets in two ways:
+
+**Option 1: Direct Source Paths (no bundle config needed)**
+```yaml
+targets:
+  my-target:
+    include:  # Direct certificate source paths
+      - sources/internal/rootCA.pem
+      - sources/partners/
+    exclude:  # Optional exclusions
+      - sources/partners/deprecated.pem
+```
+
+**Option 2: Bundle References (requires bundle configs)**
 ```yaml
 targets:
   internal-prod:
-    includes: [internal, mozilla]  # Merge multiple bundles
+    includes: [internal, mozilla]  # Reference bundle configs by name
   mozilla-only:
     includes: [mozilla]
 ```
+
+**Note:** Option 1 allows building without bundle configs. Use this when you want craft configs to be self-contained. Option 2 is useful when you want to reuse bundle definitions across multiple craft configs or when using `bundlecraft fetch` to stage sources.
 
 ### Output Configuration
 

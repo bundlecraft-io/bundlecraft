@@ -155,7 +155,11 @@ def package_tar(build_path: Path) -> Path:
     required=True,
     help="Craft name (e.g., dev, prod, dmz)",
 )
-@click.option("--bundle", required=True, help="Bundle name (e.g., internal, external)")
+@click.option(
+    "--bundle",
+    required=True,
+    help="Target name from craft config (can reference bundle configs or specify sources directly)",
+)
 @click.option("--package", is_flag=True, help="Also create a .tar.gz of the build folder")
 @click.option("--verify-only", is_flag=True, help="Only verify certificates; skip build")
 @click.option(
@@ -190,46 +194,64 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
     cfg_path = craft_path if craft_path.exists() else legacy_env_path
     env_cfg = load_yaml(cfg_path, required=True)
 
-    # Environment-driven composition support: env can define targets mapping
-    # a target bundle name to one or more base bundle configs to include/merge.
+    # Target resolution: craft configs can define targets with either:
+    # 1. Direct source paths (include/exclude)
+    # 2. References to bundle configs (includes: [bundle-names])
     # Schema examples:
     #   targets:
+    #     my-target:
+    #       include: [sources/internal/rootCA.pem]  # Direct paths
+    #       exclude: [sources/internal/old.pem]
+    #   OR:
     #     internal-dev:
-    #       includes: [internal, mozilla]
-    #     mozilla:
-    #       includes: [mozilla]
-    # Back-compat: some envs may define bundle_targets as a list (no composition).
+    #       includes: [internal, mozilla]  # Bundle references (requires bundle configs)
     targets = env_cfg.get("targets") or {}
+    target_entry = None
+    direct_sources = False  # Track if target uses direct sources
     comp_includes = None
+
     if isinstance(targets, dict) and bundle in targets:
-        entry = targets[bundle] or {}
-        comp_includes = entry.get("includes") or entry.get("compose") or []
+        target_entry = targets[bundle] or {}
+        # Check if target specifies direct source paths
+        if target_entry.get("include") is not None:
+            direct_sources = True
+        else:
+            # Target uses bundle references
+            comp_includes = target_entry.get("includes") or target_entry.get("compose") or []
 
-    # Load bundle config; if this bundle is only an env-level composition target,
-    # allow the bundle file to be missing and use an empty dict.
+    # Load bundle config only if not using direct sources
     bundle_cfg = None
-    bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle}.yaml"
-    if bundle_cfg_path.exists():
-        bundle_cfg = load_yaml(bundle_cfg_path, required=True)
-    elif comp_includes:
-        bundle_cfg = {}  # Use empty config for composed targets
-    else:
-        click.secho(f"[ERROR] Bundle config not found: {bundle_cfg_path}", fg="red")
-        sys.exit(2)
-
-    # Track which bundles have been validated to avoid duplicate warnings
     validated_bundles = set()
 
-    # Validate config separation: warn if bundle config contains build settings
-    if bundle_cfg:
-        found_keys = [k for k in FORBIDDEN_BUNDLE_KEYS if k in bundle_cfg]
-        if found_keys:
+    if direct_sources:
+        # Target specifies sources directly - no bundle config needed
+        bundle_cfg = {}
+        click.secho(
+            f"[INFO] Target '{bundle}' uses direct source paths from craft config.", fg="blue"
+        )
+    else:
+        # Need to load bundle config(s)
+        bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle}.yaml"
+        if bundle_cfg_path.exists():
+            bundle_cfg = load_yaml(bundle_cfg_path, required=True)
+            # Validate config separation: warn if bundle config contains build settings
+            found_keys = [k for k in FORBIDDEN_BUNDLE_KEYS if k in bundle_cfg]
+            if found_keys:
+                click.secho(
+                    f"[WARN] Bundle config '{bundle}' contains build settings: {', '.join(found_keys)}. "
+                    f"These keys are ignored. Move them to craft config '{env}' instead.",
+                    fg="yellow",
+                )
+                validated_bundles.add(bundle)
+        elif comp_includes:
+            bundle_cfg = {}  # Use empty config for composed targets
+        else:
+            click.secho(f"[ERROR] Bundle config not found: {bundle_cfg_path}", fg="red")
             click.secho(
-                f"[WARN] Bundle config '{bundle}' contains build settings: {', '.join(found_keys)}. "
-                f"These keys are ignored. Move them to craft config '{env}' instead.",
+                "[HINT] To use build without bundle configs, specify 'include' paths directly in the craft config target.",
                 fg="yellow",
             )
-            validated_bundles.add(bundle)
+            sys.exit(2)
 
     # Optional prefetch step (no persistent cache; stages into sources/fetched/<env>/<bundle>)
     if offline and prefetch:
@@ -273,44 +295,56 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
     build_root = BUILD_DIR / env / bundle
     ensure_dir(build_root)
 
-    # Build include/exclude lists, possibly across composed base bundles
+    # Build include/exclude lists
     include_items = []
     exclude_items = set()
 
     def _rel(p: Path) -> str:
         return str(p.relative_to(ROOT)).replace("\\", "/")
 
-    base_bundles = comp_includes if comp_includes else [bundle]
-    base_bundle_cfgs = {}
-    for bname in base_bundles:
-        # Include staged fetched sources for each base bundle if present
-        b_staged_dir = SOURCES_DIR / "fetched" / env / bname
-        if b_staged_dir.exists():
-            include_items.append(_rel(b_staged_dir))
-        # Load base bundle config for source includes/excludes
-        b_cfg = load_yaml(CONFIG_DIR / "bundles" / f"{bname}.yaml", required=True)
-        base_bundle_cfgs[bname] = b_cfg
+    if direct_sources:
+        # Use direct source paths from craft config target
+        if target_entry:
+            include_items.extend(target_entry.get("include", []) or [])
+            for ex in target_entry.get("exclude", []) or []:
+                exclude_items.add(ex)
+            # Also check for staged fetched sources if prefetch was used
+            b_staged_dir = SOURCES_DIR / "fetched" / env / bundle
+            if b_staged_dir.exists():
+                include_items.append(_rel(b_staged_dir))
+    else:
+        # Use bundle config references
+        base_bundles = comp_includes if comp_includes else [bundle]
+        base_bundle_cfgs = {}
+        for bname in base_bundles:
+            # Include staged fetched sources for each base bundle if present
+            b_staged_dir = SOURCES_DIR / "fetched" / env / bname
+            if b_staged_dir.exists():
+                include_items.append(_rel(b_staged_dir))
+            # Load base bundle config for source includes/excludes
+            b_cfg = load_yaml(CONFIG_DIR / "bundles" / f"{bname}.yaml", required=True)
+            base_bundle_cfgs[bname] = b_cfg
 
-        # Validate config separation for composed bundles (skip if already validated)
-        if bname not in validated_bundles:
-            found_keys = [k for k in FORBIDDEN_BUNDLE_KEYS if k in b_cfg]
-            if found_keys:
-                click.secho(
-                    f"[WARN] Bundle config '{bname}' contains build settings: {', '.join(found_keys)}. "
-                    f"These keys are ignored. Move them to craft config '{env}' instead.",
-                    fg="yellow",
-                )
-                validated_bundles.add(bname)
+            # Validate config separation for composed bundles (skip if already validated)
+            if bname not in validated_bundles:
+                found_keys = [k for k in FORBIDDEN_BUNDLE_KEYS if k in b_cfg]
+                if found_keys:
+                    click.secho(
+                        f"[WARN] Bundle config '{bname}' contains build settings: {', '.join(found_keys)}. "
+                        f"These keys are ignored. Move them to craft config '{env}' instead.",
+                        fg="yellow",
+                    )
+                    validated_bundles.add(bname)
 
-        include_items.extend(b_cfg.get("include", []) or [])
-        for ex in b_cfg.get("exclude", []) or []:
-            exclude_items.add(ex)
+            include_items.extend(b_cfg.get("include", []) or [])
+            for ex in b_cfg.get("exclude", []) or []:
+                exclude_items.add(ex)
 
-    # Also allow the target bundle file to contribute extra include/exclude if it exists
-    if bundle_cfg:
-        include_items.extend(bundle_cfg.get("include", []) or [])
-        for ex in bundle_cfg.get("exclude", []) or []:
-            exclude_items.add(ex)
+        # Also allow the target bundle file to contribute extra include/exclude if it exists
+        if bundle_cfg:
+            include_items.extend(bundle_cfg.get("include", []) or [])
+            for ex in bundle_cfg.get("exclude", []) or []:
+                exclude_items.add(ex)
     include_paths = []
     for item in include_items:
         p = (ROOT / item).resolve()

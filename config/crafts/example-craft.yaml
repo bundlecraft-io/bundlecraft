@@ -12,4 +12,78 @@
 #            Craft configs define HOW/WHERE (build & deploy).
 # =====================================================================
 name: Example Craft
-# ...existing code...
+description: Demonstration of craft configuration options
+
+# ---------------------------------------------------------------------
+# Bundle Composition / Target Definitions
+# ---------------------------------------------------------------------
+# Targets can be defined in two ways:
+#
+# Option 1: Direct source paths (self-contained, no bundle config needed)
+# Option 2: Bundle references (requires bundle configs)
+# ---------------------------------------------------------------------
+targets:
+  # Example 1: Self-contained target with direct source paths
+  standalone-target:
+    include:
+      - sources/internal/rootCA.pem
+      - sources/internal/issuingCA1.pem
+      - sources/partners/partner-ca.pem
+    exclude:
+      - sources/partners/deprecated/
+
+  # Example 2: Target that references bundle configs
+  composed-target:
+    includes: [internal, mozilla]  # References config/bundles/internal.yaml and mozilla.yaml
+
+# ---------------------------------------------------------------------
+# Output Configuration
+# ---------------------------------------------------------------------
+output_formats:
+  - pem   # Canonical PEM bundle (always recommended)
+  - p7b   # PKCS#7 DER format
+  - jks   # Java KeyStore
+  - p12   # PKCS#12 / PFX
+
+package: true  # Create .tar.gz archives of outputs
+
+# ---------------------------------------------------------------------
+# Verification & Filtering
+# ---------------------------------------------------------------------
+verify:
+  fail_on_expired: true
+  warn_days_before_expiry: 30
+
+filters:
+  unique_by_fingerprint: true
+  not_expired_only: true
+  ca_certs_only: true
+
+pem:
+  include_subject_comments: true  # Add "# Subject:" comments
+
+# ---------------------------------------------------------------------
+# Format-Specific Configuration
+# ---------------------------------------------------------------------
+format_overrides:
+  jks:
+    storepass_env: TRUST_JKS_PASSWORD  # Password from environment
+    alias_format: '{subject.CN}-{serial}'
+  pkcs12:
+    password_env: TRUST_P12_PASSWORD
+
+# ---------------------------------------------------------------------
+# Distribution Metadata (for CI/CD pipeline use only)
+# ---------------------------------------------------------------------
+distribution_metadata:
+  targets:
+    - type: github-release
+      enabled: true
+      assets: [bundlecraft-trust.tar.gz]
+    - type: s3
+      enabled: false
+      bucket: company-truststores
+      prefix: prod/
+  tags:
+    - production
+    - automated-build

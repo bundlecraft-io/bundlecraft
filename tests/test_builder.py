@@ -3,7 +3,8 @@
 import pytest
 from click.testing import CliRunner
 
-from bundlecraft.builder import FORBIDDEN_BUNDLE_KEYS, main as build_main
+from bundlecraft.builder import FORBIDDEN_BUNDLE_KEYS
+from bundlecraft.builder import main as build_main
 
 
 @pytest.fixture
@@ -172,3 +173,28 @@ class TestBuilder:
         assert "verify" in found
         assert "output_formats" in found
         assert "package" in found
+
+    def test_direct_source_paths(self):
+        """Test that craft configs can specify source paths directly without bundle configs."""
+        # Test case: Craft config target with direct include/exclude paths
+        craft_config = {
+            "name": "Test Craft",
+            "description": "Test with direct sources",
+            "targets": {
+                "my-target": {
+                    "include": ["sources/internal/rootCA.pem"],
+                    "exclude": ["sources/internal/old.pem"],
+                }
+            },
+            "output_formats": ["pem"],
+        }
+
+        # Verify target has direct sources
+        target_entry = craft_config["targets"]["my-target"]
+        assert "include" in target_entry, "Target should have include paths"
+        assert "exclude" in target_entry, "Target should have exclude paths"
+        assert "includes" not in target_entry, "Target should not have bundle references"
+
+        # Verify sources are specified correctly
+        assert len(target_entry["include"]) > 0, "Should have at least one include path"
+        assert isinstance(target_entry["include"][0], str), "Include paths should be strings"

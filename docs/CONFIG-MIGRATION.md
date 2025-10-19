@@ -114,8 +114,37 @@ This enforcement provides several benefits:
 
 ### Example: Multi-Environment Setup
 
-The same bundle can be used in different environments with different build settings:
+The same sources can be used in different environments with different build settings.
 
+**Option 1: Using direct source paths (no bundle configs needed)**
+```yaml
+# config/crafts/dev.yaml (permissive for development)
+---
+targets:
+  shared:
+    include:
+      - sources/mozilla/cacert.pem
+      - sources/internal/rootCA.pem
+verify:
+  fail_on_expired: false      # Allow expired certs in dev
+output_formats: [pem]         # Only PEM for development
+```
+
+```yaml
+# config/crafts/prod.yaml (strict for production)
+---
+targets:
+  shared:
+    include:
+      - sources/mozilla/cacert.pem
+      - sources/internal/rootCA.pem
+verify:
+  fail_on_expired: true       # Strict validation in prod
+output_formats: [pem, jks, p12]  # Multiple formats for prod
+package: true                 # Create archives for distribution
+```
+
+**Option 2: Using bundle references (if you prefer to keep bundle configs)**
 ```yaml
 # config/bundles/shared.yaml (source definition only)
 ---
@@ -127,7 +156,7 @@ include:
 ```
 
 ```yaml
-# config/crafts/dev.yaml (permissive for development)
+# config/crafts/dev.yaml (references the bundle)
 ---
 targets:
   shared:
@@ -138,7 +167,7 @@ output_formats: [pem]         # Only PEM for development
 ```
 
 ```yaml
-# config/crafts/prod.yaml (strict for production)
+# config/crafts/prod.yaml (references the bundle)
 ---
 targets:
   shared:
@@ -148,6 +177,48 @@ verify:
 output_formats: [pem, jks, p12]  # Multiple formats for prod
 package: true                 # Create archives for distribution
 ```
+
+### Self-Contained Craft Configs (New in v0.1.0+)
+
+Starting with v0.1.0, you can create self-contained craft configs that don't require bundle configs at all. This simplifies configuration when you don't need to reuse source definitions or use `bundlecraft fetch`.
+
+**Example self-contained craft config:**
+```yaml
+# config/crafts/standalone.yaml
+---
+name: Standalone Production
+description: Self-contained craft config with direct source paths
+
+targets:
+  prod-bundle:
+    include:
+      - sources/internal/rootCA.pem
+      - sources/internal/issuingCA1.pem
+      - sources/partners/partner-ca.pem
+    exclude:
+      - sources/partners/deprecated/
+
+output_formats: [pem, jks, p12]
+verify:
+  fail_on_expired: true
+  warn_days_before_expiry: 30
+package: true
+```
+
+Build with:
+```bash
+bundlecraft build --env standalone --bundle prod-bundle
+```
+
+**When to use self-contained craft configs:**
+- Simple deployments with static source paths
+- When you don't need to share source definitions across multiple craft configs
+- When you're not using `bundlecraft fetch` for remote sources
+
+**When to keep bundle configs:**
+- When using `bundlecraft fetch` to stage remote certificates
+- When you want to reuse the same source definitions across multiple craft configs
+- When you have complex source compositions
 
 ### Need Help?
 
