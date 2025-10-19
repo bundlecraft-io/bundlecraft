@@ -204,6 +204,21 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         click.secho(f"[ERROR] Bundle config not found: {bundle_cfg_path}", fg="red")
         sys.exit(2)
 
+    # Track which bundles have been validated to avoid duplicate warnings
+    validated_bundles = set()
+    
+    # Validate config separation: warn if bundle config contains build settings
+    if bundle_cfg:
+        forbidden_keys = ["verify", "pem", "output_formats", "package", "filters", "format_overrides"]
+        found_keys = [k for k in forbidden_keys if k in bundle_cfg]
+        if found_keys:
+            click.secho(
+                f"[WARN] Bundle config '{bundle}' contains build settings: {', '.join(found_keys)}. "
+                f"These keys are ignored. Move them to craft config '{env}' instead.",
+                fg="yellow"
+            )
+            validated_bundles.add(bundle)
+
     # Optional prefetch step (no persistent cache; stages into sources/fetched/<env>/<bundle>)
     if offline and prefetch:
         click.secho("[ERROR] --offline and --prefetch cannot be used together.", fg="red")
@@ -225,8 +240,8 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
             click.secho(f"[ERROR] Prefetch failed: {e}", fg="red")
             sys.exit(2)
 
-    # Prefer env-level verify config, fall back to bundle-level
-    verify_cfg = env_cfg.get("verify") or bundle_cfg.get("verify", True)
+    # Read verify config from craft config only (no bundle fallback)
+    verify_cfg = env_cfg.get("verify", True)
     fail_on_expired = (
         verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
     )
@@ -234,13 +249,13 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         verify_cfg.get("warn_days_before_expiry", 30) if isinstance(verify_cfg, dict) else 30
     )
 
-    # Prefer env-level pem config, fall back to bundle-level
-    pem_cfg = env_cfg.get("pem") or bundle_cfg.get("pem", {})
+    # Read pem config from craft config only (no bundle fallback)
+    pem_cfg = env_cfg.get("pem", {})
     include_subject_comments = pem_cfg.get("include_subject_comments", True)
 
-    # Prefer env-level output_formats, fall back to bundle-level, then default to ["pem"]
-    output_formats = env_cfg.get("output_formats") or bundle_cfg.get("output_formats", ["pem"])
-    do_package = bool(package or bundle_cfg.get("package", False))
+    # Read output_formats from craft config only (no bundle fallback)
+    output_formats = env_cfg.get("output_formats", ["pem"])
+    do_package = bool(package or env_cfg.get("package", False))
 
     BUILD_DIR = Path(output_root)
     build_root = BUILD_DIR / env / bundle
@@ -263,6 +278,19 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         # Load base bundle config for source includes/excludes
         b_cfg = load_yaml(CONFIG_DIR / "bundles" / f"{bname}.yaml", required=True)
         base_bundle_cfgs[bname] = b_cfg
+        
+        # Validate config separation for composed bundles (skip if already validated)
+        if bname not in validated_bundles:
+            forbidden_keys = ["verify", "pem", "output_formats", "package", "filters", "format_overrides"]
+            found_keys = [k for k in forbidden_keys if k in b_cfg]
+            if found_keys:
+                click.secho(
+                    f"[WARN] Bundle config '{bname}' contains build settings: {', '.join(found_keys)}. "
+                    f"These keys are ignored. Move them to craft config '{env}' instead.",
+                    fg="yellow"
+                )
+                validated_bundles.add(bname)
+        
         include_items.extend(b_cfg.get("include", []) or [])
         for ex in b_cfg.get("exclude", []) or []:
             exclude_items.add(ex)
