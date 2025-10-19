@@ -54,7 +54,7 @@ format_overrides:
 distribution_metadata:
   targets:
     - type: github-release
-      enabled: false  # Only used for testing in CI/CD
+      enabled: true  # Only used for testing in CI/CD
       description: Publish to GitHub Releases (handled by pipeline)
       assets:
         - bundlecraft-trust.tar.gz
