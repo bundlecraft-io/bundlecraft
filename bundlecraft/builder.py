@@ -44,6 +44,19 @@ CONFIG_DIR = ROOT / "config"
 SOURCES_DIR = ROOT / "sources"
 BUILD_DIR = ROOT / "dist"
 
+# ---------------------------------------------------------------------
+# Config validation constants
+# ---------------------------------------------------------------------
+# Build settings that are forbidden in bundle configs and must be in craft configs
+FORBIDDEN_BUNDLE_KEYS = [
+    "verify",
+    "pem",
+    "output_formats",
+    "package",
+    "filters",
+    "format_overrides",
+]
+
 # -------------------------------
 # Helper functions
 # -------------------------------
@@ -209,15 +222,7 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
 
     # Validate config separation: warn if bundle config contains build settings
     if bundle_cfg:
-        forbidden_keys = [
-            "verify",
-            "pem",
-            "output_formats",
-            "package",
-            "filters",
-            "format_overrides",
-        ]
-        found_keys = [k for k in forbidden_keys if k in bundle_cfg]
+        found_keys = [k for k in FORBIDDEN_BUNDLE_KEYS if k in bundle_cfg]
         if found_keys:
             click.secho(
                 f"[WARN] Bundle config '{bundle}' contains build settings: {', '.join(found_keys)}. "
@@ -288,15 +293,7 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
 
         # Validate config separation for composed bundles (skip if already validated)
         if bname not in validated_bundles:
-            forbidden_keys = [
-                "verify",
-                "pem",
-                "output_formats",
-                "package",
-                "filters",
-                "format_overrides",
-            ]
-            found_keys = [k for k in forbidden_keys if k in b_cfg]
+            found_keys = [k for k in FORBIDDEN_BUNDLE_KEYS if k in b_cfg]
             if found_keys:
                 click.secho(
                     f"[WARN] Bundle config '{bname}' contains build settings: {', '.join(found_keys)}. "

@@ -3,7 +3,7 @@
 import pytest
 from click.testing import CliRunner
 
-from bundlecraft.builder import main as build_main
+from bundlecraft.builder import FORBIDDEN_BUNDLE_KEYS, main as build_main
 
 
 @pytest.fixture
@@ -148,15 +148,6 @@ class TestBuilder:
     def test_config_separation_validation(self):
         """Test that the validation logic correctly identifies forbidden keys in bundle configs."""
         # This is a unit test of the validation logic, not an integration test
-        forbidden_keys = [
-            "verify",
-            "pem",
-            "output_formats",
-            "package",
-            "filters",
-            "format_overrides",
-        ]
-
         # Test case 1: Bundle config with no forbidden keys (should be OK)
         clean_config = {
             "bundle_name": "test",
@@ -164,7 +155,7 @@ class TestBuilder:
             "include": ["sources/test.pem"],
             "metadata": {"owner": "test@example.com"},
         }
-        found = [k for k in forbidden_keys if k in clean_config]
+        found = [k for k in FORBIDDEN_BUNDLE_KEYS if k in clean_config]
         assert len(found) == 0, "Clean config should have no forbidden keys"
 
         # Test case 2: Bundle config with forbidden keys
@@ -176,7 +167,7 @@ class TestBuilder:
             "output_formats": ["pem", "jks"],  # Forbidden
             "package": True,  # Forbidden
         }
-        found = [k for k in forbidden_keys if k in dirty_config]
+        found = [k for k in FORBIDDEN_BUNDLE_KEYS if k in dirty_config]
         assert len(found) == 3, f"Should find 3 forbidden keys, found {len(found)}"
         assert "verify" in found
         assert "output_formats" in found
