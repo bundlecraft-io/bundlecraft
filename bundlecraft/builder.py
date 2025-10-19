@@ -206,16 +206,23 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
 
     # Track which bundles have been validated to avoid duplicate warnings
     validated_bundles = set()
-    
+
     # Validate config separation: warn if bundle config contains build settings
     if bundle_cfg:
-        forbidden_keys = ["verify", "pem", "output_formats", "package", "filters", "format_overrides"]
+        forbidden_keys = [
+            "verify",
+            "pem",
+            "output_formats",
+            "package",
+            "filters",
+            "format_overrides",
+        ]
         found_keys = [k for k in forbidden_keys if k in bundle_cfg]
         if found_keys:
             click.secho(
                 f"[WARN] Bundle config '{bundle}' contains build settings: {', '.join(found_keys)}. "
                 f"These keys are ignored. Move them to craft config '{env}' instead.",
-                fg="yellow"
+                fg="yellow",
             )
             validated_bundles.add(bundle)
 
@@ -278,19 +285,26 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         # Load base bundle config for source includes/excludes
         b_cfg = load_yaml(CONFIG_DIR / "bundles" / f"{bname}.yaml", required=True)
         base_bundle_cfgs[bname] = b_cfg
-        
+
         # Validate config separation for composed bundles (skip if already validated)
         if bname not in validated_bundles:
-            forbidden_keys = ["verify", "pem", "output_formats", "package", "filters", "format_overrides"]
+            forbidden_keys = [
+                "verify",
+                "pem",
+                "output_formats",
+                "package",
+                "filters",
+                "format_overrides",
+            ]
             found_keys = [k for k in forbidden_keys if k in b_cfg]
             if found_keys:
                 click.secho(
                     f"[WARN] Bundle config '{bname}' contains build settings: {', '.join(found_keys)}. "
                     f"These keys are ignored. Move them to craft config '{env}' instead.",
-                    fg="yellow"
+                    fg="yellow",
                 )
                 validated_bundles.add(bname)
-        
+
         include_items.extend(b_cfg.get("include", []) or [])
         for ex in b_cfg.get("exclude", []) or []:
             exclude_items.add(ex)

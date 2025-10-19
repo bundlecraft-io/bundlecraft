@@ -148,18 +148,25 @@ class TestBuilder:
     def test_config_separation_validation(self):
         """Test that the validation logic correctly identifies forbidden keys in bundle configs."""
         # This is a unit test of the validation logic, not an integration test
-        forbidden_keys = ["verify", "pem", "output_formats", "package", "filters", "format_overrides"]
-        
+        forbidden_keys = [
+            "verify",
+            "pem",
+            "output_formats",
+            "package",
+            "filters",
+            "format_overrides",
+        ]
+
         # Test case 1: Bundle config with no forbidden keys (should be OK)
         clean_config = {
             "bundle_name": "test",
             "description": "Test bundle",
             "include": ["sources/test.pem"],
-            "metadata": {"owner": "test@example.com"}
+            "metadata": {"owner": "test@example.com"},
         }
         found = [k for k in forbidden_keys if k in clean_config]
         assert len(found) == 0, "Clean config should have no forbidden keys"
-        
+
         # Test case 2: Bundle config with forbidden keys
         dirty_config = {
             "bundle_name": "test",

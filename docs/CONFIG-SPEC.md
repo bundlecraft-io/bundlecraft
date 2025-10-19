@@ -21,7 +21,15 @@ This document defines the configuration schema for BundleCraft, clearly separati
 - Source verification and provenance
 - Content metadata (descriptions, owners, tags)
 
-**Forbidden:** Output formats, build paths, passwords, verification policies
+**Forbidden (enforced):** The following keys are **not allowed** in bundle configs and will be ignored with warnings:
+- `verify` — Verification policies
+- `pem` — PEM output options
+- `output_formats` — Output format list
+- `package` — Packaging options
+- `filters` — Certificate filters
+- `format_overrides` — Format-specific settings
+
+These must be defined in craft configs or rely on defaults.
 
 ### Craft Configs: Build & Deploy Layer
 
@@ -30,13 +38,16 @@ This document defines the configuration schema for BundleCraft, clearly separati
 **Responsibilities:**
 
 - Output formats (PEM, JKS, P7B, P12)
-- Build paths and packaging
-- Verification and filtering policies
+- Build paths and packaging (`package`)
+- Verification and filtering policies (`verify`, `filters`)
+- PEM output options (`pem`)
 - Format-specific secrets (passwords via env vars)
 - Distribution targets and CI/CD tags
 - Bundle composition (`targets.<name>.includes`)
 
 **Forbidden:** Certificate sources, fetch entries, include/exclude paths
+
+> **Note:** Starting with v0.1.0, config separation is strictly enforced. If bundle configs contain build settings, warnings will be issued and those settings will be ignored. See [CONFIG-MIGRATION.md](CONFIG-MIGRATION.md) for migration guidance.
 
 ---
 
