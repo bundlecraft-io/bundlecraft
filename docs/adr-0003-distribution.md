@@ -53,23 +53,27 @@ PyPI itself is not inherently insecure, but it requires additional process contr
 We adopt a multi-channel approach, ranked by recommendation:
 
 1) Primary: OCI image on GHCR
-- Signed with cosign; SBOM and SLSA-style provenance attached as OCI attestations
-- Multi-arch (linux/amd64, linux/arm64)
-- Inputs/outputs mounted at runtime; image contains engine only (no certs/configs)
+
+    - Signed with cosign; SBOM and SLSA-style provenance attached as OCI attestations
+    - Multi-arch (linux/amd64, linux/arm64)
+    - Inputs/outputs mounted at runtime; image contains engine only (no certs/configs)
 
 2) Secondary: pipx-installed CLI via PyPI (optional)
-- Publish a minimal, engine-only package designed for pipx (isolated venv)
-- Strong controls: Sigstore signing of wheels/sdist; pinned, minimal dependencies; reproducible build with hash-locked requirements; publish SBOM in releases
-- Clear docs: “engine only — does not install system trust; provide your own config/certs”
-- Recommended usage: pipx install bundlecraft==X.Y.Z (pin exact version)
+
+    - Publish a minimal, engine-only package designed for pipx (isolated venv)
+    - Strong controls: Sigstore signing of wheels/sdist; pinned, minimal dependencies; reproducible build with hash-locked requirements; publish SBOM in releases
+    - Clear docs: “engine only — does not install system trust; provide your own config/certs”
+    - Recommended usage: pipx install bundlecraft==X.Y.Z (pin exact version)
 
 3) Secondary: Single-file artifact (zipapp or PEX) in GitHub Releases
-- Self-contained executable with vendored dependencies for offline/air-gapped usage
-- Publish checksums, signatures, and SBOM alongside
+
+    - Self-contained executable with vendored dependencies for offline/air-gapped usage
+    - Publish checksums, signatures, and SBOM alongside
 
 4) Optional convenience wrappers
-- GitHub Action: bundlecraft/action that wraps the OCI image
-- Homebrew/Nix shells (community-supported) that either call the image or install the pipx package
+
+    - GitHub Action: bundlecraft/action that wraps the OCI image
+    - Homebrew/Nix shells (community-supported) that either call the image or install the pipx package
 
 Template repository remains part of onboarding: directory layout, example crafts/bundles, and a CI workflow calling the OCI image or Action.
 

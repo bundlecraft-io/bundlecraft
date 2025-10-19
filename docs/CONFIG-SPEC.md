@@ -11,9 +11,11 @@ This document defines the configuration schema for BundleCraft, clearly separati
 ## Configuration Philosophy
 
 ### Bundle Configs: Source & Fetch Layer
+
 **Purpose:** Define WHAT certificates to source and WHERE to get them
 
 **Responsibilities:**
+
 - Certificate source paths (`include`, `exclude`)
 - Remote fetch definitions (`fetch`)
 - Source verification and provenance
@@ -22,9 +24,11 @@ This document defines the configuration schema for BundleCraft, clearly separati
 **Forbidden:** Output formats, build paths, passwords, verification policies
 
 ### Craft Configs: Build & Deploy Layer
+
 **Purpose:** Define HOW to build and WHERE to distribute
 
 **Responsibilities:**
+
 - Output formats (PEM, JKS, P7B, P12)
 - Build paths and packaging
 - Verification and filtering policies
@@ -41,10 +45,12 @@ This document defines the configuration schema for BundleCraft, clearly separati
 Defines certificate sources for a logical bundle.
 
 ### Required Keys
+
 - `bundle_name`: string (logical identifier)
 - `description`: string (purpose/context)
 
 ### Source Definition
+
 ```yaml
 include:  # Relative paths from repo root
   - sources/internal/rootCA.pem
@@ -54,6 +60,7 @@ exclude:  # Optional exclusions
 ```
 
 ### Fetch Definitions
+
 ```yaml
 fetch:
   - name: mozilla_roots
@@ -80,6 +87,7 @@ fetch:
 ```
 
 ### Metadata
+
 ```yaml
 metadata:
   owner: security-team@example.com
@@ -88,7 +96,8 @@ metadata:
   tags: [internal, production]
 ```
 
-### Complete Example
+### Complete Bundle Config Example
+
 ```yaml
 ---
 bundle_name: internal
@@ -113,6 +122,7 @@ metadata:
 Defines build behavior and deployment configuration for an environment.
 
 ### Bundle Composition
+
 ```yaml
 targets:
   internal-prod:
@@ -122,6 +132,7 @@ targets:
 ```
 
 ### Output Configuration
+
 ```yaml
 output_formats:  # Which formats to produce
   - pem   # Canonical PEM (always recommended)
@@ -134,6 +145,7 @@ package: true  # Create .tar.gz of outputs
 ```
 
 ### Verification & Filtering
+
 ```yaml
 verify:
   fail_on_expired: true
@@ -149,6 +161,7 @@ pem:
 ```
 
 ### Format-Specific Secrets
+
 ```yaml
 format_overrides:
   jks:
@@ -159,6 +172,7 @@ format_overrides:
 ```
 
 ### Distribution Metadata (for CI/CD pipeline use only)
+
 ```yaml
 distribution_metadata:
   # NOTE: BundleCraft CLI does NOT publish or upload bundles directly.
@@ -184,14 +198,12 @@ distribution_metadata:
     - automated-build
 ```
 
-targets:
-distribution:
-### Complete Example
+### Complete Craft Config Example
+
 ```yaml
 ---
 name: Production
 description: Production environment with full certificate suite
-
 
   internal-prod:
     includes: [internal, mozilla]
@@ -246,6 +258,7 @@ metadata:
   name: Production
   contact: security@bundlecraft.io
 ```
+
 ---
 
 ## 3) Defaults: `config/defaults.yaml`
@@ -294,6 +307,7 @@ metadata:
 **For sources:** Only `config/bundles/<bundle>.yaml` is consulted (no merging with env)
 
 **For composed targets:**
+
 - Environment defines `targets.<name>.includes: [bundle1, bundle2]`
 - Builder loads each bundle config and merges their `include` + `exclude` lists
 - Environment config controls ALL build behavior (formats, verification, etc.)
@@ -303,24 +317,30 @@ metadata:
 ## CLI Integration
 
 ### Build
+
 ```bash
 bundlecraft build --env prod --bundle internal-prod --prefetch
 ```
+
 - Loads `config/crafts/prod.yaml` for build settings
 - Composes sources from `internal` and `mozilla` bundle configs
 - Outputs to `dist/prod/internal-prod/` (or custom `build_path`)
 
 ### Fetch
+
 ```bash
 bundlecraft fetch --env prod --bundle mozilla
 ```
+
 - Loads `config/bundles/mozilla.yaml` for fetch definitions
 - Stages to `sources/fetched/prod/mozilla/`
 
 ### Offline Build
+
 ```bash
 bundlecraft build --env prod --bundle internal-prod --offline
 ```
+
 - Fails if any bundle requires fetch and sources aren't pre-staged
 
 ---
@@ -342,13 +362,15 @@ Supported values for `distribution_metadata.targets[].type`:
 
 ## Migration Guide
 
-### Moving from old configs:
+### Moving from old configs
 
 **Bundle configs:**
+
 - ✅ Keep: `include`, `exclude`, `fetch`, `metadata`
 - ❌ Remove: `output_formats`, `verify`, `pem`, `filters`, `format_overrides`, `package`
 
 **Craft configs:**
+
 - ✅ Keep: `targets`, `output_formats`, `verify`, `filters`, `format_overrides`
 - ✅ Add: `distribution` section with targets and tags
 - ❌ Remove: `include`, `exclude`, `fetch` (belongs in bundles)

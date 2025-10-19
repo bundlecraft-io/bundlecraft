@@ -121,7 +121,7 @@ Legend: **◎ excellent**, ○ good, △ mixed, ✕ poor
 **Distribution unit:** `ghcr.io/<org>/bundlecraft:<semver>` (also `:latest`)
 **Invocation pattern:**
 
-```
+```bash
 podman run --rm \
   -v $PWD/config:/app/config:ro \
   -v $PWD/sources:/app/sources:ro \
