@@ -70,7 +70,7 @@ def read_pem_chunks(paths):
 
 def is_intermediate_ca(pem_block):
     """Check if a certificate is an intermediate/subordinate CA.
-    
+
     Returns True if the certificate is NOT self-signed (i.e., issuer != subject).
     Root CAs are self-signed, so they will return False.
     """
@@ -323,11 +323,11 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         if b_cfg.get("exclude_intermediates", True):
             exclude_intermediates = True
             break
-    
+
     # Also check the target bundle config if it exists
     if bundle_cfg and bundle_cfg.get("exclude_intermediates", True):
         exclude_intermediates = True
-    
+
     if exclude_intermediates:
         original_count = len(pem_blocks)
         pem_blocks = [blk for blk in pem_blocks if not is_intermediate_ca(blk)]

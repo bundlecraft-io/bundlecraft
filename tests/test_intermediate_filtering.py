@@ -1,7 +1,5 @@
 """Tests for intermediate CA filtering functionality."""
 
-import pytest
-
 from bundlecraft.builder import is_intermediate_ca
 
 
