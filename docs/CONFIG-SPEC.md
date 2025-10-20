@@ -49,6 +49,10 @@ Defines certificate sources for a logical bundle.
 - `bundle_name`: string (logical identifier)
 - `description`: string (purpose/context)
 
+### Optional Keys
+
+- `exclude_intermediates`: boolean (default: `true`) — Excludes intermediate/subordinate CA certificates from the bundle, keeping only self-signed root CAs. This enforces best practice by preventing inappropriate inclusion of intermediate certificates in trust stores.
+
 ### Source Definition
 
 ```yaml
@@ -103,6 +107,8 @@ metadata:
 bundle_name: internal
 description: Trust bundle for internal PKI services (root + issuing CAs)
 
+exclude_intermediates: false  # Include intermediate CAs (not recommended for production)
+
 include:
   - sources/internal/rootCA.pem
   - sources/internal/issuingCA1.pem
@@ -114,6 +120,8 @@ metadata:
   purpose: Internal service mesh authentication
   tags: [internal, ca-bundle]
 ```
+
+**Note:** The default value for `exclude_intermediates` is `true`, which means intermediate CAs will be filtered out by default. This is the recommended best practice to prevent inappropriate inclusion of subordinate CAs in trust stores. Set it to `false` only if you have a specific need to include intermediate certificates.
 
 ---
 

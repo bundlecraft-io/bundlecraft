@@ -68,6 +68,25 @@ def read_pem_chunks(paths):
     return blocks
 
 
+def is_intermediate_ca(pem_block):
+    """Check if a certificate is an intermediate/subordinate CA.
+    
+    Returns True if the certificate is NOT self-signed (i.e., issuer != subject).
+    Root CAs are self-signed, so they will return False.
+    """
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+
+    try:
+        cert = x509.load_pem_x509_certificate(pem_block.encode("utf-8"), default_backend())
+        # A certificate is an intermediate if issuer != subject
+        # Root CAs have issuer == subject (self-signed)
+        return cert.issuer != cert.subject
+    except Exception:
+        # If we can't parse it, assume it's not an intermediate (safer default)
+        return False
+
+
 def dedupe_ordered(pem_blocks):
     """Deduplicate PEM blocks by SHA256 fingerprint."""
     import base64
@@ -293,6 +312,31 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
     if not pem_blocks:
         click.secho("[ERROR] No valid PEM certificates parsed.", fg="red", err=True)
         sys.exit(3)
+
+    # -----------------------
+    # Filter intermediate CAs if requested
+    # -----------------------
+    # Check if any bundle config has exclude_intermediates enabled (default: true)
+    exclude_intermediates = False
+    for bname in base_bundles:
+        b_cfg = base_bundle_cfgs.get(bname, {})
+        if b_cfg.get("exclude_intermediates", True):
+            exclude_intermediates = True
+            break
+    
+    # Also check the target bundle config if it exists
+    if bundle_cfg and bundle_cfg.get("exclude_intermediates", True):
+        exclude_intermediates = True
+    
+    if exclude_intermediates:
+        original_count = len(pem_blocks)
+        pem_blocks = [blk for blk in pem_blocks if not is_intermediate_ca(blk)]
+        filtered_count = original_count - len(pem_blocks)
+        if filtered_count > 0:
+            click.secho(
+                f"[INFO] Filtered {filtered_count} intermediate/subordinate CA certificate(s).",
+                fg="blue",
+            )
 
     # -----------------------
     # Verify-only mode
