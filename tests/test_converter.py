@@ -154,3 +154,24 @@ class TestConverter:
         #     )
 
     # Multi-format output is no longer supported; test removed.
+
+    def test_output_basename_applied(self, cli_runner, temp_dir, sample_cert_path):
+        """Ensure --output-basename controls output filename for conversions."""
+        output_dir = temp_dir / "output"
+        output_dir.mkdir()
+        result = cli_runner.invoke(
+            convert_main,
+            [
+                "--input",
+                str(sample_cert_path),
+                "--output-dir",
+                str(output_dir),
+                "--output-format",
+                "pem",
+                "--output-basename",
+                "mycustomname",
+            ],
+        )
+        # Must not crash; file should be named by basename
+        assert result.exit_code in [0, 2]
+        assert (output_dir / "mycustomname.pem").exists()

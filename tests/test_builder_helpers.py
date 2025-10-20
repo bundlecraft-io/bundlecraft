@@ -2,17 +2,17 @@
 """
 test_builder_helpers.py
 Unit tests for builder.py helper functions.
+
+NOTE: After the orchestration refactor, many builder functions became private (_prefixed).
+This test file tests the core PEM processing functions which are still useful for
+validation even though they're now internal implementation details.
 """
 
-import tarfile
-
 from bundlecraft.builder import (
-    build_checksums,
-    dedupe_ordered,
-    package_tar,
-    read_pem_chunks,
-    write_canonical_pem,
+    _dedupe_pem_blocks as dedupe_pem_blocks,
 )
+from bundlecraft.builder import _read_pem_chunks as read_pem_chunks
+from bundlecraft.builder import _write_canonical_pem as write_canonical_pem
 
 
 class TestReadPemChunks:
@@ -74,14 +74,14 @@ CgKCAQEA3I8=
         assert len(blocks) == 1
 
 
-class TestDedupeOrdered:
+class TestDedupePemBlocks:
     """Test PEM block deduplication."""
 
     def test_dedupe_identical_certs(self, tmp_path, sample_cert_path):
         """Test deduplication of identical certificates."""
         block = sample_cert_path.read_text()
         blocks = [block, block, block]
-        deduped = dedupe_ordered(blocks)
+        deduped = dedupe_pem_blocks(blocks)
         assert len(deduped) == 1
 
     def test_dedupe_different_certs(self, tmp_path, sample_cert_path, intermediate_cert_path):
@@ -89,7 +89,7 @@ class TestDedupeOrdered:
         block1 = sample_cert_path.read_text()
         block2 = intermediate_cert_path.read_text()
         blocks = [block1, block2]
-        deduped = dedupe_ordered(blocks)
+        deduped = dedupe_pem_blocks(blocks)
         assert len(deduped) == 2
 
     def test_dedupe_maintains_order(self, tmp_path, sample_cert_path, intermediate_cert_path):
@@ -97,7 +97,7 @@ class TestDedupeOrdered:
         block1 = sample_cert_path.read_text()
         block2 = intermediate_cert_path.read_text()
         blocks = [block1, block2, block1]
-        deduped = dedupe_ordered(blocks)
+        deduped = dedupe_pem_blocks(blocks)
         assert len(deduped) == 2
         # First occurrence of block1 should be at index 0
         assert deduped[0] == block1 if block1.endswith("\n") else block1 + "\n"
@@ -107,13 +107,13 @@ class TestDedupeOrdered:
         """Test that dedupe ensures blocks end with newline."""
         block = "-----BEGIN CERTIFICATE-----\nMIIDXTCC\n-----END CERTIFICATE-----"
         blocks = [block]
-        deduped = dedupe_ordered(blocks)
+        deduped = dedupe_pem_blocks(blocks)
         assert deduped[0].endswith("\n")
 
     def test_dedupe_invalid_pem(self, tmp_path):
         """Test deduplication with invalid PEM blocks."""
         blocks = ["not a pem block"]
-        deduped = dedupe_ordered(blocks)
+        deduped = dedupe_pem_blocks(blocks)
         # Invalid blocks should be skipped (no BEGIN/END markers)
         assert len(deduped) == 0
 
@@ -171,128 +171,7 @@ class TestWriteCanonicalPem:
         assert "# Subject: (unparsable)" in content
 
 
-class TestBuildChecksums:
-    """Test checksum file generation."""
-
-    def test_build_checksums_single_file(self, tmp_path):
-        """Test building checksums for a single file."""
-        test_file = tmp_path / "test.txt"
-        test_file.write_text("test content")
-
-        checksum_file = build_checksums(tmp_path)
-
-        assert checksum_file.exists()
-        assert checksum_file.name == "checksums.sha256"
-        content = checksum_file.read_text()
-        assert "test.txt" in content
-        assert len(content.split("\n")[0].split()[0]) == 64  # SHA256 length
-
-    def test_build_checksums_multiple_files(self, tmp_path):
-        """Test building checksums for multiple files."""
-        (tmp_path / "file1.txt").write_text("content1")
-        (tmp_path / "file2.txt").write_text("content2")
-        (tmp_path / "file3.txt").write_text("content3")
-
-        checksum_file = build_checksums(tmp_path)
-
-        content = checksum_file.read_text()
-        lines = content.strip().split("\n")
-        assert len(lines) == 3
-        assert "file1.txt" in content
-        assert "file2.txt" in content
-        assert "file3.txt" in content
-
-    def test_build_checksums_sorted_output(self, tmp_path):
-        """Test that checksums are sorted alphabetically."""
-        (tmp_path / "z_file.txt").write_text("z")
-        (tmp_path / "a_file.txt").write_text("a")
-        (tmp_path / "m_file.txt").write_text("m")
-
-        checksum_file = build_checksums(tmp_path)
-
-        content = checksum_file.read_text()
-        lines = content.strip().split("\n")
-        assert "a_file.txt" in lines[0]
-        assert "m_file.txt" in lines[1]
-        assert "z_file.txt" in lines[2]
-
-    def test_build_checksums_empty_directory(self, tmp_path):
-        """Test building checksums for an empty directory."""
-        checksum_file = build_checksums(tmp_path)
-
-        content = checksum_file.read_text()
-        assert content == ""
-
-    def test_build_checksums_ignores_subdirs(self, tmp_path):
-        """Test that subdirectories are ignored."""
-        (tmp_path / "file.txt").write_text("content")
-        (tmp_path / "subdir").mkdir()
-        (tmp_path / "subdir" / "nested.txt").write_text("nested")
-
-        checksum_file = build_checksums(tmp_path)
-
-        content = checksum_file.read_text()
-        assert "file.txt" in content
-        assert "nested.txt" not in content
-
-
-class TestPackageTar:
-    """Test tar.gz package creation."""
-
-    def test_package_single_file(self, tmp_path):
-        """Test packaging a single file."""
-        test_file = tmp_path / "test.txt"
-        test_file.write_text("test content")
-
-        tar_path = package_tar(tmp_path)
-
-        assert tar_path.exists()
-        assert tar_path.name == "package.tar.gz"
-
-        # Verify tar contents
-        with tarfile.open(tar_path, "r:gz") as tar:
-            members = tar.getnames()
-            assert "test.txt" in members
-
-    def test_package_multiple_files(self, tmp_path):
-        """Test packaging multiple files."""
-        (tmp_path / "file1.txt").write_text("content1")
-        (tmp_path / "file2.txt").write_text("content2")
-
-        tar_path = package_tar(tmp_path)
-
-        with tarfile.open(tar_path, "r:gz") as tar:
-            members = tar.getnames()
-            assert len(members) == 2
-            assert "file1.txt" in members
-            assert "file2.txt" in members
-
-    def test_package_excludes_itself(self, tmp_path):
-        """Test that the tar file doesn't include itself."""
-        (tmp_path / "file.txt").write_text("content")
-
-        tar_path = package_tar(tmp_path)
-
-        with tarfile.open(tar_path, "r:gz") as tar:
-            members = tar.getnames()
-            assert "package.tar.gz" not in members
-
-    def test_package_sorted_files(self, tmp_path):
-        """Test that files are added in sorted order."""
-        (tmp_path / "z_file.txt").write_text("z")
-        (tmp_path / "a_file.txt").write_text("a")
-
-        tar_path = package_tar(tmp_path)
-
-        with tarfile.open(tar_path, "r:gz") as tar:
-            members = tar.getnames()
-            assert members == sorted(members)
-
-    def test_package_empty_directory(self, tmp_path):
-        """Test packaging an empty directory."""
-        tar_path = package_tar(tmp_path)
-
-        assert tar_path.exists()
-        with tarfile.open(tar_path, "r:gz") as tar:
-            members = tar.getnames()
-            assert len(members) == 0
+# NOTE: The following test classes (TestBuildChecksums, TestPackageTar) were removed
+# because those functions are no longer part of the refactored builder.
+# - build_checksums is now inline in the main() function
+# - package_tar was removed entirely (packaging feature removed)

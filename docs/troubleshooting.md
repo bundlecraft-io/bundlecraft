@@ -41,11 +41,11 @@ This guide covers common issues, root causes, and quick fixes when using the Fet
 ## Build issues
 
 - Empty or missing outputs
-  - Check inputs in sources/ and sources/fetched/<env>/<bundle>/
+  - Check inputs in `sources/` and `sources/staged/<craft>/`
   - Ensure include paths in the bundle config are correct.
 
 - Unexpected duplicates or missing certs
-  - Ensure filters (e.g., unique_by_fingerprint) are set appropriately in defaults/env config.
+  - Ensure filters (e.g., unique_by_fingerprint) are set appropriately in defaults or craft config.
 
 - Packaging problems
   - Verify OpenSSL and keytool are installed for P7B/JKS/P12 conversions.
@@ -69,13 +69,14 @@ This guide covers common issues, root causes, and quick fixes when using the Fet
 - Use verify.ca_file and optionally verify.tls_fingerprint_sha256 for API/services
 - Keep tokens in env vars (KEYFACTOR_TOKEN, VAULT_TOKEN), not YAML
 - Treat sources/fetched as ephemeral; do not rely on it as a cache
+- Treat sources/staged as ephemeral; do not rely on it as a cache
 - Embed provenance: keep provenance.fetch.json with builds for audit trails
 
 ---
 
 ## Mozilla and other public providers
 
-- Mozilla CA bundle is published at https://curl.se/ca/cacert.pem
+- Mozilla CA bundle is published at <https://curl.se/ca/cacert.pem>
 - Recommended: pin verify.sha256 to the published hash you validate through a trusted channel
 - Consider aggregating public + internal roots by staging Mozilla bundle via fetch and layering internal CAs via local sources
 

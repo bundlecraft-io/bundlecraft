@@ -40,6 +40,7 @@ def convert_to_formats(
     build_root: Path,
     formats: list[str],
     fmt_overrides: dict | None = None,
+    output_basename: str | None = None,
 ):
     """
     Convert a canonical PEM bundle into one or more target formats.
@@ -49,14 +50,17 @@ def convert_to_formats(
         build_root (Path): Output directory
         formats (list[str]): Target formats (e.g., ["p7b", "jks", "p12"])
         fmt_overrides (dict|None): Optional per-format overrides (alias/password settings)
+        output_basename (str|None): Base name for output files (default: input file stem)
     """
     fmt_overrides = fmt_overrides or {}
+    if output_basename is None:
+        output_basename = pem_path.stem
     norm = [f.lower() for f in formats]
 
     for fmt in norm:
         if fmt in ("pem",):
             # Just copy/normalize the PEM into the output directory
-            out_path = build_root / "bundlecraft-ca-trust.pem"
+            out_path = build_root / f"{output_basename}.pem"
             if out_path.exists() and not fmt_overrides.get("force", False):
                 raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
             out_path.write_text(
@@ -64,11 +68,14 @@ def convert_to_formats(
             )
             print(f"[INFO] Wrote PEM: {out_path}")
         elif fmt in ("p7b", "pkcs7"):
-            create_p7b(pem_path, build_root, force=fmt_overrides.get("force", False))
+            create_p7b(
+                pem_path, build_root, output_basename, force=fmt_overrides.get("force", False)
+            )
         elif fmt == "jks":
             create_jks(
                 pem_path,
                 build_root,
+                output_basename,
                 fmt_overrides.get("jks", {}),
                 force=fmt_overrides.get("force", False),
             )
@@ -76,11 +83,14 @@ def convert_to_formats(
             create_pkcs12(
                 pem_path,
                 build_root,
+                output_basename,
                 fmt_overrides.get("pkcs12", {}),
                 force=fmt_overrides.get("force", False),
             )
         elif fmt == "zip":
-            create_zip(pem_path, build_root, force=fmt_overrides.get("force", False))
+            create_zip(
+                pem_path, build_root, output_basename, force=fmt_overrides.get("force", False)
+            )
         else:
             print(f"[WARN] Unknown format requested: {fmt}")
 
@@ -90,7 +100,7 @@ def convert_to_formats(
 # ---------------------------------------------------------------------
 
 
-def create_zip(pem_path: Path, build_root: Path, force: bool = False):
+def create_zip(pem_path: Path, build_root: Path, output_basename: str, force: bool = False):
     """
     Create a tarball (zip) containing each certificate as an individual PEM file.
     Filenames: {subject.CN}-{thumbprint}.pem
@@ -104,7 +114,7 @@ def create_zip(pem_path: Path, build_root: Path, force: bool = False):
         print(f"[WARN] No certificates found in {pem_path}; skipping ZIP.")
         return
 
-    tar_path = build_root / "bundlecraft-ca-trust.tar.gz"
+    tar_path = build_root / f"{output_basename}.tar.gz"
     if tar_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {tar_path}. Use --force to overwrite.")
     with tarfile.open(tar_path, "w:gz") as tar:
@@ -135,6 +145,7 @@ def convert_from_any(
     password: str | None = None,
     verbose: bool = False,
     force: bool = False,
+    output_basename: str | None = None,
 ) -> None:
     """
     Normalize arbitrary input (PEM/P7B/JKS/P12) to a canonical PEM and convert to targets.
@@ -166,7 +177,8 @@ def convert_from_any(
             },
             "force": force,
         }
-        convert_to_formats(pem_path, output_dir, formats, fmt_overrides)
+        # Perform conversions while the normalized PEM exists
+        convert_to_formats(pem_path, output_dir, formats, fmt_overrides, output_basename)
 
 
 # ---------------------------------------------------------------------
@@ -208,13 +220,13 @@ def create_der(pem_path: Path, build_root: Path):
             print(f"[INFO] Created DER: {out_path}")
 
 
-def create_p7b(pem_path: Path, build_root: Path, force: bool = False):
+def create_p7b(pem_path: Path, build_root: Path, output_basename: str, force: bool = False):
     """
     Convert PEM → PKCS#7 (.p7b, DER) including ALL certs.
 
     Use -certfile (not -in) so OpenSSL ingests the entire bundle.
     """
-    out_path = build_root / "bundlecraft-ca-trust.p7b"
+    out_path = build_root / f"{output_basename}.p7b"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
 
@@ -251,7 +263,9 @@ def create_p7b(pem_path: Path, build_root: Path, force: bool = False):
     print(f"[INFO] Created P7B: {out_path}")
 
 
-def create_jks(pem_path: Path, build_root: Path, overrides: dict, force: bool = False):
+def create_jks(
+    pem_path: Path, build_root: Path, output_basename: str, overrides: dict, force: bool = False
+):
     """
     Create a Java KeyStore (JKS) from a PEM bundle.
     Imports each certificate individually with alias naming controlled by alias_format.
@@ -259,14 +273,14 @@ def create_jks(pem_path: Path, build_root: Path, overrides: dict, force: bool = 
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
 
-    alias_format = overrides.get("alias_format", "{subject.CN}-{serial}")
+    alias_format = overrides.get("alias_format", "{subject.CN}-{fingerprint}")
     storepass = (
         overrides.get("storepass")
         or os.environ.get(overrides.get("storepass_env", "TRUST_JKS_PASSWORD"))
         or "changeit"
     )
 
-    out_path = build_root / "bundlecraft-ca-trust.jks"
+    out_path = build_root / f"{output_basename}.jks"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
 
@@ -280,7 +294,17 @@ def create_jks(pem_path: Path, build_root: Path, overrides: dict, force: bool = 
                 cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
                 cn = _get_cn(cert)
                 serial = f"{cert.serial_number:X}"
-                alias = _format_alias(alias_format, cn, serial)
+                from cryptography.hazmat.primitives import hashes
+
+                fp_sha256 = cert.fingerprint(hashes.SHA256()).hex()
+                fp_sha1 = cert.fingerprint(hashes.SHA1()).hex()
+                alias = _format_alias(
+                    alias_format,
+                    cn,
+                    serial,
+                    fingerprint_sha1=fp_sha1,
+                    fingerprint_sha256=fp_sha256,
+                )
                 alias = _sanitize_alias(alias)
 
                 tmp_pem = td / f"cert{idx}.pem"
@@ -307,7 +331,9 @@ def create_jks(pem_path: Path, build_root: Path, overrides: dict, force: bool = 
     print(f"[INFO] Created JKS: {out_path}")
 
 
-def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict, force: bool = False):
+def create_pkcs12(
+    pem_path: Path, build_root: Path, output_basename: str, overrides: dict, force: bool = False
+):
     """
     Create a single PKCS#12 (.p12) containing ALL certificates from the PEM bundle.
 
@@ -317,14 +343,14 @@ def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict, force: bool
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
 
-    alias_format = overrides.get("alias_format", "{subject.CN}-{serial}")
+    alias_format = overrides.get("alias_format", "{subject.CN}-{fingerprint}")
     password = (
         overrides.get("password")
         or os.environ.get(overrides.get("password_env", "TRUST_P12_PASSWORD"))
         or "changeit"
     )
 
-    out_path = build_root / "bundlecraft-ca-trust.p12"
+    out_path = build_root / f"{output_basename}.p12"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
 
@@ -352,7 +378,17 @@ def create_pkcs12(pem_path: Path, build_root: Path, overrides: dict, force: bool
         first_cert = x509.load_pem_x509_certificate(first_pem.encode(), default_backend())
         cn = _get_cn(first_cert)
         serial = f"{first_cert.serial_number:X}"
-        alias = _format_alias(alias_format, cn, serial)
+        from cryptography.hazmat.primitives import hashes
+
+        fp_sha256 = first_cert.fingerprint(hashes.SHA256()).hex()
+        fp_sha1 = first_cert.fingerprint(hashes.SHA1()).hex()
+        alias = _format_alias(
+            alias_format,
+            cn,
+            serial,
+            fingerprint_sha1=fp_sha1,
+            fingerprint_sha256=fp_sha256,
+        )
         alias = _sanitize_alias(alias)
 
         cmd = [
@@ -560,10 +596,31 @@ def _sanitize_alias(alias: str) -> str:
     return "".join(c if c.isalnum() or c in ("-", "_", ".") else "_" for c in alias)[:80]
 
 
-def _format_alias(template: str, cn: str, serial: str) -> str:
-    """Replace {subject.CN} and {serial} placeholders safely."""
+def _format_alias(
+    template: str,
+    cn: str,
+    serial: str,
+    *,
+    fingerprint_sha1: str | None = None,
+    fingerprint_sha256: str | None = None,
+) -> str:
+    """Replace placeholders in alias templates safely.
+
+    Supported placeholders:
+      - {subject.CN}
+      - {serial}
+      - {fingerprint} (alias for {fingerprint_sha256})
+      - {fingerprint_sha1}
+      - {fingerprint_sha256}
+    """
     cn = cn or "Unknown_CN"
+    fp1 = fingerprint_sha1 or ""
+    fp256 = fingerprint_sha256 or ""
     try:
-        return template.replace("{subject.CN}", cn).replace("{serial}", serial)
+        out = template
+        out = out.replace("{subject.CN}", cn).replace("{serial}", serial)
+        out = out.replace("{fingerprint_sha1}", fp1).replace("{fingerprint_sha256}", fp256)
+        out = out.replace("{fingerprint}", fp256)
+        return out
     except Exception:
         return f"{cn}-{serial}"

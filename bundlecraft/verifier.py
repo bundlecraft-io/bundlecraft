@@ -257,13 +257,7 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
 )
 @click.option("--verify-all", is_flag=True, help="Verify both bundle files and manifest together")
 @click.option("--verbose", is_flag=True, help="Show detailed file metadata and hashes")
-@click.option(
-    "--output-root",
-    type=str,
-    default="dist",
-    help="Root directory for build outputs (default: ./dist)",
-)
-def main(target, verify_manifest, verify_all, verbose, output_root):
+def main(target, verify_manifest, verify_all, verbose):
     """Verify the integrity and consistency of built trust bundles."""
     click.secho("\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
     path = Path(target)

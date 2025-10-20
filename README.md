@@ -79,7 +79,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 │   ├── crafts/
 │   └── bundles/
 ├── bundlecraft/            # Python scripts for build, verify, convert, helpers
-├── dist/                   # Generated outputs (per environment/bundle)
+├── dist/                   # Generated outputs (per craft/target)
 ├── docs/                   # Project documentation
 ├── .github/
 │   └── workflows/
@@ -100,8 +100,8 @@ fetch → build → verify → convert (CI orchestrates discover → build → c
 1. **Defaults** (`config/defaults.yaml`):
    Global settings (verification, filters, formats)
 
-2. **Craft** (`config/crafts/<env>.yaml`):
-  Contextual overrides (paths, secrets, output formats)
+2. **Craft** (`config/crafts/<craft>.yaml`):
+  Contextual overrides (paths, secrets, output formats, targets)
 
 3. **Bundle** (`config/bundles/<bundle>.yaml`):
    Content definition (certificate sources to include/exclude)
@@ -137,17 +137,19 @@ targets:
 
 Commands:
 
-```bash
-# Prefetch remote sources for all included bundles and build merged target
-bundlecraft build --env dev --bundle internal-dev --prefetch
 
-# Build a single-bundle target
-bundlecraft build --env prod --bundle mozilla --prefetch
+```bash
+# Build the composed target (composed from bundles)
+bundlecraft build --craft dev --bundle internal-dev
+
+# Build one target from a production craft
+bundlecraft build --craft prod --bundle mozilla
 ```
 
 Outputs:
-- `dist/dev/internal-dev/` contains both internal and mozilla certs
-- `dist/prod/mozilla/` contains only mozilla certs
+
+- `dist/Development/internal-dev/` contains both internal and mozilla certs (craft display name)
+- `dist/Production/mozilla/` contains only mozilla certs
 
 ---
 
@@ -249,17 +251,17 @@ eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 - Update `config/bundles/` YAMLs to specify which sources to include/exclude
  - Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault)
 
-### 3. Fetch and Build a Bundle
+### 3. Fetch and Build
 
 ```bash
-# Stage remote sources (optional but recommended)
-bundlecraft fetch --env prod --bundle internal
-
-# Build using local + staged sources
-bundlecraft build --env prod --bundle internal
+# Build a craft target (fetch is done automatically unless skipped)
+```bash
+bundlecraft build --craft prod --bundle internal-prod
 ```
-- Produces artifacts in `dist/prod/internal/`:
-  ```
+```
+- Produces artifacts in `dist/Production/internal-prod/`:
+
+  ```text
   bundlecraft-ca-trust.pem
   bundlecraft-ca-trust.p7b
   bundlecraft-ca-trust.jks
@@ -272,7 +274,7 @@ bundlecraft build --env prod --bundle internal
 ### 4. Verify Outputs
 
 ```bash
-bundlecraft verify --target dist/prod/internal --verbose --verify-all
+bundlecraft verify --target dist/Production/internal-prod --verbose --verify-all
 ```
 - Checks:
   - Expiry and soon-to-expire certificates
@@ -335,7 +337,7 @@ BundleCraft supports the following environment variables for configuration:
 |Script|Purpose|Example Usage|
 |---|---|---|
 | `bundlecraft.fetch` (CLI: `bundlecraft fetch`) | Securely fetch remote sources and stage them (no persistent cache) | `bundlecraft fetch --env prod --bundle internal` |
-| `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --env prod --bundle internal` |
+| `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --craft prod --bundle internal-prod` |
 | `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify dist/prod/internal/` |
 | `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert any supported input to any supported output (PEM, P7B, JKS, P12, ZIP) | `bundlecraft convert --input dist/prod/internal/bundlecraft-ca-trust.pem --output-dir dist/prod/internal/ --output-format jks` |
 

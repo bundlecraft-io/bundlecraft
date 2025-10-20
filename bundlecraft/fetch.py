@@ -4,7 +4,7 @@ fetch.py
 First stage of the BundleCraft pipeline: securely fetch and stage certificate sources.
 
 Design choices per ADR-0002 and user guidance:
- - No persistent caching; fetched artifacts are staged under sources/fetched/<env>/<bundle>/
+ - No persistent caching; fetched artifacts are staged under sources/fetched/<craft>/<bundle>/
  - Staging directory is cleaned at the start of each fetch run
  - Only trusted origins: HTTPS/file URLs supported; optional content SHA256 pinning
  - Staged files are treated the same as local sources by the build stage
@@ -35,6 +35,8 @@ formatter = logging.Formatter("[%(levelname)s] %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
+# Avoid duplicate log lines by preventing propagation to the root logger
+logger.propagate = False
 
 
 def _clean_dir(path: Path) -> None:
@@ -227,102 +229,172 @@ def run_fetch(
     return outputs
 
 
+def _stage_local_includes(
+    cfg: dict[str, Any], staging_root: Path, root: Path, verbose: bool
+) -> list[Path]:
+    include_items = cfg.get("include") or []
+    exclude_items = set(cfg.get("exclude") or [])
+    staged: list[Path] = []
+    if not include_items:
+        return staged
+
+    include_dir = staging_root / "include"
+    ensure_dir(include_dir)
+    logger.info("[Local] Copying includes ...")
+    for item in include_items:
+        p = (root / item).resolve()
+        if p.is_dir():
+            for f in sorted(p.rglob("*.pem")):
+                rel_str = str(f.relative_to(root)).replace("\\", "/")
+                if rel_str in exclude_items:
+                    if verbose:
+                        logger.debug(f"  Skipped (excluded): {rel_str}")
+                    continue
+                out = include_dir / f.name
+                out.write_bytes(f.read_bytes())
+                staged.append(out)
+                logger.info(f"  Copied: {rel_str} -> {out}")
+        elif p.is_file():
+            rel_str = str(p.relative_to(root)).replace("\\", "/")
+            if rel_str in exclude_items:
+                if verbose:
+                    logger.debug(f"  Skipped (excluded): {rel_str}")
+                continue
+            out = include_dir / p.name
+            out.write_bytes(p.read_bytes())
+            staged.append(out)
+            logger.info(f"  Copied: {rel_str} -> {out}")
+        else:
+            logger.warning(f"  Include path not found: {item}")
+    return staged
+
+
+def _fetch_each_to_named_dirs(
+    fetch_cfg: list[dict[str, Any]],
+    staging_root: Path,
+    root: Path,
+    verbose: bool,
+    name_filter: str | None,
+) -> list[Path]:
+    staged: list[Path] = []
+    if not fetch_cfg:
+        return staged
+    logger.info(f"[Remote] Fetching {len(fetch_cfg)} source(s) ...")
+    for idx, src in enumerate(fetch_cfg, start=1):
+        name = src.get("name") or f"fetched-{idx}"
+        if name_filter and name != name_filter:
+            continue
+        subdir = staging_root / name
+        ensure_dir(subdir)
+        try:
+            out_paths = _fetch_from_config([src], subdir, root, verbose=verbose)
+            staged.extend(out_paths)
+        except click.ClickException:
+            raise
+    return staged
+
+
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
-    "--config-file",
+    "--bundle-config-file",
+    "bundle_config_file",
     type=click.Path(exists=True, dir_okay=False, file_okay=True, path_type=Path),
-    help=(
-        "Optional: Path to a single bundle config YAML to fetch from directly. When provided,"
-        " --env/--bundle (or --craft/--bundle) are optional; env defaults to 'ci' and bundle name is derived from"
-        " the config 'id' or filename."
-    ),
+    required=True,
+    help="Path to a bundle config YAML to fetch from directly (reads include/exclude/fetch only)",
 )
-@click.option("--env", "--craft", "env", required=False, help="Craft name (e.g., dev, prod, dmz)")
-@click.option("--bundle", required=False, help="Bundle name (e.g., internal, external)")
+@click.option(
+    "--fetch-name",
+    "fetch_name",
+    required=False,
+    help="If provided, only run the fetch entry with this name; otherwise run all fetch entries",
+)
 @click.option(
     "--workspace-root",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
     default=Path(".").resolve(),
-    help="Workspace root directory containing config/ and sources/ (defaults to current repo)",
+    help="Workspace root directory used to resolve relative include/exclude paths (default: current dir)",
 )
+@click.option("--no-clean", is_flag=True, help="Do not clean staging directory before fetching")
 @click.option(
-    "--no-clean",
+    "--fetch-only",
     is_flag=True,
-    help="Do not clean staging directory before fetching (default is to clean)",
+    help="Only perform remote fetches; skip copying local certificates from 'include'",
 )
-@click.option("--offline", is_flag=True, help="Fail if 'fetch' is required; do not contact network")
 @click.option(
-    "--verbose", is_flag=True, help="Show extra debug output and tracebacks for fetch operations"
+    "--output-dir",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    default=Path("sources") / "staged",
+    help="Output directory for staged certificates (default: ./sources/staged)",
 )
+@click.option("--verbose", is_flag=True, help="Show extra debug output for fetch operations")
 def main(
-    config_file: Path | None,
-    env: str | None,
-    bundle: str | None,
+    bundle_config_file: Path,
+    fetch_name: str | None,
     workspace_root: Path,
     no_clean: bool,
-    offline: bool,
+    fetch_only: bool,
+    output_dir: Path,
     verbose: bool,
 ):
-    """Fetch and stage certificate inputs declared in bundle config (CLI).
+    """Fetch and stage certificate inputs declared in a bundle config.
 
-    Modes:
-    - Default (no --config-file): requires --env and --bundle; loads from config/bundles
-    - Direct (--config-file): loads bundle config from the given path; --env optional (defaults 'ci')
+    This command operates entirely on a single bundle config file and does not consult craft/env configs.
+
+    Steps:
+      1) Create the staging directory (--output-dir)
+      2) Create per-source subdirectories: 'include/' for local paths and one subdirectory per fetch 'name'
+      3) Copy local includes (unless --fetch-only) and perform remote fetches into their respective subdirectories
+      4) Summarize the resulting directory structure and file counts
     """
     click.secho("\n🔐 BundleCraft Fetcher\n----------------------", fg="cyan")
 
     # Set logging level based on verbose flag
+    logger.setLevel(logging.DEBUG if verbose else logging.INFO)
     if verbose:
-        logger.setLevel(logging.DEBUG)
         logger.debug("Verbose mode enabled")
-    else:
-        logger.setLevel(logging.INFO)
 
     try:
-        outputs: list[Path] = []
         root = workspace_root.resolve()
-        logger.info(f"Workspace root: {root}")
+        cfg = load_yaml(bundle_config_file, required=True)
+        fetch_cfg = cfg.get("fetch") or []
+        if not isinstance(fetch_cfg, list):
+            raise click.ClickException("Config key 'fetch' must be a list of sources")
 
-        if config_file is not None:
-            # Direct-from-file mode
-            logger.info(f"Loading bundle config from file: {config_file}")
-            cfg = load_yaml(config_file, required=True)
-            fetch_cfg = cfg.get("fetch") or []
-            if not isinstance(fetch_cfg, list):
-                raise click.ClickException("Config key 'fetch' must be a list of sources")
-            if not fetch_cfg:
-                click.secho(
-                    "[INFO] No 'fetch' entries found in provided config. Nothing to do.",
-                    fg="yellow",
-                )
-                sys.exit(0)
+        # Determine bundle identifier for staging root
+        bundle_name = cfg.get("bundle_name") or cfg.get("id") or bundle_config_file.stem
 
-            bundle_name = cfg.get("id") or config_file.stem
-            env_name = env or "ci"
-            logger.info(f"Bundle: {bundle_name}, Environment: {env_name}")
-            logger.info(f"Found {len(fetch_cfg)} fetch source(s)")
-
-            sources_dir = root / "sources"
-            ensure_dir(sources_dir)
-            dest_dir = sources_dir / "fetched" / env_name / bundle_name
-            ensure_dir(dest_dir)
-            if not no_clean:
-                logger.info(f"Cleaning staging directory: {dest_dir}")
-                _clean_dir(dest_dir)
-                ensure_dir(dest_dir)
-
-            if offline:
-                raise click.ClickException("Offline mode is enabled but fetch entries are present.")
-            outputs = _fetch_from_config(fetch_cfg, dest_dir, root, verbose=verbose)
+        # Prepare staging dir: <output_dir>/<bundle_name>
+        # If output_dir is relative, resolve it against workspace_root
+        if not output_dir.is_absolute():
+            staging_root = (root / output_dir / bundle_name).resolve()
         else:
-            # Legacy/default mode
-            if not env or not bundle:
-                raise click.ClickException(
-                    "--env and --bundle are required unless --config-file is used"
-                )
-            outputs = run_fetch(
-                env, bundle, workspace_root, no_clean=no_clean, offline=offline, verbose=verbose
-            )
+            staging_root = (output_dir / bundle_name).resolve()
+        ensure_dir(staging_root)
+        if not no_clean:
+            logger.info(f"Cleaning staging directory: {staging_root}")
+            _clean_dir(staging_root)
+            ensure_dir(staging_root)
+
+        staged_paths: list[Path] = []
+        if not fetch_only:
+            staged_paths += _stage_local_includes(cfg, staging_root, root, verbose)
+
+        staged_paths += _fetch_each_to_named_dirs(
+            fetch_cfg, staging_root, root, verbose, fetch_name
+        )
+
+        # Summarize directory structure and counts
+        click.secho("\n[SUMMARY] Staged artifacts:", fg="blue")
+        total = 0
+        for sub in sorted(staging_root.iterdir()):
+            if not sub.is_dir():
+                continue
+            files = [p for p in sorted(sub.rglob("*")) if p.is_file()]
+            count = len(files)
+            total += count
+            click.secho(f"  - {sub.name}/ : {count} file(s)", fg="blue")
+        click.secho(f"  Total: {total} file(s)\n", fg="blue")
+
     except click.ClickException as e:
         click.secho(f"[ERROR] {e}", fg="red", err=True)
         sys.exit(2)
@@ -330,14 +402,7 @@ def main(
         click.secho(f"[ERROR] Fetch failed: {e}", fg="red", err=True)
         sys.exit(2)
 
-    if not outputs:
-        click.secho("[INFO] No 'fetch' entries found in bundle config. Nothing to do.", fg="yellow")
-        sys.exit(0)
-
-    for p in outputs:
-        click.secho(f"[OK] Staged: {p}", fg="green")
-
-    click.secho("[SUCCESS] Fetch completed. You can now run 'bundlecraft build'", fg="green")
+    click.secho("[SUCCESS] Fetch completed.", fg="green")
 
 
 if __name__ == "__main__":

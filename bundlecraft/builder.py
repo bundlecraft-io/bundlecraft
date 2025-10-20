@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """
 builder.py
-Central build engine that produces ready-to-distribute trust bundles.
+Orchestrates the three core BundleCraft stages: fetch → convert → verify
 
-Enhancements:
-- PEM files now include # Subject comments above each cert block (configurable)
-- Build fails by default if any expired cert is found (configurable)
-- Expiration warnings for certs expiring within 30 days
-- Uses timezone-aware datetime (UTC safe)
+Architecture:
+  1) FETCH: Stage certificate sources (local includes + remote fetches) per bundle config
+  2) CONVERT: Aggregate staged sources into canonical PEM, then convert to requested formats
+  3) VERIFY: Validate certificates and produce compliance reports
+
+Changes from legacy builder:
+  - Removed --prefetch flag (fetch is now always executed)
+    - Staging directory: sources/staged/<craft>/<bundle>/ (cleaner separation from sources/)
+    - Build output: dist/<craft>/<target>/ (craft display name and target name)
+  - Clearer orchestration: each stage is self-contained with explicit inputs/outputs
 """
 
 from __future__ import annotations
@@ -15,41 +20,95 @@ from __future__ import annotations
 import datetime as dt
 import json
 import sys
-import tarfile
 from pathlib import Path
 
 import click
 
-from bundlecraft.fetch import run_fetch
 from bundlecraft.helpers.convert_utils import convert_to_formats
-from bundlecraft.helpers.utils import ensure_dir, list_files, load_yaml, sha256_file
-from bundlecraft.helpers.verify_utils import verifier
-
-# ---------------------------------------------------------------------
-# Path setup
-# ---------------------------------------------------------------------
-CURRENT_DIR = Path(__file__).resolve().parent
-HELPERS_DIR = CURRENT_DIR / "helpers"
-sys.path.insert(0, str(HELPERS_DIR))
-
-# ---------------------------------------------------------------------
-# Helper imports
-# ---------------------------------------------------------------------
+from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
 # ---------------------------------------------------------------------
 # Path constants
 # ---------------------------------------------------------------------
+CURRENT_DIR = Path(__file__).resolve().parent
 ROOT = CURRENT_DIR.parent
 CONFIG_DIR = ROOT / "config"
 SOURCES_DIR = ROOT / "sources"
-BUILD_DIR = ROOT / "dist"
-
-# -------------------------------
-# Helper functions
-# -------------------------------
+STAGED_DIR = SOURCES_DIR / "staged"
+DIST_DIR = ROOT / "dist"
 
 
-def read_pem_chunks(paths):
+# ---------------------------------------------------------------------
+# Stage 1: FETCH
+# ---------------------------------------------------------------------
+
+
+def _clean_dir(path: Path) -> None:
+    """Recursively remove all files and subdirectories."""
+    if path.exists():
+        for p in sorted(path.rglob("*"), reverse=True):
+            try:
+                if p.is_file() or p.is_symlink():
+                    p.unlink(missing_ok=True)
+                elif p.is_dir():
+                    p.rmdir()
+            except Exception:
+                pass
+
+
+def _stage_bundle_sources(
+    bundle_name: str, env: str, workspace_root: Path, verbose: bool = False
+) -> Path:
+    """Stage a bundle's sources (includes + fetch) into sources/staged/<env>/<bundle>/.
+
+    This mirrors the fetch CLI behavior but writes to a staging area for build.
+    Returns the staging directory path.
+    """
+    from bundlecraft.fetch import (
+        _fetch_each_to_named_dirs,
+        _stage_local_includes,
+        load_yaml,
+    )
+
+    bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle_name}.yaml"
+    bundle_cfg = load_yaml(bundle_cfg_path, required=True)
+
+    staging_root = STAGED_DIR / env / bundle_name
+    ensure_dir(staging_root)
+
+    # Clean staging dir
+    if verbose:
+        click.echo(f"[Fetch] Cleaning staging: {staging_root}", err=True)
+    _clean_dir(staging_root)
+    ensure_dir(staging_root)
+
+    # Stage local includes
+    if verbose:
+        click.echo(f"[Fetch] Staging local includes for bundle: {bundle_name}", err=True)
+    _stage_local_includes(bundle_cfg, staging_root, workspace_root, verbose)
+
+    # Stage remote fetches
+    fetch_cfg = bundle_cfg.get("fetch") or []
+    if fetch_cfg:
+        if verbose:
+            click.echo(
+                f"[Fetch] Fetching {len(fetch_cfg)} remote source(s) for bundle: {bundle_name}",
+                err=True,
+            )
+        _fetch_each_to_named_dirs(
+            fetch_cfg, staging_root, workspace_root, verbose, name_filter=None
+        )
+
+    return staging_root
+
+
+# ---------------------------------------------------------------------
+# Stage 2: CONVERT (aggregate + format conversion)
+# ---------------------------------------------------------------------
+
+
+def _read_pem_chunks(paths: list[Path]) -> list[str]:
+    """Extract PEM certificate blocks from a list of file paths."""
     start, end = "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"
     blocks = []
     for p in paths:
@@ -68,8 +127,8 @@ def read_pem_chunks(paths):
     return blocks
 
 
-def dedupe_ordered(pem_blocks):
-    """Deduplicate PEM blocks by SHA256 fingerprint."""
+def _dedupe_pem_blocks(pem_blocks: list[str]) -> list[str]:
+    """Deduplicate PEM blocks by SHA256 fingerprint, preserving order."""
     import base64
     import hashlib
     import re
@@ -91,8 +150,10 @@ def dedupe_ordered(pem_blocks):
     return out
 
 
-def write_canonical_pem(dst: Path, pem_blocks, include_subject_comments: bool):
-    """Write PEM with optional '# Subject:' lines."""
+def _write_canonical_pem(
+    dst: Path, pem_blocks: list[str], include_subject_comments: bool, *, force: bool = False
+) -> None:
+    """Write canonical PEM with optional subject comments."""
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
 
@@ -110,211 +171,38 @@ def write_canonical_pem(dst: Path, pem_blocks, include_subject_comments: bool):
     dst.write_text("".join(lines), encoding="utf-8")
 
 
-def build_checksums(build_path: Path) -> Path:
-    lines = []
-    for f in sorted(build_path.glob("*")):
-        if f.is_file():
-            lines.append(f"{sha256_file(f)}  {f.name}")
-    out = build_path / "checksums.sha256"
-    out.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
-    return out
+def _aggregate_staged_sources(staging_dirs: list[Path], verbose: bool = False) -> list[Path]:
+    """Aggregate all PEM files from staging directories.
+
+    Walks each staging dir and collects all .pem files.
+    Returns list of paths to aggregate.
+    """
+    pem_files = []
+    for staging_dir in staging_dirs:
+        if not staging_dir.exists():
+            if verbose:
+                click.echo(f"[Convert] Staging dir not found (skipping): {staging_dir}", err=True)
+            continue
+        for pem_path in sorted(staging_dir.rglob("*.pem")):
+            if pem_path.is_file():
+                pem_files.append(pem_path)
+                if verbose:
+                    click.echo(f"[Convert] Including: {pem_path.relative_to(ROOT)}", err=True)
+    return pem_files
 
 
-def package_tar(build_path: Path) -> Path:
-    out = build_path / "package.tar.gz"
-    with tarfile.open(out, "w:gz") as tar:
-        for f in sorted(build_path.glob("*")):
-            if f.is_file() and f.name != out.name:
-                tar.add(f, arcname=f.name)
-    return out
+# ---------------------------------------------------------------------
+# Stage 3: VERIFY
+# ---------------------------------------------------------------------
 
 
-# -------------------------------
-# Core Build Function
-# -------------------------------
+def _verify_certificates(
+    pem_blocks: list[str], fail_on_expired: bool, warn_days: int
+) -> tuple[list[str], list[str]]:
+    """Verify certificates for expiration and validity.
 
-
-@click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.option(
-    "--env",
-    "--craft",
-    "env",
-    required=True,
-    help="Craft name (e.g., dev, prod, dmz)",
-)
-@click.option("--bundle", required=True, help="Bundle name (e.g., internal, external)")
-@click.option("--package", is_flag=True, help="Also create a .tar.gz of the build folder")
-@click.option("--verify-only", is_flag=True, help="Only verify certificates; skip build")
-@click.option(
-    "--prefetch/--no-prefetch",
-    default=False,
-    help="Run 'fetch' first to stage remote sources for this env/bundle (default: no-prefetch)",
-)
-@click.option(
-    "--offline",
-    is_flag=True,
-    default=False,
-    help="Offline mode: do not contact network; fail if fetch is required",
-)
-@click.option(
-    "--output-root",
-    type=str,
-    default="dist",
-    help="Root directory for build outputs (default: ./dist)",
-)
-def main(env, bundle, package, verify_only, prefetch, offline, output_root):
-    """Build or verify trust bundles based on configuration."""
-    click.secho(
-        "\n🔐 BundleCraft CA Trust Store Builder\n--------------------------------------",
-        fg="cyan",
-    )
-
-    # defaults is currently unused, to be refactored when the config structure is revalidated
-    # defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False) or {}
-    # Prefer crafts configs, fall back to legacy envs for backward compatibility
-    craft_path = CONFIG_DIR / "crafts" / f"{env}.yaml"
-    legacy_env_path = CONFIG_DIR / "envs" / f"{env}.yaml"
-    cfg_path = craft_path if craft_path.exists() else legacy_env_path
-    env_cfg = load_yaml(cfg_path, required=True)
-
-    # Environment-driven composition support: env can define targets mapping
-    # a target bundle name to one or more base bundle configs to include/merge.
-    # Schema examples:
-    #   targets:
-    #     internal-dev:
-    #       includes: [internal, mozilla]
-    #     mozilla:
-    #       includes: [mozilla]
-    # Back-compat: some envs may define bundle_targets as a list (no composition).
-    targets = env_cfg.get("targets") or {}
-    comp_includes = None
-    if isinstance(targets, dict) and bundle in targets:
-        entry = targets[bundle] or {}
-        comp_includes = entry.get("includes") or entry.get("compose") or []
-
-    # Load bundle config; if this bundle is only an env-level composition target,
-    # allow the bundle file to be missing and use an empty dict.
-    bundle_cfg = None
-    bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle}.yaml"
-    if bundle_cfg_path.exists():
-        bundle_cfg = load_yaml(bundle_cfg_path, required=True)
-    elif comp_includes:
-        bundle_cfg = {}  # Use empty config for composed targets
-    else:
-        click.secho(f"[ERROR] Bundle config not found: {bundle_cfg_path}", fg="red")
-        sys.exit(2)
-
-    # Optional prefetch step (no persistent cache; stages into sources/fetched/<env>/<bundle>)
-    if offline and prefetch:
-        click.secho("[ERROR] --offline and --prefetch cannot be used together.", fg="red")
-        sys.exit(2)
-
-    if prefetch:
-        try:
-            # If composed, prefetch each included base bundle; otherwise prefetch this bundle
-            base_bundles = comp_includes if comp_includes else [bundle]
-            total_staged = 0
-            for bname in base_bundles:
-                staged = run_fetch(env, bname, ROOT, no_clean=False)
-                total_staged += len(staged)
-            if total_staged:
-                click.secho(f"[INFO] Prefetch staged {total_staged} file(s).", fg="blue")
-            else:
-                click.secho("[INFO] No fetch entries; skipping prefetch.", fg="blue")
-        except Exception as e:
-            click.secho(f"[ERROR] Prefetch failed: {e}", fg="red")
-            sys.exit(2)
-
-    # Prefer env-level verify config, fall back to bundle-level
-    verify_cfg = env_cfg.get("verify") or bundle_cfg.get("verify", True)
-    fail_on_expired = (
-        verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
-    )
-    warn_days = (
-        verify_cfg.get("warn_days_before_expiry", 30) if isinstance(verify_cfg, dict) else 30
-    )
-
-    # Prefer env-level pem config, fall back to bundle-level
-    pem_cfg = env_cfg.get("pem") or bundle_cfg.get("pem", {})
-    include_subject_comments = pem_cfg.get("include_subject_comments", True)
-
-    # Prefer env-level output_formats, fall back to bundle-level, then default to ["pem"]
-    output_formats = env_cfg.get("output_formats") or bundle_cfg.get("output_formats", ["pem"])
-    do_package = bool(package or bundle_cfg.get("package", False))
-
-    BUILD_DIR = Path(output_root)
-    build_root = BUILD_DIR / env / bundle
-    ensure_dir(build_root)
-
-    # Build include/exclude lists, possibly across composed base bundles
-    include_items = []
-    exclude_items = set()
-
-    def _rel(p: Path) -> str:
-        return str(p.relative_to(ROOT)).replace("\\", "/")
-
-    base_bundles = comp_includes if comp_includes else [bundle]
-    base_bundle_cfgs = {}
-    for bname in base_bundles:
-        # Include staged fetched sources for each base bundle if present
-        b_staged_dir = SOURCES_DIR / "fetched" / env / bname
-        if b_staged_dir.exists():
-            include_items.append(_rel(b_staged_dir))
-        # Load base bundle config for source includes/excludes
-        b_cfg = load_yaml(CONFIG_DIR / "bundles" / f"{bname}.yaml", required=True)
-        base_bundle_cfgs[bname] = b_cfg
-        include_items.extend(b_cfg.get("include", []) or [])
-        for ex in b_cfg.get("exclude", []) or []:
-            exclude_items.add(ex)
-
-    # Also allow the target bundle file to contribute extra include/exclude if it exists
-    if bundle_cfg:
-        include_items.extend(bundle_cfg.get("include", []) or [])
-        for ex in bundle_cfg.get("exclude", []) or []:
-            exclude_items.add(ex)
-    include_paths = []
-    for item in include_items:
-        p = (ROOT / item).resolve()
-        if p.is_dir():
-            include_paths.extend(list_files(p, suffixes=(".pem",)))
-        elif p.is_file():
-            include_paths.append(p)
-        else:
-            click.secho(f"[WARN] Include path not found: {item}", fg="yellow")
-    include_paths = [
-        p for p in include_paths if str(p.relative_to(ROOT)).replace("\\", "/") not in exclude_items
-    ]
-
-    if not include_paths:
-        click.secho("[ERROR] No certificate sources found.", fg="red", err=True)
-        sys.exit(2)
-
-    pem_blocks = dedupe_ordered(read_pem_chunks(include_paths))
-    if not pem_blocks:
-        click.secho("[ERROR] No valid PEM certificates parsed.", fg="red", err=True)
-        sys.exit(3)
-
-    # -----------------------
-    # Verify-only mode
-    # -----------------------
-    if verify_only:
-        pem_path = build_root / "bundlecraft-ca-trust.pem"
-        if pem_path.exists():
-            click.secho(f"[INFO] Verifying existing PEM bundle: {pem_path}", fg="blue")
-            code = verifier(pem_path, warn_days, fail_on_expired)
-        else:
-            click.secho("[INFO] No built bundle found; verifying sources directly.", fg="blue")
-            import tempfile
-
-            tmp_pem = Path(tempfile.gettempdir()) / "verify-temp.pem"
-            tmp_pem.write_text("".join(pem_blocks), encoding="utf-8")
-            code = verifier(tmp_pem, warn_days, fail_on_expired)
-            tmp_pem.unlink(missing_ok=True)
-        sys.exit(code)
-
-    # -----------------------
-    # Verification integrated (build-time)
-    # -----------------------
+    Returns (errors, warnings) lists.
+    """
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
 
@@ -336,139 +224,328 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         except Exception as e:
             errs.append(f"Parse error (block {i}): {e}")
 
-    for e in errs:
-        click.secho(f"[ERROR] {e}", fg="red")
-    for w in warns:
-        click.secho(f"[WARN] {w}", fg="yellow")
+    return errs, warns
 
-    if errs:
-        click.secho(f"[SUMMARY] {len(errs)} expired or invalid certificates detected.", fg="red")
-        if fail_on_expired:
-            click.secho("[ERROR] Build aborted due to expired certificates.", fg="red")
-            sys.exit(5)
-    if warns:
+
+# ---------------------------------------------------------------------
+# Main orchestration
+# ---------------------------------------------------------------------
+
+
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.option(
+    "--craft",
+    "--env",
+    "env",
+    required=True,
+    help="Craft name (e.g., dev, prod). Alias: --env (legacy)",
+)
+@click.option(
+    "--bundle",
+    required=False,
+    help=(
+        "Target name to build (from craft 'targets'). If omitted, builds all targets in the craft. "
+        "For legacy behavior, provide a bundle name not present in targets to build that bundle directly."
+    ),
+)
+@click.option(
+    "--verify-only",
+    is_flag=True,
+    help="Skip build; only verify existing output or staged sources",
+)
+@click.option(
+    "--skip-fetch",
+    is_flag=True,
+    help="Skip fetch stage; use existing staged sources (for iteration)",
+)
+@click.option(
+    "--skip-verify",
+    is_flag=True,
+    help="Skip verification stage (not recommended for production)",
+)
+@click.option(
+    "--output-root",
+    type=str,
+    default="dist",
+    help="Root directory for build outputs (default: ./dist). Outputs are written under dist/<craft-name>/<target-name>.",
+)
+@click.option(
+    "--verbose",
+    is_flag=True,
+    help="Enable verbose output for all stages",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite existing output files (passes through to conversion stage)",
+)
+def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose, force):
+    """Build trust bundles by orchestrating: fetch → convert → verify.
+
+    This command coordinates the three core BundleCraft stages:
+      1. FETCH: Stage certificate sources from bundle configs
+      2. CONVERT: Aggregate and convert to requested output formats
+      3. VERIFY: Validate certificates and produce reports
+
+    The build always fetches unless --skip-fetch is used (for fast iteration).
+    """
+    click.secho("\n🔐 BundleCraft Builder\n---------------------", fg="cyan")
+
+    # Load craft config
+    craft_path = CONFIG_DIR / "crafts" / f"{env}.yaml"
+    legacy_env_path = CONFIG_DIR / "envs" / f"{env}.yaml"
+    cfg_path = craft_path if craft_path.exists() else legacy_env_path
+
+    if not cfg_path.exists():
+        click.secho(f"[ERROR] Craft config not found: {env}", fg="red", err=True)
+        sys.exit(2)
+
+    env_cfg = load_yaml(cfg_path, required=True)
+
+    # Normalize targets from craft config
+    raw_targets = env_cfg.get("targets") or {}
+    targets_map: dict[str, dict] = {}
+    if isinstance(raw_targets, list):
+        # Support list form: [{ target_name: str, include_bundles|includes|compose: [...] }]
+        for item in raw_targets:
+            if not isinstance(item, dict):
+                continue
+            tname = item.get("target_name") or item.get("name")
+            if not tname:
+                continue
+            includes = (
+                item.get("include_bundles") or item.get("includes") or item.get("compose") or []
+            )
+            targets_map[tname] = {"include_bundles": includes}
+    elif isinstance(raw_targets, dict):
+        for tname, entry in raw_targets.items():
+            entry = entry or {}
+            includes = (
+                entry.get("include_bundles") or entry.get("includes") or entry.get("compose") or []
+            )
+            targets_map[tname] = {"include_bundles": includes}
+
+    # Determine which target(s) to build
+    targets_to_build: list[tuple[str, list[str]]] = []  # (target_name, include_bundles)
+    if bundle:
+        if bundle in targets_map:
+            targets_to_build.append((bundle, list(targets_map[bundle]["include_bundles"])))
+        else:
+            # Legacy direct-bundle build as a single-target with same name
+            targets_to_build.append((bundle, [bundle]))
+    else:
+        if targets_map:
+            for tname, entry in targets_map.items():
+                targets_to_build.append((tname, list(entry["include_bundles"])))
+        else:
+            click.secho(
+                "[ERROR] No targets found in craft config and no --bundle provided.",
+                fg="red",
+                err=True,
+            )
+            sys.exit(2)
+
+    # =========================================================================
+    # STAGE 1: FETCH
+    # =========================================================================
+    staging_map: dict[str, list[Path]] = {}
+    if not skip_fetch:
         click.secho(
-            f"[SUMMARY] {len(warns)} certificates expiring within {warn_days} days.",
-            fg="yellow",
+            f"\n[STAGE 1/3] FETCH - Staging sources for {len(targets_to_build)} target(s)",
+            fg="blue",
+            bold=True,
         )
-    if not errs and not warns:
-        click.secho("[INFO] All certificates are valid and healthy.", fg="green")
+        for target_name, include_bundles in targets_to_build:
+            per_target: list[Path] = []
+            for bname in include_bundles:
+                try:
+                    staging_dir = _stage_bundle_sources(bname, env, ROOT, verbose=verbose)
+                    per_target.append(staging_dir)
+                    click.secho(
+                        f"  [{target_name}] ✓ Staged bundle: {bname} → {staging_dir.relative_to(ROOT)}",
+                        fg="green",
+                    )
+                except Exception as e:
+                    click.secho(
+                        f"  [{target_name}] ✗ Failed to stage bundle {bname}: {e}",
+                        fg="red",
+                        err=True,
+                    )
+                    if verbose:
+                        import traceback
 
-    # -----------------------
-    # Write canonical PEM
-    # -----------------------
-    pem_out = build_root / "bundlecraft-ca-trust.pem"
-    write_canonical_pem(pem_out, pem_blocks, include_subject_comments)
-    click.secho(f"[INFO] Wrote canonical PEM: {pem_out}", fg="green")
+                        traceback.print_exc()
+                    sys.exit(2)
+            staging_map[target_name] = per_target
+    else:
+        click.secho("\n[STAGE 1/3] FETCH - Skipped (using existing staged sources)", fg="yellow")
+        for target_name, include_bundles in targets_to_build:
+            per_target = []
+            for bname in include_bundles:
+                per_target.append(STAGED_DIR / env / bname)
+            staging_map[target_name] = per_target
 
-    # -----------------------
-    # Convert formats
-    # -----------------------
-    extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
+    # =========================================================================
+    # STAGE 2: CONVERT
+    # =========================================================================
+    click.secho("\n[STAGE 2/3] CONVERT - Aggregating and converting formats", fg="blue", bold=True)
+    craft_name_for_path = env_cfg.get("name") or env
+    safe_craft = str(craft_name_for_path).replace("/", "-").replace(" ", "-")
+
+    # Settings from craft
+    pem_cfg = env_cfg.get("pem") or {}
+    include_subject_comments = pem_cfg.get("include_subject_comments", True)
+    output_formats = env_cfg.get("output_formats") or ["pem"]
     fmt_overrides = env_cfg.get("format_overrides") or {}
-    convert_to_formats(pem_out, build_root, extra_formats, fmt_overrides)
 
-    # --- OPTIONAL PACKAGING (must happen before manifest) ---
-    if package:
-        import tarfile
+    per_target_results: dict[str, dict] = {}
+    for target_name, dirs_list in staging_map.items():
+        pem_files = _aggregate_staged_sources(dirs_list, verbose=verbose)
+        if not pem_files:
+            click.secho(
+                f"  [ERROR] [{target_name}] No certificate sources found in staging.",
+                fg="red",
+                err=True,
+            )
+            sys.exit(2)
+        click.secho(f"  [{target_name}] Found {len(pem_files)} source file(s)", fg="green")
 
-        archive_path = build_root / "package.tar.gz"
-        with tarfile.open(archive_path, "w:gz") as tar:
-            tar.add(build_root, arcname=".")
-        click.secho(f"[INFO] Packaged archive: {archive_path}", fg="green")
+        pem_blocks = _read_pem_chunks(pem_files)
+        pem_blocks = _dedupe_pem_blocks(pem_blocks)
+        if not pem_blocks:
+            click.secho(
+                f"  [ERROR] [{target_name}] No valid PEM certificates parsed.", fg="red", err=True
+            )
+            sys.exit(3)
+        click.secho(
+            f"  [{target_name}] Deduplicated to {len(pem_blocks)} unique certificate(s)", fg="green"
+        )
 
-    # -----------------------
-    # Final deterministic manifest + checksums
-    # -----------------------
-    from datetime import datetime
+        build_root = (Path(output_root) / safe_craft / target_name).resolve()
+        ensure_dir(build_root)
 
-    expiry_summary = {
-        "total": len(pem_blocks),
-        "expired": len(errs),
-        "expiring_soon": len(warns),
-        "valid": len(pem_blocks) - len(errs) - len(warns),
-        "warn_days_before_expiry": warn_days,
-    }
+        pem_out = build_root / "bundlecraft-ca-trust.pem"
+        _write_canonical_pem(pem_out, pem_blocks, include_subject_comments, force=force)
+        click.secho(
+            f"  [{target_name}] ✓ Wrote canonical PEM: {pem_out.relative_to(ROOT)}", fg="green"
+        )
 
-    manifest_path = build_root / "manifest.json"
-    checksum_path = build_root / "checksums.sha256"
+        extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
+        if extra_formats:
+            fmt_overrides_combined = dict(fmt_overrides)
+            if force:
+                fmt_overrides_combined["force"] = True
+            convert_to_formats(
+                pem_out, build_root, extra_formats, fmt_overrides_combined, "bundlecraft-ca-trust"
+            )
+            click.secho(
+                f"  [{target_name}] ✓ Converted to formats: {', '.join(extra_formats)}", fg="green"
+            )
 
-    # Collect all files that currently exist in the build dir
-    all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+        per_target_results[target_name] = {
+            "build_root": build_root,
+            "pem_blocks": pem_blocks,
+            "output_formats": output_formats,
+        }
 
-    # Files recorded inside manifest["files"]:
-    #   - include everything EXCEPT manifest.json
-    files_for_manifest = [n for n in all_files if n != "manifest.json"]
+    # =========================================================================
+    # STAGE 3: VERIFY
+    # =========================================================================
+    if not skip_verify:
+        click.secho("\n[STAGE 3/3] VERIFY - Validating certificates", fg="blue", bold=True)
+        verify_cfg = env_cfg.get("verify") or {}
+        fail_on_expired = (
+            verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
+        )
+        warn_days = (
+            verify_cfg.get("warn_days_before_expiry", 30) if isinstance(verify_cfg, dict) else 30
+        )
+        for target_name, result in per_target_results.items():
+            pem_blocks = result["pem_blocks"]
+            errs, warns = _verify_certificates(pem_blocks, fail_on_expired, warn_days)
+            for e in errs:
+                click.secho(f"  [{target_name}] [ERROR] {e}", fg="red")
+            for w in warns:
+                click.secho(f"  [{target_name}] [WARN] {w}", fg="yellow")
+            if errs:
+                click.secho(
+                    f"  [{target_name}] [SUMMARY] {len(errs)} expired/invalid certificate(s)",
+                    fg="red",
+                )
+                if fail_on_expired:
+                    click.secho("  Build FAILED due to expired certificates", fg="red", err=True)
+                    sys.exit(5)
+            if warns:
+                click.secho(
+                    f"  [{target_name}] [SUMMARY] {len(warns)} certificate(s) expiring within {warn_days} days",
+                    fg="yellow",
+                )
+            if not errs and not warns:
+                click.secho(
+                    f"  [{target_name}] ✓ All certificates are valid and healthy", fg="green"
+                )
+    else:
+        click.secho("\n[STAGE 3/3] VERIFY - Skipped", fg="yellow")
 
-    # Build manifest["files"] entries (manifest.json excluded)
-    file_entries = [{"path": n, "sha256": sha256_file(build_root / n)} for n in files_for_manifest]
+    # =========================================================================
+    # FINALIZE: Manifest and checksums
+    # =========================================================================
+    click.secho("\nFinalizing build artifacts...", fg="blue")
 
-    # Load fetch provenance if present
-    fetch_provenance = None
-    # Embed fetch provenance for each base bundle (if any)
-    fetched_prov_map = {}
-    for bname in base_bundles:
-        b_staged_dir = SOURCES_DIR / "fetched" / env / bname
-        prov_path = b_staged_dir / "provenance.fetch.json"
-        if prov_path.exists():
-            try:
-                fetched_prov_map[bname] = json.loads(prov_path.read_text(encoding="utf-8"))
-            except Exception:
-                fetched_prov_map[bname] = {"error": "unreadable"}
-    fetch_provenance = {"bundles": fetched_prov_map} if fetched_prov_map else None
+    # Build manifest and checksums per target
+    for target_name, result in per_target_results.items():
+        build_root = result["build_root"]
+        pem_blocks = result["pem_blocks"]
+        output_formats = result["output_formats"]
+        manifest_obj = {
+            "craft": env_cfg.get("name") or env,
+            "environment": env,  # retained for compatibility
+            "target": target_name,
+            "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "certificate_count": len(pem_blocks),
+            "output_formats": output_formats,
+        }
+        # Add verification summary if not skipped (same policy for all targets)
+        if not skip_verify:
+            manifest_obj["verification"] = {
+                "fail_on_expired": (
+                    verify_cfg.get("fail_on_expired", True)
+                    if isinstance(verify_cfg, dict)
+                    else True
+                ),
+                "warn_days": (
+                    verify_cfg.get("warn_days_before_expiry", 30)
+                    if isinstance(verify_cfg, dict)
+                    else 30
+                ),
+            }
+        output_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+        manifest_obj["files"] = [
+            {"path": fname, "sha256": sha256_file(build_root / fname)}
+            for fname in output_files
+            if fname != "manifest.json"
+        ]
+        manifest_path = build_root / "manifest.json"
+        manifest_path.write_text(
+            json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        click.secho(
+            f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}", fg="green"
+        )
 
-    manifest_obj = {
-        "bundle": bundle,
-        "environment": env,
-        "timestamp_utc": datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "sources": [str(p.relative_to(ROOT)).replace("\\", "/") for p in include_paths],
-        "outputs": files_for_manifest,  # includes package.tar.gz if present
-        "verify": {"fail_on_expired": fail_on_expired},
-        "expiry_summary": expiry_summary,
-        "fetched": fetch_provenance,
-        "files": file_entries,
-    }
+        all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+        checksum_lines = [f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files]
+        checksum_path = build_root / "checksums.sha256"
+        checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+        click.secho(
+            f"  [{target_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}", fg="green"
+        )
 
-    # Write manifest exactly once (deterministic order)
-    manifest_json = json.dumps(manifest_obj, indent=2, sort_keys=True)
-    manifest_path.write_text(manifest_json + "\n", encoding="utf-8")
-    click.secho(f"[INFO] Wrote manifest: {manifest_path}", fg="green")
-
-    # checksums.sha256 includes EVERY file, INCLUDING manifest.json
-    checksum_lines = [f"{sha256_file(build_root / n)}  {n}" for n in all_files]
-    checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
-    click.secho(f"[INFO] Wrote checksums: {checksum_path}", fg="green")
-
-    click.secho("[SUCCESS] Build completed successfully.", fg="green")
-
-    # Compute fresh checksums including manifest.json itself
-    all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
-    checksum_lines = [f"{sha256_file(build_root / f)}  {f}" for f in all_files]
-    checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
-    click.secho(f"[INFO] Wrote checksums: {checksum_path}", fg="green")
-
-    # -----------------------
-    # Embed hash data into manifest (for verifier)
-    # -----------------------
-    file_entries = []
-    for f in sorted(build_root.glob("*")):
-        if f.is_file():
-            file_entries.append({"path": f.name, "sha256": sha256_file(f)})
-
-    # Reload manifest JSON, inject "files" array
-    mdata = json.loads(manifest_path.read_text(encoding="utf-8"))
-    mdata["files"] = file_entries
-    manifest_path.write_text(json.dumps(mdata, indent=2), encoding="utf-8")
-    click.secho("[INFO] Updated manifest with file hashes.", fg="green")
-
-    # -----------------------
-    # Package (optional)
-    # -----------------------
-    if do_package:
-        pkg = package_tar(build_root)
-        click.secho(f"[INFO] Wrote package archive: {pkg}", fg="green")
-
-    click.secho("\n✅ Build complete.", fg="bright_green")
+    click.secho(
+        "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
+        fg="bright_green",
+        bold=True,
+    )
 
 
 if __name__ == "__main__":

@@ -117,9 +117,9 @@ metadata:
 
 ---
 
-## 2) Craft Configuration: `config/crafts/<env>.yaml`
+## 2) Craft Configuration: `config/crafts/<craft>.yaml`
 
-Defines build behavior and deployment configuration for an environment.
+Defines build behavior and deployment configuration for a craft.
 
 ### Bundle Composition
 
@@ -140,7 +140,7 @@ output_formats:  # Which formats to produce
   - jks   # Java KeyStore
   - p12   # PKCS#12
 
-build_path: dist/prod/  # Override default (dist/<env>/<bundle>/)
+# Outputs are written by default to: dist/<craft-name>/<target-name>/
 package: true  # Create .tar.gz of outputs
 ```
 
@@ -166,9 +166,15 @@ pem:
 format_overrides:
   jks:
     storepass_env: TRUST_JKS_PASSWORD  # Read from environment
-    alias_format: '{subject.CN}-{serial}'
+    # Alias naming for each imported certificate
+    # Placeholders: {subject.CN}, {serial}, {fingerprint}, {fingerprint_sha1}, {fingerprint_sha256}
+    # Defaults to: '{subject.CN}-{fingerprint}'
+    alias_format: '{subject.CN}-{fingerprint}'
   pkcs12:
     password_env: TRUST_P12_PASSWORD
+    # Optional: control the friendly name (-name) inside the P12
+    # Follows the same alias_format placeholders and default
+    # alias_format: '{subject.CN}-{fingerprint}'
 ```
 
 ### Distribution Metadata (for CI/CD pipeline use only)
@@ -183,7 +189,7 @@ distribution_metadata:
       enabled: true
       assets:
         - bundlecraft-trust.tar.gz
-        - bundlecraft-trust-env-*.tar.gz
+        - bundlecraft-trust-*.tar.gz
     - type: artifactory
       enabled: false
       repository: libs-release-local
@@ -203,8 +209,9 @@ distribution_metadata:
 ```yaml
 ---
 name: Production
-description: Production environment with full certificate suite
+description: Production craft with full certificate suite
 
+targets:
   internal-prod:
     includes: [internal, mozilla]
   mozilla-only:
@@ -241,7 +248,7 @@ distribution_metadata:
       description: Publish to GitHub Releases (handled by pipeline)
       assets:
         - bundlecraft-trust.tar.gz
-        - bundlecraft-trust-env-*.tar.gz
+        - bundlecraft-trust-*.tar.gz
     - type: artifactory
       enabled: false
       description: Example: JFrog Artifactory (not used currently)
@@ -302,15 +309,15 @@ metadata:
 
 ## Configuration Precedence
 
-**For build settings:** `built-in defaults` → `config/defaults.yaml` → `config/crafts/<env>.yaml`
+**For build settings:** `built-in defaults` → `config/defaults.yaml` → `config/crafts/<craft>.yaml`
 
-**For sources:** Only `config/bundles/<bundle>.yaml` is consulted (no merging with env)
+**For sources:** Only `config/bundles/<bundle>.yaml` is consulted (no merging with craft)
 
 **For composed targets:**
 
-- Environment defines `targets.<name>.includes: [bundle1, bundle2]`
+- Craft defines `targets.<name>.includes: [bundle1, bundle2]`
 - Builder loads each bundle config and merges their `include` + `exclude` lists
-- Environment config controls ALL build behavior (formats, verification, etc.)
+- Craft config controls ALL build behavior (formats, verification, etc.)
 
 ---
 
@@ -319,29 +326,36 @@ metadata:
 ### Build
 
 ```bash
-bundlecraft build --env prod --bundle internal-prod --prefetch
+bundlecraft build --craft prod --bundle internal-prod
 ```
 
 - Loads `config/crafts/prod.yaml` for build settings
 - Composes sources from `internal` and `mozilla` bundle configs
-- Outputs to `dist/prod/internal-prod/` (or custom `build_path`)
+- Outputs to `dist/Production/internal-prod/`
+
+To overwrite existing artifacts:
+
+```bash
+bundlecraft build --craft prod --bundle internal-prod --force
+```
 
 ### Fetch
 
 ```bash
-bundlecraft fetch --env prod --bundle mozilla
+bundlecraft fetch --bundle-config-file config/bundles/mozilla.yaml --workspace-root .
 ```
 
-- Loads `config/bundles/mozilla.yaml` for fetch definitions
-- Stages to `sources/fetched/prod/mozilla/`
+- Loads `config/bundles/mozilla.yaml` and stages into `sources/staged/<craft>/<bundle>/`
+  - Stages into `sources/staged/<craft>/<target>/` during build
+- Note: `bundlecraft build` performs fetch automatically unless `--skip-fetch` is used
 
-### Offline Build
+### Using Existing Staged Sources
 
 ```bash
-bundlecraft build --env prod --bundle internal-prod --offline
+bundlecraft build --craft prod --bundle internal-prod --skip-fetch
 ```
 
-- Fails if any bundle requires fetch and sources aren't pre-staged
+- Uses existing staged sources at `sources/staged/prod/*` and does not perform network fetches
 
 ---
 
@@ -380,8 +394,8 @@ Supported values for `distribution_metadata.targets[].type`:
 ## Reserved Fields
 
 - `bundle_cfg.package`: reserved (may be used for bundle-level compression hints)
-- `env_cfg.publish_targets`: deprecated, use `distribution.targets` instead
-- `env_cfg.build_path`: supported but optional (CLI `--output-root` takes precedence)
+- `craft_cfg.publish_targets`: deprecated, use `distribution.targets` instead
+- `craft_cfg.build_path`: deprecated; prefer CLI `--output-root`
 
 ---
 

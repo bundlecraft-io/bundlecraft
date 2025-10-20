@@ -77,8 +77,8 @@ jobs:
           echo "Targets count: ${TARGETS_COUNT}"
           echo '::endgroup::'
           if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-            {
-              echo '## Build selection'
+                  bundlecraft-trust-*-bundle-*.tar.gz
+                  bundlecraft-trust-*-bundle-*.sha256
               echo
               echo "- Selected environments: ${SELECTED_SORTED:-'(all)'}"
               echo -n "- Available environments: "

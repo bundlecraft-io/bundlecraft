@@ -4,6 +4,7 @@
 
 # Staged fetch directory (ephemeral)
 sources/fetched/
+sources/staged/
 
 # Personal/local test folders
 personal*/

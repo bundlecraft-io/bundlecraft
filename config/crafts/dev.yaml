@@ -54,7 +54,8 @@ distribution_metadata:
     - type: github-release
       enabled: true  # Only used for testing in CI/CD
       description: Publish to GitHub Releases (handled by pipeline)
-      assets: [bundlecraft-trust.tar.gz, bundlecraft-trust-env-*.tar.gz]
+  assets: [bundlecraft-trust.tar.gz, bundlecraft-trust-*.tar.gz]
+  repositories:
     - type: artifactory
       enabled: false
       description: 'Example: JFrog Artifactory (not used currently)'

@@ -24,31 +24,41 @@ class TestFetch:
     def test_fetch_help(self, cli_runner):
         result = cli_runner.invoke(fetch_main, ["--help"])
         assert result.exit_code == 0
-        assert "Craft name" in result.output
+        assert "--bundle-config-file" in result.output
 
-    def test_fetch_no_section(self, cli_runner, temp_workspace, sample_bundle_config):
-        # Use the provided sample configs: test-env.yaml + test-bundle.yaml
-        # The sample bundle has no 'fetch:' key, so it should no-op successfully.
+    def test_fetch_no_section(self, cli_runner, temp_workspace, test_data_dir):
+        # Create a bundle config with includes only (no fetch section)
+        bundle_dir = temp_workspace / "config" / "bundles"
+        bundle_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure sample exists at sources/sample.pem (conftest copies certs there)
+        bundle_yaml = """
+        include:
+          - sources/sample.pem
+        exclude: []
+        """
+        cfg_path = bundle_dir / "test-bundle.yaml"
+        cfg_path.write_text(bundle_yaml, encoding="utf-8")
+
+        staging = temp_workspace / "staging"
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--env",
-                "test-env",
-                "--bundle",
-                "test-bundle",
+                "--bundle-config-file",
+                str(cfg_path),
                 "--workspace-root",
                 str(temp_workspace),
+                "--output-dir",
+                str(staging),
             ],
         )
         assert result.exit_code == 0
+        assert (staging / "test-bundle" / "include").exists()
+        assert list((staging / "test-bundle" / "include").glob("*.pem"))
 
     def test_fetch_file_url(self, cli_runner, temp_workspace, test_data_dir):
         sample_pem = test_data_dir / "certs" / "sample.pem"
-        env_dir = temp_workspace / "config" / "crafts"
         bundle_dir = temp_workspace / "config" / "bundles"
-        env_dir.mkdir(parents=True, exist_ok=True)
         bundle_dir.mkdir(parents=True, exist_ok=True)
-        (env_dir / "test-env.yaml").write_text("name: Test\n", encoding="utf-8")
         sha = _sha256_of(sample_pem)
         bundle_yaml = f"""
         fetch:
@@ -60,31 +70,27 @@ class TestFetch:
         include: []
         """
         (bundle_dir / "test-bundle.yaml").write_text(bundle_yaml, encoding="utf-8")
-
+        staging = temp_workspace / "staging"
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--env",
-                "test-env",
-                "--bundle",
-                "test-bundle",
+                "--bundle-config-file",
+                str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
+                "--output-dir",
+                str(staging),
             ],
         )
         assert result.exit_code == 0
-        staged = temp_workspace / "sources" / "fetched" / "test-env" / "test-bundle"
-        files = list(staged.glob("*.pem"))
-        assert files, f"No staged PEM found in {staged}"
+        files = list((staging / "test-bundle" / "sample").glob("*.pem"))
+        assert files
         assert _sha256_of(files[0]) == sha
 
     def test_fetch_sha_mismatch_fails(self, cli_runner, temp_workspace, test_data_dir):
         sample_pem = test_data_dir / "certs" / "sample.pem"
-        env_dir = temp_workspace / "config" / "crafts"
         bundle_dir = temp_workspace / "config" / "bundles"
-        env_dir.mkdir(parents=True, exist_ok=True)
         bundle_dir.mkdir(parents=True, exist_ok=True)
-        (env_dir / "test-env.yaml").write_text("name: Test\n", encoding="utf-8")
         wrong_sha = "0" * 64
         bundle_yaml = f"""
         fetch:
@@ -99,10 +105,8 @@ class TestFetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--env",
-                "test-env",
-                "--bundle",
-                "test-bundle",
+                "--bundle-config-file",
+                str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
             ],
@@ -111,11 +115,8 @@ class TestFetch:
         assert "SHA256 mismatch" in result.output
 
     def test_fetch_rejects_insecure_http(self, cli_runner, temp_workspace):
-        env_dir = temp_workspace / "config" / "crafts"
         bundle_dir = temp_workspace / "config" / "bundles"
-        env_dir.mkdir(parents=True, exist_ok=True)
         bundle_dir.mkdir(parents=True, exist_ok=True)
-        (env_dir / "test-env.yaml").write_text("name: Test\n", encoding="utf-8")
         bundle_yaml = """
         fetch:
           - name: bad
@@ -127,10 +128,8 @@ class TestFetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--env",
-                "test-env",
-                "--bundle",
-                "test-bundle",
+                "--bundle-config-file",
+                str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
             ],
@@ -140,11 +139,8 @@ class TestFetch:
 
     def test_fetch_cleans_staging_by_default(self, cli_runner, temp_workspace, test_data_dir):
         sample_pem = test_data_dir / "certs" / "sample.pem"
-        env_dir = temp_workspace / "config" / "crafts"
         bundle_dir = temp_workspace / "config" / "bundles"
-        env_dir.mkdir(parents=True, exist_ok=True)
         bundle_dir.mkdir(parents=True, exist_ok=True)
-        (env_dir / "test-env.yaml").write_text("name: Test\n", encoding="utf-8")
         sha = _sha256_of(sample_pem)
         (bundle_dir / "test-bundle.yaml").write_text(
             f"""
@@ -158,31 +154,32 @@ class TestFetch:
             """,
             encoding="utf-8",
         )
-        staging = temp_workspace / "sources" / "fetched" / "test-env" / "test-bundle"
+        staging = temp_workspace / "staging"
         staging.mkdir(parents=True, exist_ok=True)
-        extra = staging / "old.pem"
+        # Create a file in the bundle directory that should be cleaned
+        bundle_staging = staging / "test-bundle"
+        bundle_staging.mkdir(parents=True, exist_ok=True)
+        extra = bundle_staging / "old.pem"
         extra.write_text("SHOULD BE REMOVED", encoding="utf-8")
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--env",
-                "test-env",
-                "--bundle",
-                "test-bundle",
+                "--bundle-config-file",
+                str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
+                "--output-dir",
+                str(staging),
             ],
         )
         assert result.exit_code == 0
         assert not extra.exists()
-        assert list(staging.glob("*.pem"))
+        # Expect files under bundle dir then named subdir 'sample'
+        assert list((staging / "test-bundle" / "sample").glob("*.pem"))
 
     def test_fetch_api_https_required(self, cli_runner, temp_workspace):
-        env_dir = temp_workspace / "config" / "crafts"
         bundle_dir = temp_workspace / "config" / "bundles"
-        env_dir.mkdir(parents=True, exist_ok=True)
         bundle_dir.mkdir(parents=True, exist_ok=True)
-        (env_dir / "test-env.yaml").write_text("name: Test\n", encoding="utf-8")
         bundle_yaml = """
         fetch:
           - name: api_bad
@@ -194,10 +191,8 @@ class TestFetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--env",
-                "test-env",
-                "--bundle",
-                "test-bundle",
+                "--bundle-config-file",
+                str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
             ],
@@ -207,11 +202,8 @@ class TestFetch:
 
     def test_fetch_vault_missing_token(self, cli_runner, monkeypatch, temp_workspace):
         monkeypatch.delenv("VAULT_TOKEN", raising=False)
-        env_dir = temp_workspace / "config" / "crafts"
         bundle_dir = temp_workspace / "config" / "bundles"
-        env_dir.mkdir(parents=True, exist_ok=True)
         bundle_dir.mkdir(parents=True, exist_ok=True)
-        (env_dir / "test-env.yaml").write_text("name: Test\n", encoding="utf-8")
         bundle_yaml = """
         fetch:
           - name: from_vault
@@ -225,10 +217,8 @@ class TestFetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--env",
-                "test-env",
-                "--bundle",
-                "test-bundle",
+                "--bundle-config-file",
+                str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
             ],
@@ -272,11 +262,8 @@ class TestFetch:
         monkeypatch.setenv("VAULT_TOKEN", "tkn")
         monkeypatch.setattr(vault_mod, "_import_hvac", lambda: MockHVAC)
 
-        env_dir = temp_workspace / "config" / "crafts"
         bundle_dir = temp_workspace / "config" / "bundles"
-        env_dir.mkdir(parents=True, exist_ok=True)
         bundle_dir.mkdir(parents=True, exist_ok=True)
-        (env_dir / "test-env.yaml").write_text("name: Test\n", encoding="utf-8")
         bundle_yaml = """
         fetch:
           - name: from_vault
@@ -289,14 +276,17 @@ class TestFetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--env",
-                "test-env",
-                "--bundle",
-                "test-bundle",
+                "--bundle-config-file",
+                str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
             ],
         )
         assert result.exit_code == 0
-        staged = temp_workspace / "sources" / "fetched" / "test-env" / "test-bundle"
-        assert list(staged.glob("from_vault.pem"))
+        # Default output directory changed from sources/fetched to sources/staged
+        staged = temp_workspace / "sources" / "staged"
+        assert (staged / "test-bundle" / "from_vault").exists()
+        pems = list((staged / "test-bundle" / "from_vault").glob("*.pem"))
+        assert len(pems) > 0
+        # Under new CLI, files go under <output-dir>/<bundle_name>/<fetch-name>
+        assert list((staged / "test-bundle" / "from_vault").glob("*.pem"))

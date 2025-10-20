@@ -83,6 +83,13 @@ from bundlecraft.helpers.convert_utils import convert_from_any
     help="Enable verbose logging",
 )
 @click.option(
+    "--output-basename",
+    "output_basename",
+    type=str,
+    required=False,
+    help="Base name for output files (default: inferred from input). Example: bundlecraft-ca-trust",
+)
+@click.option(
     "--output-root",
     type=str,
     default="dist",
@@ -98,6 +105,7 @@ def main(
     prompt,
     verbose,
     output_root,
+    output_basename,
     force,
 ):
     """Convert certificate bundles between formats without losing certificates.
@@ -111,7 +119,7 @@ def main(
     in_path = Path(input_path or pem_file).resolve() if (input_path or pem_file) else None
     if in_path is None:
         click.secho("[ERROR] Missing required input (--input or --pem-file)", fg="red", err=True)
-        sys.exit(5)
+        sys.exit(2)
     out_dir = Path(output_dir).resolve()
 
     fmt = output_format.lower()
@@ -119,7 +127,7 @@ def main(
 
     if not in_path.exists():
         click.secho(f"[ERROR] Input file not found: {in_path}", fg="red", err=True)
-        sys.exit(5)
+        sys.exit(2)
 
     if not out_dir.exists():
         click.secho(f"[INFO] Creating output directory: {out_dir}", fg="yellow")
@@ -149,7 +157,7 @@ def main(
             fg="red",
             err=True,
         )
-        sys.exit(5)
+        sys.exit(2)
 
     try:
         convert_from_any(
@@ -160,12 +168,13 @@ def main(
             password=resolved_password,
             verbose=verbose,
             force=force,
+            output_basename=output_basename,
         )
         click.secho(f"[SUCCESS] Conversion complete → {out_dir}", fg="green")
         sys.exit(0)
     except Exception as e:
         click.secho(f"[ERROR] Conversion failed: {e}", fg="red", err=True)
-        sys.exit(5)
+        sys.exit(2)
 
 
 # Back-compat function used by older tests

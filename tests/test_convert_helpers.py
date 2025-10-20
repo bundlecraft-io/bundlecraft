@@ -263,3 +263,15 @@ class TestFormatAlias:
         # Should handle edge cases gracefully
         result = _format_alias(template, "Valid", "123")
         assert "Valid" in result or "Unknown_CN" in result
+
+    def test_format_alias_with_fingerprint_shortcuts(self):
+        """Support {fingerprint} as alias for {fingerprint_sha256}."""
+        template = "{subject.CN}-{fingerprint}"
+        res = _format_alias(template, "CA", "1", fingerprint_sha256="aa11")
+        assert res == "CA-aa11"
+
+    def test_format_alias_with_explicit_fingerprints(self):
+        """Support explicit {fingerprint_sha1} and {fingerprint_sha256}."""
+        template = "{subject.CN}-{fingerprint_sha1}-{fingerprint_sha256}"
+        res = _format_alias(template, "CA", "1", fingerprint_sha1="bb22", fingerprint_sha256="cc33")
+        assert res == "CA-bb22-cc33"
