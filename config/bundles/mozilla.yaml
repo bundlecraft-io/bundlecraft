@@ -1,8 +1,6 @@
 ---
 bundle_name: mozilla
 description: Mozilla NSS CA certificate program - publicly trusted root CAs
-include: []
-exclude: []
 fetch:
   - name: mozilla_roots
     type: url

@@ -12,17 +12,19 @@ bundle_name: example-bundle
 description: >
   Demonstration of all supported source and fetch options.
   Bundle configs focus purely on certificate sourcing - no build settings.
-
 # ---------------------------------------------------------------------
-# Certificate Sources
+# Certificate Sources (preferred schema: named repos)
 # ---------------------------------------------------------------------
-include:  # Relative paths from repo root
-  - sources/example/roots/  # All .pem files in this directory
-  - sources/example/intermediates/  # Another directory
-  - sources/example/special.pem  # Single file reference
-exclude:  # Optional explicit exclusions
-  - sources/example/intermediates/old-ca.pem
-  - sources/example/roots/deprecated/
+repo:
+  - name: roots
+    include:  # Relative paths from repo root
+      - sources/example/roots/  # All .pem files in this directory
+      - sources/example/special.pem  # Single file reference
+    exclude: [sources/example/roots/deprecated/]  # Optional explicit exclusions scoped to this repo
+  - name: intermediates
+    include: [sources/example/intermediates/]
+    exclude:
+      - sources/example/intermediates/old-ca.pem
 # ---------------------------------------------------------------------
 # Remote Fetch Definitions
 # ---------------------------------------------------------------------

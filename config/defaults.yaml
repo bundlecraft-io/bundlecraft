@@ -54,5 +54,5 @@ metadata:
 #     includes: [mozilla]
 #
 # Then build with:
-#   bundlecraft build --craft dev --bundle internal-dev --prefetch
+#   bundlecraft build --craft dev --bundle internal-dev
 # ---------------------------------------------------------------------

@@ -163,26 +163,24 @@ Outputs:
 
 ### Bundle Config (`config/bundles/*.yaml`)
 
-Defines **what** certificates go into a bundle, filters, output formats, and per-format overrides.
+Defines what certificates go into a bundle and where to fetch them from.
+
+Use the named repo schema for local sources and optionally add fetch entries for remote sources.
 
 ```yaml
-id: internal
+bundle_name: internal
 description: Trust bundle for internal PKI services
-include:
-  - sources/internal/rootCA.pem
-  - sources/internal/issuingCA1.pem
-exclude: []
-output_formats:
-  - pem
-  - jks
-  - p7b
-  - p12
-pem:
-  include_subject_comments: true
-verify:
-  fail_on_expired: true
-  warn_days_before_expiry: 30
-package: true  # produce package.tar.gz
+repo:
+  - name: internal
+    include:
+      - sources/internal/rootCA.pem
+      - sources/internal/issuingCA1.pem
+
+# Optional remote sources (fetched at build time, staged with provenance)
+fetch:
+  - name: mozilla_roots
+    type: url
+    url: https://curl.se/ca/cacert.pem
 ```
 
 ### Craft Config (`config/crafts/*.yaml`)
@@ -395,7 +393,7 @@ The included workflows automate builds and fetch tests:
 
 - Discover → Build → Collect → Verify → Publish
 - Build per-craft “targets” declared in `config/crafts/<env>.yaml` under `targets:` (composition-aware)
-- For each target, the job runs `bundlecraft build --prefetch` and respects `build_path` via `--output-root`
+- For each target, the job runs `bundlecraft build` and respects `build_path` via `--output-root`
 - Uploads artifacts per target using the naming `trust-store-<env>-<target>`
 - Optionally signs and publishes a release tarball
 - Concurrency: only one pipeline per branch at a time

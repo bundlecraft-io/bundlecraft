@@ -345,7 +345,6 @@ Configure your bundle to fetch this PEM via the Vault fetcher:
 ```yaml
 # config/bundles/local-vault.yaml
 id: local-vault
-include: []
 fetch:
   - name: from_vault
     type: vault
@@ -547,7 +546,7 @@ podman run --rm -p 8200:8200 \
 # Run your BundleCraft fetch after exporting env vars (see config example below)
 export VAULT_ADDR="http://127.0.0.1:8200"
 export VAULT_TOKEN="root"
-bundlecraft fetch --env dev --bundle local-vault
+bundlecraft fetch --craft dev --bundle local-vault
 
 # Tear down environment
 ./vault-local.sh down
@@ -564,7 +563,7 @@ Vault will wait for you to finish, then clean up automatically.
 #### CI/CD Mode
 
 ```bash
-./vault-local.sh up --ci-cmd "bundlecraft fetch --env dev --bundle local-vault"
+./vault-local.sh up --ci-cmd "bundlecraft fetch --craft dev --bundle local-vault"
 ```
 
 Runs your test command, then removes the local Vault environment automatically.

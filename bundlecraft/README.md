@@ -186,7 +186,6 @@ bundlecraft build --craft <craft> --bundle <bundle_name> [OPTIONS]
 | `--bundle`      | Bundle name (e.g., `internal`, `external`). Required.    |
 | `--package`     | Also create a `.tar.gz` archive of the build folder.     |
 | `--verify-only` | Skip build; verify certificates only.                    |
-| `--prefetch`    | Run `fetch` first to stage remote sources (staging only, no cache). |
 | `--offline`     | Do not contact the network; fail if `fetch` is required. |
 | `--output-root` | Root directory for build outputs (default: `./dist`).    |
 
@@ -202,17 +201,14 @@ bundlecraft build --craft <craft> --bundle <bundle_name> [OPTIONS]
 **Examples:**
 
 ```bash
-# Build internal trust bundle for production
-bundlecraft build --env prod --bundle internal
+# Build a composed target in a craft
+bundlecraft build --craft prod --bundle internal
 
 # Verify only (no rebuild)
 bundlecraft build --env dev --bundle internal --verify-only
 
-# Fetch+Build: prefetch remote sources into staging then build
-bundlecraft build --env prod --bundle internal --prefetch
-
 # Offline build: will fail if bundle config contains 'fetch:' entries
-bundlecraft build --env prod --bundle internal --offline
+bundlecraft build --craft prod --bundle internal --offline
 ```
 
 ---
@@ -248,10 +244,10 @@ bundlecraft verify --target <build_dir_or_file> [OPTIONS]
 
 ```bash
 # Verify an entire bundle
-tbundlecraft verify --target dist/prod/internal
+bundlecraft verify --target dist/prod/internal
 
 # Verify everything with full detail
-tbundlecraft verify --target dist/prod/internal --verify-all --verbose
+bundlecraft verify --target dist/prod/internal --verify-all --verbose
 ```
 
 ---

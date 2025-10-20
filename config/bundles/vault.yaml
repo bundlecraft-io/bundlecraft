@@ -1,8 +1,6 @@
 ---
 bundle_name: vault
 description: Trust bundle sourced from HashiCorp Vault secret store
-include: []
-exclude: []
 fetch:
   - name: from_vault
     type: vault
