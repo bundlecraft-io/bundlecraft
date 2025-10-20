@@ -345,45 +345,112 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             )
             sys.exit(2)
 
+    # Precompute craft-safe path and output settings used during caching
+    craft_name_for_path = env_cfg.get("name") or env
+    safe_craft = str(craft_name_for_path).replace("/", "-").replace(" ", "-")
+
+    # Settings from craft (needed for cache conversion)
+    pem_cfg = env_cfg.get("pem") or {}
+    include_subject_comments = pem_cfg.get("include_subject_comments", True)
+    output_formats = env_cfg.get("output_formats") or ["pem"]
+    fmt_overrides = env_cfg.get("format_overrides") or {}
+
     # =========================================================================
-    # STAGE 1: FETCH
+    # STAGE 1: FETCH (unique bundle staging + caching)
     # =========================================================================
     staging_map: dict[str, list[Path]] = {}
+
+    # Collect unique bundle names across targets
+    unique_bundles: list[str] = []
+    for _, include_bundles in targets_to_build:
+        for b in include_bundles:
+            if b not in unique_bundles:
+                unique_bundles.append(b)
+
+    bundle_cache_root = ROOT / "build_cache" / safe_craft
+    bundle_cache_root.mkdir(parents=True, exist_ok=True)
+    bundle_cache_dirs: dict[str, Path] = {}
+
     if not skip_fetch:
         click.secho(
-            f"\n[STAGE 1/3] FETCH - Staging sources for {len(targets_to_build)} target(s)",
+            f"\n[STAGE 1/3] FETCH - Staging and caching {len(unique_bundles)} unique bundle(s)",
             fg="blue",
             bold=True,
         )
-        for target_name, include_bundles in targets_to_build:
-            per_target: list[Path] = []
-            for bname in include_bundles:
-                try:
-                    staging_dir = _stage_bundle_sources(bname, env, ROOT, verbose=verbose)
-                    per_target.append(staging_dir)
+        for bname in unique_bundles:
+            try:
+                staging_dir = _stage_bundle_sources(bname, env, ROOT, verbose=verbose)
+                click.secho(
+                    f"  [cache] ✓ Staged bundle: {bname} → {staging_dir.relative_to(ROOT)}",
+                    fg="green",
+                )
+
+                cache_dir = bundle_cache_root / bname
+                ensure_dir(cache_dir)
+
+                # Aggregate and write canonical PEM into cache
+                pem_files = _aggregate_staged_sources([staging_dir], verbose=verbose)
+                if not pem_files:
                     click.secho(
-                        f"  [{target_name}] ✓ Staged bundle: {bname} → {staging_dir.relative_to(ROOT)}",
-                        fg="green",
-                    )
-                except Exception as e:
-                    click.secho(
-                        f"  [{target_name}] ✗ Failed to stage bundle {bname}: {e}",
+                        f"  [cache] [ERROR] {bname} - no sources found in staging",
                         fg="red",
                         err=True,
                     )
-                    if verbose:
-                        import traceback
-
-                        traceback.print_exc()
                     sys.exit(2)
-            staging_map[target_name] = per_target
+                pem_blocks = _read_pem_chunks(pem_files)
+                pem_blocks = _dedupe_pem_blocks(pem_blocks)
+                if not pem_blocks:
+                    click.secho(
+                        f"  [cache] [ERROR] {bname} - no valid PEM parsed", fg="red", err=True
+                    )
+                    sys.exit(3)
+                cache_pem = cache_dir / "bundlecraft-ca-trust.pem"
+                _write_canonical_pem(cache_pem, pem_blocks, include_subject_comments, force=True)
+                click.secho(
+                    f"  [cache] ✓ Wrote cached canonical PEM: {cache_pem.relative_to(ROOT)}",
+                    fg="green",
+                )
+
+                # Convert cached canonical PEM to configured extra formats (once)
+                extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
+                if extra_formats:
+                    fmt_overrides_combined = dict(fmt_overrides)
+                    if force:
+                        fmt_overrides_combined["force"] = True
+                    convert_to_formats(
+                        cache_pem,
+                        cache_dir,
+                        extra_formats,
+                        fmt_overrides_combined,
+                        "bundlecraft-ca-trust",
+                    )
+                    click.secho(
+                        f"  [cache] ✓ Converted cached bundle to formats: {', '.join(extra_formats)}",
+                        fg="green",
+                    )
+
+                bundle_cache_dirs[bname] = cache_dir
+            except Exception as e:
+                click.secho(
+                    f"  [cache] ✗ Failed to stage/cache bundle {bname}: {e}", fg="red", err=True
+                )
+                if verbose:
+                    import traceback
+
+                    traceback.print_exc()
+                sys.exit(2)
     else:
         click.secho("\n[STAGE 1/3] FETCH - Skipped (using existing staged sources)", fg="yellow")
-        for target_name, include_bundles in targets_to_build:
-            per_target = []
-            for bname in include_bundles:
-                per_target.append(STAGED_DIR / env / bname)
-            staging_map[target_name] = per_target
+        for bname in unique_bundles:
+            cache_dir = bundle_cache_root / bname
+            bundle_cache_dirs[bname] = cache_dir
+
+    # Map targets to their bundle staging/cache dirs
+    for target_name, include_bundles in targets_to_build:
+        per_target = []
+        for bname in include_bundles:
+            per_target.append(bundle_cache_dirs.get(bname, STAGED_DIR / env / bname))
+        staging_map[target_name] = per_target
 
     # =========================================================================
     # STAGE 2: CONVERT
@@ -399,35 +466,59 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     fmt_overrides = env_cfg.get("format_overrides") or {}
 
     per_target_results: dict[str, dict] = {}
-    for target_name, dirs_list in staging_map.items():
-        pem_files = _aggregate_staged_sources(dirs_list, verbose=verbose)
-        if not pem_files:
-            click.secho(
-                f"  [ERROR] [{target_name}] No certificate sources found in staging.",
-                fg="red",
-                err=True,
-            )
-            sys.exit(2)
-        click.secho(f"  [{target_name}] Found {len(pem_files)} source file(s)", fg="green")
+    import shutil
 
-        pem_blocks = _read_pem_chunks(pem_files)
-        pem_blocks = _dedupe_pem_blocks(pem_blocks)
-        if not pem_blocks:
-            click.secho(
-                f"  [ERROR] [{target_name}] No valid PEM certificates parsed.", fg="red", err=True
-            )
-            sys.exit(3)
-        click.secho(
-            f"  [{target_name}] Deduplicated to {len(pem_blocks)} unique certificate(s)", fg="green"
-        )
-
+    for target_name, bundle_dirs in staging_map.items():
         build_root = (Path(output_root) / safe_craft / target_name).resolve()
         ensure_dir(build_root)
 
+        # Single-bundle target: copy cached outputs directly
+        if len(bundle_dirs) == 1:
+            bdir = bundle_dirs[0]
+            cache_pem = bdir / "bundlecraft-ca-trust.pem"
+            if cache_pem.exists():
+                for f in sorted([p for p in bdir.iterdir() if p.is_file()]):
+                    dst = build_root / f.name
+                    try:
+                        shutil.copy2(f, dst)
+                    except Exception:
+                        dst.write_bytes(f.read_bytes())
+                click.secho(
+                    f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {build_root.relative_to(ROOT)}",
+                    fg="green",
+                )
+                pem_blocks = _read_pem_chunks([cache_pem])
+                per_target_results[target_name] = {
+                    "build_root": build_root,
+                    "pem_blocks": pem_blocks,
+                    "output_formats": output_formats,
+                }
+                continue
+
+        # Multi-bundle target: merge cached canonical PEMs
+        merged_blocks: list[str] = []
+        for bdir in bundle_dirs:
+            cache_pem = bdir / "bundlecraft-ca-trust.pem"
+            if cache_pem.exists():
+                merged_blocks.extend(_read_pem_chunks([cache_pem]))
+            else:
+                pem_files = _aggregate_staged_sources([bdir], verbose=verbose)
+                merged_blocks.extend(_read_pem_chunks(pem_files))
+
+        merged_blocks = _dedupe_pem_blocks(merged_blocks)
+        if not merged_blocks:
+            click.secho(
+                f"  [ERROR] [{target_name}] No valid PEM certificates parsed for merged target.",
+                fg="red",
+                err=True,
+            )
+            sys.exit(3)
+
         pem_out = build_root / "bundlecraft-ca-trust.pem"
-        _write_canonical_pem(pem_out, pem_blocks, include_subject_comments, force=force)
+        _write_canonical_pem(pem_out, merged_blocks, include_subject_comments, force=force)
         click.secho(
-            f"  [{target_name}] ✓ Wrote canonical PEM: {pem_out.relative_to(ROOT)}", fg="green"
+            f"  [{target_name}] ✓ Wrote merged canonical PEM: {pem_out.relative_to(ROOT)}",
+            fg="green",
         )
 
         extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
@@ -439,12 +530,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                 pem_out, build_root, extra_formats, fmt_overrides_combined, "bundlecraft-ca-trust"
             )
             click.secho(
-                f"  [{target_name}] ✓ Converted to formats: {', '.join(extra_formats)}", fg="green"
+                f"  [{target_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
+                fg="green",
             )
 
         per_target_results[target_name] = {
             "build_root": build_root,
-            "pem_blocks": pem_blocks,
+            "pem_blocks": merged_blocks,
             "output_formats": output_formats,
         }
 
