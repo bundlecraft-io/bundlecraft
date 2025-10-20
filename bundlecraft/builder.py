@@ -291,35 +291,59 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         # Load base bundle config for source includes/excludes
         b_cfg = load_yaml(CONFIG_DIR / "bundles" / f"{bname}.yaml", required=True)
         base_bundle_cfgs[bname] = b_cfg
-        include_items.extend(b_cfg.get("include", []) or [])
-        for ex in b_cfg.get("exclude", []) or []:
-            exclude_items.add(ex)
+        
+        # New schema: repo list with name and include fields
+        if "repo" in b_cfg:
+            for repo_entry in b_cfg.get("repo", []):
+                if isinstance(repo_entry, dict):
+                    include_items.extend(repo_entry.get("include", []) or [])
+                    for ex in repo_entry.get("exclude", []) or []:
+                        exclude_items.add(ex)
+        # Legacy schema: top-level include/exclude
+        else:
+            include_items.extend(b_cfg.get("include", []) or [])
+            for ex in b_cfg.get("exclude", []) or []:
+                exclude_items.add(ex)
 
     # Also allow the target bundle file to contribute extra include/exclude if it exists
     if bundle_cfg:
-        include_items.extend(bundle_cfg.get("include", []) or [])
-        for ex in bundle_cfg.get("exclude", []) or []:
-            exclude_items.add(ex)
+        # New schema: repo list with name and include fields
+        if "repo" in bundle_cfg:
+            for repo_entry in bundle_cfg.get("repo", []):
+                if isinstance(repo_entry, dict):
+                    include_items.extend(repo_entry.get("include", []) or [])
+                    for ex in repo_entry.get("exclude", []) or []:
+                        exclude_items.add(ex)
+        # Legacy schema: top-level include/exclude
+        else:
+            include_items.extend(bundle_cfg.get("include", []) or [])
+            for ex in bundle_cfg.get("exclude", []) or []:
+                exclude_items.add(ex)
     
     # Separate inline PEM entries from file paths
     include_paths = []
     inline_pems = []
     for item in include_items:
-        # Check if this is an inline PEM entry (dict with 'inline' key)
-        if isinstance(item, dict) and "inline" in item:
+        # Check if this is an inline PEM entry (string starting with certificate marker)
+        if isinstance(item, str) and "-----BEGIN CERTIFICATE-----" in item:
+            inline_pems.append(item)
+            click.secho("[INFO] Including inline PEM certificate", fg="blue")
+        # Legacy: dict with 'inline' key (for backward compatibility)
+        elif isinstance(item, dict) and "inline" in item:
             inline_pem = item["inline"]
             if inline_pem:  # Skip empty inline entries
                 inline_pems.append(inline_pem)
                 click.secho("[INFO] Including inline PEM certificate", fg="blue")
         else:
             # Process as file path
-            p = (ROOT / item).resolve()
+            item_str = str(item)
+            p = (ROOT / item_str).resolve()
             if p.is_dir():
                 include_paths.extend(list_files(p, suffixes=(".pem",)))
             elif p.is_file():
                 include_paths.append(p)
             else:
-                click.secho(f"[WARN] Include path not found: {item}", fg="yellow")
+                click.secho(f"[WARN] Include path not found: {item_str}", fg="yellow")
     
     include_paths = [
         p for p in include_paths if str(p.relative_to(ROOT)).replace("\\", "/") not in exclude_items
