@@ -321,31 +321,87 @@ def _stage_local_includes(
                 continue
             subdir = staging_root / name
             ensure_dir(subdir)
-            for item in include_items:
-                p = (root / item).resolve()
-                if p.is_dir():
-                    for f in sorted(p.rglob("*.pem")):
-                        rel_str = str(f.relative_to(root)).replace("\\", "/")
+            for idx, item in enumerate(include_items, start=1):
+                # Back-compat: allow include items to be plain strings (paths)
+                if isinstance(item, str):
+                    p = (root / item).resolve()
+                    if p.is_dir():
+                        for f in sorted(p.rglob("*.pem")):
+                            rel_str = str(f.relative_to(root)).replace("\\", "/")
+                            if rel_str in exclude_items:
+                                if verbose:
+                                    logger.debug(f"  Skipped (excluded): {rel_str}")
+                                continue
+                            out = subdir / f.name
+                            out.write_bytes(f.read_bytes())
+                            staged.append(out)
+                            logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
+                    elif p.is_file():
+                        rel_str = str(p.relative_to(root)).replace("\\", "/")
                         if rel_str in exclude_items:
                             if verbose:
                                 logger.debug(f"  Skipped (excluded): {rel_str}")
                             continue
-                        out = subdir / f.name
-                        out.write_bytes(f.read_bytes())
+                        out = subdir / p.name
+                        out.write_bytes(p.read_bytes())
                         staged.append(out)
                         logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
-                elif p.is_file():
-                    rel_str = str(p.relative_to(root)).replace("\\", "/")
-                    if rel_str in exclude_items:
-                        if verbose:
-                            logger.debug(f"  Skipped (excluded): {rel_str}")
+                    else:
+                        logger.warning(f"  [{name}] Include path not found: {item}")
+                    continue
+
+                if isinstance(item, dict):
+                    # Dictionary form supports either 'path' or 'inline' (inline PEM)
+                    if "path" in item and item["path"]:
+                        p = root / str(item["path"])
+                        p = p.resolve()
+                        if p.is_dir():
+                            for f in sorted(p.rglob("*.pem")):
+                                rel_str = str(f.relative_to(root)).replace("\\", "/")
+                                if rel_str in exclude_items:
+                                    if verbose:
+                                        logger.debug(f"  Skipped (excluded): {rel_str}")
+                                    continue
+                                out = subdir / f.name
+                                out.write_bytes(f.read_bytes())
+                                staged.append(out)
+                                logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
+                        elif p.is_file():
+                            rel_str = str(p.relative_to(root)).replace("\\", "/")
+                            if rel_str in exclude_items:
+                                if verbose:
+                                    logger.debug(f"  Skipped (excluded): {rel_str}")
+                                continue
+                            out = subdir / p.name
+                            out.write_bytes(p.read_bytes())
+                            staged.append(out)
+                            logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
+                        else:
+                            logger.warning(f"  [{name}] Include path not found: {item.get('path')}")
                         continue
-                    out = subdir / p.name
-                    out.write_bytes(p.read_bytes())
-                    staged.append(out)
-                    logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
-                else:
-                    logger.warning(f"  [{name}] Include path not found: {item}")
+
+                    if "inline" in item and item["inline"]:
+                        import textwrap
+
+                        pem_text = textwrap.dedent(str(item["inline"]))
+                        pem_text = pem_text.strip()
+                        # Filename can be specified or auto-generated
+                        fname = item.get("name") or f"inline-{idx}.pem"
+                        out = subdir / fname
+                        # Ensure newline termination
+                        if not pem_text.endswith("\n"):
+                            pem_text += "\n"
+                        out.write_text(pem_text, encoding="utf-8")
+                        staged.append(out)
+                        logger.info(f"  [{name}] Wrote inline PEM -> {out}")
+                        continue
+
+                    logger.warning(
+                        f"  [{name}] Unrecognized include item (expected 'path' or 'inline'): {item}"
+                    )
+                    continue
+
+                logger.warning(f"  [{name}] Unsupported include item type: {type(item)}")
 
     # Legacy schema: flat include/exclude
     include_items_legacy = cfg.get("include") or []

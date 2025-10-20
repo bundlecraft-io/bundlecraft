@@ -137,9 +137,18 @@ Generated certificates can be used in BundleCraft configs:
 # config/bundles/test-bundle.yaml
 id: test-internal
 description: Test bundle with generated CAs
-include:
-  - generated-test-cas/dev/internal/root/dev-root.pem
-  - generated-test-cas/dev/internal/tier1/dev-root-sub1.pem
+repo:
+  - name: generated
+    include:
+      # Path entries (string or {path: ...})
+      - generated-test-cas/dev/internal/root/dev-root.pem
+      - { path: generated-test-cas/dev/internal/tier1/dev-root-sub1.pem }
+      # Inline (optional)
+      # - name: example-inline.pem
+      #   inline: |
+      #     -----BEGIN CERTIFICATE-----
+      #     ...
+      #     -----END CERTIFICATE-----
 output_formats:
   - pem
 ```

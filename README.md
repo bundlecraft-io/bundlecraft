@@ -173,8 +173,15 @@ description: Trust bundle for internal PKI services
 repo:
   - name: internal
     include:
+      # Path entries (string or {path: ...})
       - sources/internal/rootCA.pem
-      - sources/internal/issuingCA1.pem
+      - { path: sources/internal/issuingCA1.pem }
+      # Inline PEM entry (optional name; if omitted, a name is generated)
+      - name: special-inline.pem
+        inline: |
+          -----BEGIN CERTIFICATE-----
+          ...
+          -----END CERTIFICATE-----
 
 # Optional remote sources (fetched at build time, staged with provenance)
 fetch:
@@ -262,22 +269,20 @@ eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 
 ```bash
 # Build a craft target (fetch is done automatically unless skipped)
-```bash
 bundlecraft build --craft prod --bundle internal-prod
 ```
 
-```
 - Produces artifacts in `dist/Production/internal-prod/`:
 
-  ```text
-  bundlecraft-ca-trust.pem
-  bundlecraft-ca-trust.p7b
-  bundlecraft-ca-trust.jks
-  bundlecraft-ca-trust.p12
-  manifest.json
-  checksums.sha256
-  package.tar.gz  # if enabled
-  ```
+```text
+bundlecraft-ca-trust.pem
+bundlecraft-ca-trust.p7b
+bundlecraft-ca-trust.jks
+bundlecraft-ca-trust.p12
+manifest.json
+checksums.sha256
+package.tar.gz  # if enabled
+```
 
 ### 4. Verify Outputs
 

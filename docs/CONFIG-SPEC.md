@@ -58,9 +58,17 @@ You can declare local certificate sources in two ways. The new preferred schema 
   ```yaml
   repo:
     - name: roots
-      include:  # paths are relative to repo root
+      include:  # "include" items support both path and inline entries
+        # 1) Path entries (string or {path: ...})
         - sources/internal/roots/
-        - sources/internal/rootCA.pem
+        - { path: sources/internal/rootCA.pem }
+        # 2) Inline PEM entries ({inline: <PEM>, name?: <filename>})
+        # When "name" is omitted, a filename like inline-1.pem is generated.
+        - name: special-inline.pem
+          inline: |
+            -----BEGIN CERTIFICATE-----
+            ...PEM-CONTENT-ELIDED...
+            -----END CERTIFICATE-----
       exclude:  # optional exclusions within this repo
         - sources/internal/roots/deprecated.pem
 
@@ -68,6 +76,16 @@ You can declare local certificate sources in two ways. The new preferred schema 
       include:
         - sources/partners/
   ```
+
+  Include item forms supported:
+  - String: a file or directory path
+  - Mapping with `path`: `{ path: <file-or-dir> }`
+  - Mapping with `inline`: `{ inline: <PEM text>, name?: <filename> }`
+
+  Notes for `inline` entries:
+  - PEM text can be provided as a YAML block scalar (recommended).
+  - Indentation is handled automatically; trailing whitespace is trimmed.
+  - If `name` is omitted, files are created as `inline-<N>.pem` within the repo folder.
 
   Staging layout: `sources/staged/<craft>/<bundle>/<name>/...`
 
@@ -88,6 +106,31 @@ Validation rules for names:
 - Each `repo[].name` must be unique and must not use reserved names like `include`.
 - If `fetch[].name` is provided, those names must be unique as well.
 - A `repo[].name` must not conflict with any `fetch[].name`.
+
+### Minimal Examples
+
+Repo with both path and inline entries:
+
+```yaml
+repo:
+  - name: roots
+    include:
+      - sources/internal/roots/
+      - { path: sources/internal/rootCA.pem }
+      - name: special-inline.pem
+        inline: |
+          -----BEGIN CERTIFICATE-----
+          ...
+          -----END CERTIFICATE-----
+```
+
+Legacy form (paths only):
+
+```yaml
+include:
+  - sources/internal/roots/
+  - sources/internal/rootCA.pem
+```
 
 ### Fetch Definitions
 

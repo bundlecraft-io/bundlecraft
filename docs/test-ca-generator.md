@@ -152,20 +152,26 @@ generated-test-cas/
 
 ```yaml
 # config/bundles/test-bundle.yaml
-id: test-internal
+bundle_name: test-internal
 description: Test bundle with generated CAs
-include:
-  - generated-test-cas/dev/internal/root/dev-root.pem
-  - generated-test-cas/dev/internal/tier1/dev-root-sub1.pem
-output_formats:
-  - pem
-  - jks
+repo:
+  - name: generated
+    include:
+      # Path entries (string or {path: ...})
+      - generated-test-cas/dev/internal/root/dev-root.pem
+      - { path: generated-test-cas/dev/internal/tier1/dev-root-sub1.pem }
+      # Inline entry example (optional)
+      # - name: ci-inline.pem
+      #   inline: |
+      #     -----BEGIN CERTIFICATE-----
+      #     ...
+      #     -----END CERTIFICATE-----
 ```
 
 Build:
 
 ```bash
-bundlecraft build --env dev --bundle test-internal
+bundlecraft build --craft dev --bundle test-internal
 ```
 
 ### Use in CI/CD
@@ -184,7 +190,7 @@ Generate test chains in CI for fetch/verify testing:
 - name: Test with generated CAs
   run: |
     bundlecraft build \
-      --env test \
+      --craft test \
       --bundle ci-test \
       --output-root dist
 ```
@@ -212,6 +218,7 @@ Generate test chains in CI for fetch/verify testing:
 ### Subject DN
 
 All generated CAs have:
+
 - `CN=<name>` (provided via CLI)
 - `O=BundleCraft Test CA`
 - `OU=Testing Only`
@@ -285,6 +292,7 @@ Shell would require multiple `openssl` command invocations and temp file managem
 ### Why Dispose Keys Immediately?
 
 Even though keys are only for testing:
+
 1. **Principle enforcement**: Aligns with BundleCraft's trust-only model
 2. **Habit formation**: Developers don't get comfortable with key material
 3. **Accident prevention**: Can't accidentally export or persist keys
@@ -300,6 +308,7 @@ Even though keys are only for testing:
 ## Future Enhancements
 
 Potential additions (if needed):
+
 - ECDSA/Ed25519 key algorithm support (currently RSA only)
 - Custom subject DN fields via CLI
 - CRL/OCSP URL extensions

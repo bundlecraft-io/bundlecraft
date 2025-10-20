@@ -79,7 +79,7 @@ fetch:
 ## 4️⃣ Expected Behavior
 
 1. **Pre-build phase:**
-   The `fetch` module runs explicitly (via `bundlecraft fetch`) or with `--prefetch` on `bundlecraft build`.
+   The `fetch` module runs explicitly (via `bundlecraft fetch`) or as part of `bundlecraft build` unless fetch is skipped.
    It downloads, validates, and stores certs under `sources/fetched/<env>/<bundle>/`. The staging directory is cleaned each run; there is no persistent cache.
 
 2. **Build phase:**

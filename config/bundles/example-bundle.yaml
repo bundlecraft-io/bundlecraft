@@ -17,9 +17,16 @@ description: >
 # ---------------------------------------------------------------------
 repo:
   - name: roots
-    include:  # Relative paths from repo root
+    include:  # Relative paths from repo root; supports path and inline entries
+      # Path entries (string or {path: ...})
       - sources/example/roots/  # All .pem files in this directory
-      - sources/example/special.pem  # Single file reference
+      - {path: sources/example/special.pem}  # Single file reference
+      # Inline PEM entry (optional); omit name to auto-generate filename
+      # - name: special-inline.pem
+      #   inline: |
+      #     -----BEGIN CERTIFICATE-----
+      #     ...PEM-CONTENT-ELIDED...
+      #     -----END CERTIFICATE-----
     exclude: [sources/example/roots/deprecated/]  # Optional explicit exclusions scoped to this repo
   - name: intermediates
     include: [sources/example/intermediates/]

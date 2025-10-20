@@ -48,7 +48,7 @@ bundlecraft --help
 
 You’ll see:
 
-```
+```text
 Usage: bundlecraft [OPTIONS] COMMAND [ARGS]...
 
 Commands:
@@ -211,6 +211,24 @@ bundlecraft build --env dev --bundle internal --verify-only
 bundlecraft build --craft prod --bundle internal --offline
 ```
 
+Local source schema tip:
+
+```yaml
+# In config/bundles/<bundle>.yaml
+repo:
+  - name: roots
+    include:
+      # Path entries (string or {path: ...})
+      - sources/internal/roots/
+      - { path: sources/internal/rootCA.pem }
+      # Inline PEM entry (optional name)
+      - name: special-inline.pem
+        inline: |
+          -----BEGIN CERTIFICATE-----
+          ...
+          -----END CERTIFICATE-----
+```
+
 ---
 
 ### 🔍 `bundlecraft verify`
@@ -342,7 +360,7 @@ bundlecraft verify --help
 
 ## 🧱 Project Structure
 
-```
+```text
 bundlecraft/
 ├── __init__.py
 ├── cli.py          # Unified CLI entrypoint
@@ -364,9 +382,9 @@ bundlecraft/
 
 ## 🧠 Best Practices for Referencing in Docs and Scripts
 
-* **Preferred (installed usage):** `bundlecraft <subcommand>` — this is the canonical CLI form.
-* **Module form (uninstalled / dev use):** `python -m bundlecraft.cli <subcommand>`
-* **Never reference file paths** like `bundlecraft/builder.py` in docs; this implies direct script execution, which breaks imports.
+- **Preferred (installed usage):** `bundlecraft <subcommand>` — this is the canonical CLI form.
+- **Module form (uninstalled / dev use):** `python -m bundlecraft.cli <subcommand>`
+- **Never reference file paths** like `bundlecraft/builder.py` in docs; this implies direct script execution, which breaks imports.
 
 So in all documentation, use:
 
@@ -404,9 +422,9 @@ bundlecraft verify --target dist/prod/internal --verify-all
 
 ## 📘 Notes for Contributors
 
-* Always run from the project root or with the package installed.
-* Use `pip install -e .` for iterative local testing.
-* The project expects Python 3.9+ and system utilities `openssl` + `keytool`.
+- Always run from the project root or with the package installed.
+- Use `pip install -e .` for iterative local testing.
+- The project expects Python 3.9+ and system utilities `openssl` + `keytool`.
 
 ---
 
