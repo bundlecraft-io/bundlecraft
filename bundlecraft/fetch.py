@@ -39,6 +39,67 @@ logger.setLevel(logging.INFO)
 logger.propagate = False
 
 
+# Names that are reserved for internal use within the staging directory
+_RESERVED_STAGING_NAMES: set[str] = {"include"}
+
+
+def _validate_source_and_fetch_names(cfg: dict[str, Any]) -> None:
+    """Validate that local repo names and fetch names are unique and non-reserved.
+
+    Rules:
+      - repo: must be a list of objects with unique 'name' values
+      - fetch: if 'name' is provided explicitly, names must be unique
+      - No repo/fetch name may use a reserved name (e.g., 'include')
+      - No repo name may conflict with a fetch name
+    Raises click.ClickException on violation.
+    """
+    repos = cfg.get("repo") or []
+    fetches = cfg.get("fetch") or []
+
+    repo_names: list[str] = []
+    if repos:
+        if not isinstance(repos, list):
+            raise click.ClickException("Config key 'repo' must be a list of sources")
+        for idx, r in enumerate(repos, start=1):
+            if not isinstance(r, dict):
+                raise click.ClickException("Each 'repo' entry must be an object with a 'name'")
+            name = (r.get("name") or "").strip()
+            if not name:
+                raise click.ClickException(f"Local repo entry #{idx} is missing required 'name'")
+            if name in _RESERVED_STAGING_NAMES:
+                raise click.ClickException(
+                    f"Local repo name '{name}' is reserved. Choose a different name."
+                )
+            if name in repo_names:
+                raise click.ClickException(f"Duplicate local repo name: '{name}'")
+            repo_names.append(name)
+
+    fetch_names_explicit: list[str] = []
+    if fetches:
+        if not isinstance(fetches, list):
+            raise click.ClickException("Config key 'fetch' must be a list of sources")
+    for _idx, f in enumerate(fetches, start=1):
+        if not isinstance(f, dict):
+            raise click.ClickException("Each 'fetch' entry must be an object")
+        name = (f.get("name") or "").strip()
+        if not name:
+            # Auto-generated names like fetched-1 are unique by index; ignore for duplication check
+            continue
+        if name in _RESERVED_STAGING_NAMES:
+            raise click.ClickException(f"Fetch name '{name}' is reserved. Choose a different name.")
+        if name in fetch_names_explicit:
+            raise click.ClickException(f"Duplicate fetch name: '{name}'")
+        fetch_names_explicit.append(name)
+
+    # Cross-conflict between repo names and fetch names
+    conflicts = set(repo_names).intersection(set(fetch_names_explicit))
+    if conflicts:
+        raise click.ClickException(
+            "Name conflict between local 'repo' and 'fetch' entries: "
+            + ", ".join(sorted(conflicts))
+        )
+
+
 def _clean_dir(path: Path) -> None:
     if path.exists():
         for p in sorted(path.rglob("*"), reverse=True):
@@ -232,40 +293,92 @@ def run_fetch(
 def _stage_local_includes(
     cfg: dict[str, Any], staging_root: Path, root: Path, verbose: bool
 ) -> list[Path]:
-    include_items = cfg.get("include") or []
-    exclude_items = set(cfg.get("exclude") or [])
-    staged: list[Path] = []
-    if not include_items:
-        return staged
+    """Stage local sources into named subdirectories.
 
-    include_dir = staging_root / "include"
-    ensure_dir(include_dir)
-    logger.info("[Local] Copying includes ...")
-    for item in include_items:
-        p = (root / item).resolve()
-        if p.is_dir():
-            for f in sorted(p.rglob("*.pem")):
-                rel_str = str(f.relative_to(root)).replace("\\", "/")
-                if rel_str in exclude_items:
+    Supports two schemas:
+      1) New: repo: - name: <name>, include: [...], exclude: [...]
+         Staged under: <staging_root>/<name>/
+      2) Legacy: include: [...], exclude: [...]
+         Staged under: <staging_root>/include/
+    """
+
+    staged: list[Path] = []
+
+    # Validate names against fetch entries to avoid conflicts
+    _validate_source_and_fetch_names(cfg)
+
+    # New schema: named repos
+    repos = cfg.get("repo") or []
+    if repos:
+        logger.info("[Local] Copying named repos ...")
+        for r in repos:
+            name = r.get("name")
+            include_items = r.get("include") or []
+            exclude_items = set(r.get("exclude") or [])
+            if not include_items:
+                if verbose:
+                    logger.debug(f"  Repo '{name}' has no include items; skipping")
+                continue
+            subdir = staging_root / name
+            ensure_dir(subdir)
+            for item in include_items:
+                p = (root / item).resolve()
+                if p.is_dir():
+                    for f in sorted(p.rglob("*.pem")):
+                        rel_str = str(f.relative_to(root)).replace("\\", "/")
+                        if rel_str in exclude_items:
+                            if verbose:
+                                logger.debug(f"  Skipped (excluded): {rel_str}")
+                            continue
+                        out = subdir / f.name
+                        out.write_bytes(f.read_bytes())
+                        staged.append(out)
+                        logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
+                elif p.is_file():
+                    rel_str = str(p.relative_to(root)).replace("\\", "/")
+                    if rel_str in exclude_items:
+                        if verbose:
+                            logger.debug(f"  Skipped (excluded): {rel_str}")
+                        continue
+                    out = subdir / p.name
+                    out.write_bytes(p.read_bytes())
+                    staged.append(out)
+                    logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
+                else:
+                    logger.warning(f"  [{name}] Include path not found: {item}")
+
+    # Legacy schema: flat include/exclude
+    include_items_legacy = cfg.get("include") or []
+    if include_items_legacy:
+        exclude_items_legacy = set(cfg.get("exclude") or [])
+        include_dir = staging_root / "include"
+        ensure_dir(include_dir)
+        logger.info("[Local] Copying legacy includes ...")
+        for item in include_items_legacy:
+            p = (root / item).resolve()
+            if p.is_dir():
+                for f in sorted(p.rglob("*.pem")):
+                    rel_str = str(f.relative_to(root)).replace("\\", "/")
+                    if rel_str in exclude_items_legacy:
+                        if verbose:
+                            logger.debug(f"  Skipped (excluded): {rel_str}")
+                        continue
+                    out = include_dir / f.name
+                    out.write_bytes(f.read_bytes())
+                    staged.append(out)
+                    logger.info(f"  Copied: {rel_str} -> {out}")
+            elif p.is_file():
+                rel_str = str(p.relative_to(root)).replace("\\", "/")
+                if rel_str in exclude_items_legacy:
                     if verbose:
                         logger.debug(f"  Skipped (excluded): {rel_str}")
                     continue
-                out = include_dir / f.name
-                out.write_bytes(f.read_bytes())
+                out = include_dir / p.name
+                out.write_bytes(p.read_bytes())
                 staged.append(out)
                 logger.info(f"  Copied: {rel_str} -> {out}")
-        elif p.is_file():
-            rel_str = str(p.relative_to(root)).replace("\\", "/")
-            if rel_str in exclude_items:
-                if verbose:
-                    logger.debug(f"  Skipped (excluded): {rel_str}")
-                continue
-            out = include_dir / p.name
-            out.write_bytes(p.read_bytes())
-            staged.append(out)
-            logger.info(f"  Copied: {rel_str} -> {out}")
-        else:
-            logger.warning(f"  Include path not found: {item}")
+            else:
+                logger.warning(f"  Include path not found: {item}")
     return staged
 
 
@@ -356,6 +469,7 @@ def main(
     try:
         root = workspace_root.resolve()
         cfg = load_yaml(bundle_config_file, required=True)
+        _validate_source_and_fetch_names(cfg)
         fetch_cfg = cfg.get("fetch") or []
         if not isinstance(fetch_cfg, list):
             raise click.ClickException("Config key 'fetch' must be a list of sources")

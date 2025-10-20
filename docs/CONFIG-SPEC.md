@@ -51,13 +51,43 @@ Defines certificate sources for a logical bundle.
 
 ### Source Definition
 
-```yaml
-include:  # Relative paths from repo root
-  - sources/internal/rootCA.pem
-  - sources/partners/
-exclude:  # Optional exclusions
-  - sources/partners/deprecated.pem
-```
+You can declare local certificate sources in two ways. The new preferred schema uses named repositories for clearer provenance and target path construction. The legacy flat include/exclude form remains supported for backward compatibility.
+
+- Preferred: named repositories under `repo:`
+
+  ```yaml
+  repo:
+    - name: roots
+      include:  # paths are relative to repo root
+        - sources/internal/roots/
+        - sources/internal/rootCA.pem
+      exclude:  # optional exclusions within this repo
+        - sources/internal/roots/deprecated.pem
+
+    - name: partners
+      include:
+        - sources/partners/
+  ```
+
+  Staging layout: `sources/staged/<craft>/<bundle>/<name>/...`
+
+- Legacy: flat `include`/`exclude` keys at the top level
+
+  ```yaml
+  include:
+    - sources/internal/rootCA.pem
+    - sources/partners/
+  exclude:
+    - sources/partners/deprecated.pem
+  ```
+
+  Staging layout: `sources/staged/<craft>/<bundle>/include/...`
+
+Validation rules for names:
+
+- Each `repo[].name` must be unique and must not use reserved names like `include`.
+- If `fetch[].name` is provided, those names must be unique as well.
+- A `repo[].name` must not conflict with any `fetch[].name`.
 
 ### Fetch Definitions
 

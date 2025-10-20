@@ -67,11 +67,17 @@ def _stage_bundle_sources(
     from bundlecraft.fetch import (
         _fetch_each_to_named_dirs,
         _stage_local_includes,
+        _validate_source_and_fetch_names,
         load_yaml,
     )
 
     bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle_name}.yaml"
     bundle_cfg = load_yaml(bundle_cfg_path, required=True)
+    # Validate local repo and fetch names
+    try:
+        _validate_source_and_fetch_names(bundle_cfg)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
     staging_root = STAGED_DIR / env / bundle_name
     ensure_dir(staging_root)
