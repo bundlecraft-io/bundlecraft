@@ -52,12 +52,25 @@ Defines certificate sources for a logical bundle.
 ### Source Definition
 
 ```yaml
-include:  # Relative paths from repo root
+include:  # Relative paths from repo root OR inline PEM certificates
   - sources/internal/rootCA.pem
   - sources/partners/
-exclude:  # Optional exclusions
+  - inline: |
+      -----BEGIN CERTIFICATE-----
+      MIIDrzCCApegAwIBAgIQCDvgVpBCRrGhdWrJWZHHSjANBgkqhkiG9w0BAQUFADBh
+      ...
+      -----END CERTIFICATE-----
+exclude:  # Optional exclusions (applies only to file paths, not inline)
   - sources/partners/deprecated.pem
 ```
+
+**Include Sources:**
+- **File paths**: Relative paths to certificate files or directories (e.g., `sources/internal/rootCA.pem`)
+- **Inline PEM**: Direct embedding of PEM-encoded certificates using `inline:` key
+  - Useful for testing, bootstrapping, or one-off root certificates
+  - Multiple inline entries are supported
+  - Inline sources are treated identically to file-based sources during build
+  - Subject to same deduplication and verification logic as file sources
 
 ### Fetch Definitions
 
@@ -106,6 +119,14 @@ description: Trust bundle for internal PKI services (root + issuing CAs)
 include:
   - sources/internal/rootCA.pem
   - sources/internal/issuingCA1.pem
+  - inline: |
+      -----BEGIN CERTIFICATE-----
+      MIIDrzCCApegAwIBAgIQCDvgVpBCRrGhdWrJWZHHSjANBgkqhkiG9w0BAQUFADBh
+      MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3
+      d3cuZGlnaWNlcnQuY29tMSAwHgYDVQQDExdEaWdpQ2VydCBHbG9iYWwgUm9vdCBD
+      QTAeFw0wNjExMTAwMDAwMDBaFw0zMTExMTAwMDAwMDBaMGExCzAJBgNVBAYTAlVT
+      ...
+      -----END CERTIFICATE-----
 
 exclude: []
 

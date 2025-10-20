@@ -49,9 +49,21 @@ BUILD_DIR = ROOT / "dist"
 # -------------------------------
 
 
-def read_pem_chunks(paths):
+def read_pem_chunks(paths, inline_pems=None):
+    """
+    Extract PEM certificate blocks from paths and inline PEM strings.
+    
+    Args:
+        paths: List of Path objects to read PEM certificates from
+        inline_pems: Optional list of inline PEM certificate strings
+        
+    Returns:
+        List of PEM certificate blocks as strings
+    """
     start, end = "-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"
     blocks = []
+    
+    # Process file paths
     for p in paths:
         text = p.read_text(encoding="utf-8", errors="ignore")
         buf, inside = [], False
@@ -65,6 +77,22 @@ def read_pem_chunks(paths):
                 inside = False
             elif inside:
                 buf.append(line)
+    
+    # Process inline PEM strings
+    if inline_pems:
+        for pem_text in inline_pems:
+            buf, inside = [], False
+            for line in pem_text.splitlines():
+                if start in line:
+                    inside = True
+                    buf = [line]
+                elif end in line and inside:
+                    buf.append(line)
+                    blocks.append("\n".join(buf) + "\n")
+                    inside = False
+                elif inside:
+                    buf.append(line)
+    
     return blocks
 
 
@@ -272,24 +300,36 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         include_items.extend(bundle_cfg.get("include", []) or [])
         for ex in bundle_cfg.get("exclude", []) or []:
             exclude_items.add(ex)
+    
+    # Separate inline PEM entries from file paths
     include_paths = []
+    inline_pems = []
     for item in include_items:
-        p = (ROOT / item).resolve()
-        if p.is_dir():
-            include_paths.extend(list_files(p, suffixes=(".pem",)))
-        elif p.is_file():
-            include_paths.append(p)
+        # Check if this is an inline PEM entry (dict with 'inline' key)
+        if isinstance(item, dict) and "inline" in item:
+            inline_pem = item["inline"]
+            if inline_pem:  # Skip empty inline entries
+                inline_pems.append(inline_pem)
+                click.secho("[INFO] Including inline PEM certificate", fg="blue")
         else:
-            click.secho(f"[WARN] Include path not found: {item}", fg="yellow")
+            # Process as file path
+            p = (ROOT / item).resolve()
+            if p.is_dir():
+                include_paths.extend(list_files(p, suffixes=(".pem",)))
+            elif p.is_file():
+                include_paths.append(p)
+            else:
+                click.secho(f"[WARN] Include path not found: {item}", fg="yellow")
+    
     include_paths = [
         p for p in include_paths if str(p.relative_to(ROOT)).replace("\\", "/") not in exclude_items
     ]
 
-    if not include_paths:
+    if not include_paths and not inline_pems:
         click.secho("[ERROR] No certificate sources found.", fg="red", err=True)
         sys.exit(2)
 
-    pem_blocks = dedupe_ordered(read_pem_chunks(include_paths))
+    pem_blocks = dedupe_ordered(read_pem_chunks(include_paths, inline_pems))
     if not pem_blocks:
         click.secho("[ERROR] No valid PEM certificates parsed.", fg="red", err=True)
         sys.exit(3)
@@ -422,6 +462,7 @@ def main(env, bundle, package, verify_only, prefetch, offline, output_root):
         "environment": env,
         "timestamp_utc": datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "sources": [str(p.relative_to(ROOT)).replace("\\", "/") for p in include_paths],
+        "inline_sources_count": len(inline_pems) if inline_pems else 0,
         "outputs": files_for_manifest,  # includes package.tar.gz if present
         "verify": {"fail_on_expired": fail_on_expired},
         "expiry_summary": expiry_summary,

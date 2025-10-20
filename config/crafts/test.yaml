@@ -1,0 +1,23 @@
+---
+name: test
+description: Test environment for inline PEM support
+
+targets:
+  test-inline:
+    includes: [test-inline]
+  test-inline-multi:
+    includes: [test-inline-multi]
+
+output_formats:
+  - pem
+
+verify:
+  fail_on_expired: false
+  warn_days_before_expiry: 30
+
+filters:
+  unique_by_fingerprint: true
+
+metadata:
+  name: Test
+  contact: test@bundlecraft.io
