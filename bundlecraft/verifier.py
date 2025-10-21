@@ -266,6 +266,9 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
     "--gpg-keyring",
     type=click.Path(exists=True),
     help="Path to GPG public keyring file to import for signature verification",
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be verified without actually reading files",
 )
 @click.option(
     "--json",
@@ -275,13 +278,41 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
 )
 def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_keyring, json_output):
     """Verify the integrity and consistency of built trust bundles."""
+def main(target, verify_manifest, verify_all, verbose, dry_run, json_output):
+    """Verify the integrity and consistency of built trust bundles.
+
+    Use --dry-run to preview what would be verified without making any changes.
+    """
     if not json_output:
         click.secho("\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
-    
+
+        if dry_run:
+            click.secho(
+                "[DRY RUN MODE] No files will be read or verified\n", fg="yellow", bold=True
+            )
+
     path = Path(target)
-    
+
     # For single file verification
     if path.is_file():
+        if dry_run:
+            if not json_output:
+                click.echo(f"[dry-run] Would verify single file: {path.name}")
+                click.echo("[dry-run] Would compute SHA256 hash")
+                if verbose:
+                    click.echo("[dry-run] Would display file info")
+            else:
+                from bundlecraft.helpers.json_output import create_verify_response, emit_json
+
+                emit_json(
+                    create_verify_response(
+                        success=True,
+                        target_path=str(path),
+                        verified_files=0,
+                        dry_run=True,
+                    )
+                )
+            return
         if not json_output:
             logger.info(f"Verifying single file: {path.name}")
         digest = sha256sum(path)
@@ -316,12 +347,12 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
                 logger.info(f"Info: {file_info(path)}")
         else:
             from bundlecraft.helpers.json_output import create_verify_response, emit_json
-            emit_json(create_verify_response(
-                success=True,
-                target_path=str(path),
-                verified_files=1,
-                file_sha256=digest
-            ))
+
+            emit_json(
+                create_verify_response(
+                    success=True, target_path=str(path), verified_files=1, file_sha256=digest
+                )
+            )
         return
 
     # For directory verification
@@ -330,8 +361,45 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
     verified_count = 0
     skipped_count = 0
     total_certs = 0
-    
+
     ok = True
+    if dry_run:
+        if not json_output:
+            if verify_manifest:
+                click.echo("[dry-run] Would display manifest info from: " + str(path))
+            elif verify_all:
+                click.echo("[dry-run] Would verify directory: " + str(path))
+                click.echo("[dry-run] Would display manifest info from: " + str(path))
+            else:
+                click.echo("[dry-run] Would verify directory: " + str(path))
+
+            # Show what would be checked
+            checksum_path = path / CHECKSUM_FILE
+            if checksum_path.exists():
+                click.echo(f"[dry-run] Would load checksums from: {checksum_path.name}")
+                try:
+                    checksums = load_checksums(checksum_path)
+                    click.echo(f"[dry-run] Would verify {len(checksums)} file(s)")
+                except Exception as e:
+                    click.echo(f"[dry-run] Note: Could not parse checksums: {e}", err=True)
+            else:
+                click.echo(f"[dry-run] Note: {CHECKSUM_FILE} not found", err=True)
+
+            manifest_path = path / MANIFEST_FILE
+            if (verify_manifest or verify_all) and manifest_path.exists():
+                click.echo(f"[dry-run] Would display manifest from: {manifest_path.name}")
+
+            click.echo("✅ [dry-run] Verification simulation complete")
+        else:
+            from bundlecraft.helpers.json_output import create_verify_response, emit_json
+
+            emit_json(
+                create_verify_response(
+                    success=True, target_path=str(path), verified_files=0, dry_run=True
+                )
+            )
+        return
+
     if verify_manifest:
         show_manifest_info(path, verbose)
     elif verify_all:
@@ -476,21 +544,24 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
 
     if json_output:
         from bundlecraft.helpers.json_output import create_verify_response, emit_json
-        emit_json(create_verify_response(
-            success=ok,
-            target_path=str(path),
-            verified_files=verified_count,
-            skipped_files=skipped_count,
-            total_certificates=total_certs,
-            errors=json_errors if json_errors else None,
-            warnings=json_warnings if json_warnings else None
-        ))
+
+        emit_json(
+            create_verify_response(
+                success=ok,
+                target_path=str(path),
+                verified_files=verified_count,
+                skipped_files=skipped_count,
+                total_certificates=total_certs,
+                errors=json_errors if json_errors else None,
+                warnings=json_warnings if json_warnings else None,
+            )
+        )
     else:
         if ok:
             logger.info("✅ All verifications passed.")
         else:
             logger.error("❌ One or more verifications failed.")
-    
+
     if not ok:
         exit(1)
 

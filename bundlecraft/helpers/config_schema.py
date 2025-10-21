@@ -131,6 +131,18 @@ class FetchEntry(BaseModel):
     endpoint: str | None = Field(None, description="API endpoint URL")
     headers: dict[str, str] = Field(default_factory=dict, description="HTTP headers for API")
     bearer_token_env: str | None = Field(None, description="Environment variable for bearer token")
+    timeout: int | None = Field(
+        None, ge=1, le=600, description="Request timeout in seconds (overrides default)"
+    )
+    retries: int | None = Field(
+        None, ge=0, le=10, description="Number of retry attempts (overrides default)"
+    )
+    backoff_factor: float | None = Field(
+        None, ge=1.0, le=10.0, description="Exponential backoff multiplier (overrides default)"
+    )
+    retry_on_status: list[int] | None = Field(
+        None, description="HTTP status codes to retry (overrides default)"
+    )
 
     @field_validator("name")
     @classmethod
@@ -198,6 +210,29 @@ class FiltersModel(BaseModel):
         return v
 
 
+class FetchRetryConfig(BaseModel):
+    """Fetch retry and timeout configuration."""
+
+    timeout: int = Field(30, ge=1, le=600, description="Request timeout in seconds")
+    retries: int = Field(3, ge=0, le=10, description="Number of retry attempts")
+    backoff_factor: float = Field(
+        2.0, ge=1.0, le=10.0, description="Exponential backoff multiplier"
+    )
+    retry_on_status: list[int] = Field(
+        default_factory=lambda: [429, 502, 503, 504],
+        description="HTTP status codes to retry",
+    )
+
+    @field_validator("retry_on_status")
+    @classmethod
+    def validate_retry_status_codes(cls, v: list[int]) -> list[int]:
+        """Ensure retry status codes are valid HTTP codes."""
+        for code in v:
+            if not 100 <= code <= 599:
+                raise ValueError(f"Invalid HTTP status code: {code}")
+        return v
+
+
 class VerifyModel(BaseModel):
     """Verification settings."""
 
@@ -242,6 +277,21 @@ class DistributionMetadata(BaseModel):
     assets: list[str] = Field(default_factory=list)
     repositories: list[dict[str, Any]] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+
+
+class OutputMetadata(BaseModel):
+    """Output metadata configuration for GitOps orchestration."""
+
+    model_config = ConfigDict(extra="allow")  # Allow additional metadata fields
+
+    annotations: dict[str, str] = Field(
+        default_factory=dict,
+        description="Annotations for Kubernetes/GitOps (e.g., ArgoCD sync-wave)",
+    )
+    labels: dict[str, str] = Field(
+        default_factory=dict,
+        description="Labels for Kubernetes/GitOps (e.g., environment, component)",
+    )
 
 
 class TargetEntry(BaseModel):
@@ -332,6 +382,9 @@ class CraftConfig(BaseModel):
     distribution_metadata: DistributionMetadata | None = None
     metadata: MetadataModel = Field(default_factory=MetadataModel)
     build_path: str | None = Field(None, description="Custom build output path")
+    output_metadata: OutputMetadata | None = Field(
+        None, description="Output metadata for GitOps (annotations/labels with templating)"
+    )
 
     @field_validator("output_formats")
     @classmethod
@@ -376,6 +429,10 @@ class DefaultsConfig(BaseModel):
     filters: FiltersModel = Field(default_factory=FiltersModel)
     format_overrides: FormatOverridesModel = Field(default_factory=FormatOverridesModel)
     metadata: MetadataModel = Field(default_factory=MetadataModel)
+    fetch: FetchRetryConfig = Field(
+        default_factory=FetchRetryConfig,
+        description="Default fetch retry and timeout configuration",
+    )
 
     @field_validator("output_formats")
     @classmethod
