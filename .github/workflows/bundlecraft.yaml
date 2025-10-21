@@ -148,15 +148,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
+        id: download
         uses: actions/download-artifact@v4
         with:
           pattern: trust-store-*
           path: dist/
           merge-multiple: false
+        continue-on-error: true
+      - name: Check download status
+        run: |
+          if [ "${{ steps.download.outcome }}" != "success" ]; then
+            echo "::error::Artifact download failed or found no matching artifacts"
+            echo "Build job may have failed or artifacts were not uploaded"
+            exit 1
+          fi
+          echo "Artifact download succeeded"
+      - name: Debug - List downloaded artifacts
+        run: |
+          echo "=== Checking if dist/ exists ==="
+          ls -la . || true
+          echo "=== Contents of current directory ==="
+          find . -maxdepth 2 -type d || true
+          echo "=== Contents of dist/ (if exists) ==="
+          if [ -d dist ]; then
+            ls -laR dist/ || true
+          else
+            echo "dist/ directory does not exist!"
+          fi
       - name: Rehydrate to pki-ca-trust/<env>/<bundle> and package
         run: |
           set -euo pipefail
           echo "=== Contents of dist/ after artifact download ==="
+          if [ ! -d dist ]; then
+            echo "::error::dist/ directory was not created by artifact download"
+            echo "This means no artifacts matching 'trust-store-*' were found"
+            echo "Check that the build job completed successfully and uploaded artifacts"
+            exit 1
+          fi
           ls -laR dist/ || true
           echo "=================================================="
           rm -rf pki-ca-trust
