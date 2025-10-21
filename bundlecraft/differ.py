@@ -26,6 +26,8 @@ import click
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
+from bundlecraft.helpers.exit_codes import ExitCode
+
 
 def _extract_cert_info(pem_block: str) -> dict[str, any] | None:
     """Extract certificate information from PEM block.
@@ -331,13 +333,13 @@ def main(from_path: Path, to_path: Path, output_format: str, output: Path | None
         # Exit code based on changes
         summary = diff_result["diff"]["summary"]
         if summary["total_changes"] > 0:
-            sys.exit(0)  # Changes detected, but not an error
+            sys.exit(ExitCode.SUCCESS)  # Changes detected, but not an error
         else:
-            sys.exit(0)  # No changes
+            sys.exit(ExitCode.SUCCESS)  # No changes
 
     except Exception as e:
         click.secho(f"Error: {e}", fg="red", err=True)
-        sys.exit(1)
+        sys.exit(ExitCode.GENERAL_ERROR)
 
 
 if __name__ == "__main__":

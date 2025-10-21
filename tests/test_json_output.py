@@ -74,7 +74,8 @@ fetch:
             ],
         )
 
-        assert result.exit_code == 2
+        # Exit code 22 = FETCH_ERROR (see bundlecraft/helpers/exit_codes.py)
+        assert result.exit_code == 22
         # Check that we got valid JSON output even on error
         if result.output.strip():
             data = json.loads(result.output)
@@ -199,7 +200,8 @@ class TestVerifyJsonOutput:
             ],
         )
 
-        assert result.exit_code == 1
+        # Exit code 30 = VALIDATION_ERROR (see bundlecraft/helpers/exit_codes.py)
+        assert result.exit_code == 30
         data = json.loads(result.output)
         assert data["success"] is False
         assert data["command"] == "verify"
@@ -274,7 +276,8 @@ class TestJsonOutputSchema:
             ],
         )
 
-        assert result.exit_code == 2
+        # Exit code 22 = FETCH_ERROR (see bundlecraft/helpers/exit_codes.py)
+        assert result.exit_code == 22
         if result.output.strip():
             data = json.loads(result.output)
             assert data["success"] is False
