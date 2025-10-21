@@ -1143,10 +1143,9 @@ def main(
                 display_path = manifest_path.relative_to(ROOT)
             except ValueError:
                 display_path = manifest_path
-            click.secho(f"  [{target_name}] ✓ Wrote manifest: {display_path}", fg="green")
             if not json_output:
                 click.secho(
-                    f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}",
+                    f"  [{target_name}] ✓ Wrote manifest: {display_path}",
                     fg="green",
                 )
 
