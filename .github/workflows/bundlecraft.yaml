@@ -136,12 +136,28 @@ jobs:
           echo "=== output directory structure ==="
           (tree "${{ matrix.item.output_root }}/" || find "${{ matrix.item.output_root }}/") || true
           echo "=================================="
+      - name: Check built target path exists
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          ROOT="${{ matrix.item.output_root }}"
+          CANDIDATES=("${ROOT}"/*/"${{ matrix.item.target }}"/)
+          echo "Searching for build output in: ${ROOT}/*/${{ matrix.item.target }}/"
+          if [ ${#CANDIDATES[@]} -eq 0 ]; then
+            echo "::error::Build output directory not found for target '${{ matrix.item.target }}' under ${ROOT}/*/"
+            echo "Listing ${ROOT}/ for debugging:" && (ls -laR "${ROOT}/" || true)
+            exit 1
+          fi
+          echo "Found ${#CANDIDATES[@]} candidate(s):"
+          printf ' - %s\n' "${CANDIDATES[@]}"
+          shopt -u nullglob
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
           name: trust-store-${{ matrix.item.env }}-${{ matrix.item.target }}
-          path: ${{ matrix.item.output_root }}/${{ matrix.item.env }}/${{ matrix.item.target
-            }}/
+          path: |
+            ${{ matrix.item.output_root }}/*/${{ matrix.item.target }}/
+          if-no-files-found: error
   collect:
     name: Collect and package all builds
     needs: build
