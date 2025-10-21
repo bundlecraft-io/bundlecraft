@@ -78,7 +78,15 @@ class MetadataModel(BaseModel):
     environment_tier: str | None = None
     approval_required: bool | None = None
     maintainer: str | None = None
-    policy_version: str | None = None
+    policy_version: str | int | float | None = None
+
+    @field_validator("policy_version", mode="before")
+    @classmethod
+    def convert_policy_version_to_str(cls, v: str | int | float | None) -> str | None:
+        """Convert numeric policy versions to strings."""
+        if v is not None and not isinstance(v, str):
+            return str(v)
+        return v
 
 
 class RepoEntry(BaseModel):

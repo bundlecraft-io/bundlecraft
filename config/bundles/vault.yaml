@@ -4,7 +4,7 @@ description: Trust bundle sourced from HashiCorp Vault secret store
 fetch:
   - name: from_vault
     type: vault
-    mount_point: secret
+    mount: secret
     path: pki/trusted_roots
     pem_field: pem
     addr: http://127.0.0.1:8200

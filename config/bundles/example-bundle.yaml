@@ -61,7 +61,7 @@ fetch:
   # Example: HashiCorp Vault
   - name: vault_roots
     type: vault
-    mount_point: secret
+    mount: secret
     path: pki/trusted_roots
     pem_field: pem
     addr: https://vault.example.com:8200

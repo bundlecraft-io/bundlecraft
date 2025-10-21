@@ -152,7 +152,7 @@ fetch:
 
   - name: vault_roots
     type: vault
-    mount_point: secret
+    mount: secret
     path: pki/trusted_roots
     pem_field: pem
     addr: http://127.0.0.1:8200
@@ -488,6 +488,237 @@ Supported values for `distribution_metadata.targets[].type`:
 
 ---
 
+## Schema Validation
+
+BundleCraft uses Pydantic v2 for comprehensive configuration validation. All configs are validated at load time with clear error messages.
+
+For step-by-step guidance on interpreting and fixing validation errors (plus pytest and pre-commit tips), see:
+- docs/troubleshooting.md → YAML schema/validation failures
+- docs/troubleshooting.md → Pytest failures: quick navigation
+- docs/troubleshooting.md → pre-commit failures: common hooks and fixes
+
+### Required Fields
+
+**Bundle Configs:**
+- `bundle_name` (string, non-empty) - Unique identifier for the bundle
+- `description` (string, non-empty) - Human-readable purpose/context
+- At least one of: `repo[]` or `fetch[]` - Must define at least one certificate source
+
+**Craft Configs:**
+- `name` (string, non-empty) - Display name for the craft
+- `description` (string, non-empty) - Human-readable purpose/context
+- `targets` (dict or list, non-empty) - At least one build target required
+
+**Defaults Config:**
+- No strictly required fields (all have sensible defaults)
+
+### Value Constraints
+
+**Output Formats:**
+- Valid values: `pem`, `p7b`, `jks`, `p12`, `pkcs12`, `der`
+- Invalid formats trigger a clear error with the list of valid options
+
+**Key Size Requirements (Security):**
+- RSA keys: minimum 1024 bits (configurable via `filters.minimum_key_size_rsa`)
+- ECC keys: minimum 192 bits (configurable via `filters.minimum_key_size_ecc`)
+
+**Expiry Warnings:**
+- `warn_days_before_expiry`: must be between 0 and 365 days
+
+**URL Security:**
+- Only `https://` and `file://` URLs are allowed (enforced for `fetch[].url` and `fetch[].endpoint`)
+- Exception: `http://localhost` and `http://127.0.0.1` are permitted for local development
+- Insecure HTTP URLs trigger: `"Only HTTPS URLs are allowed for security"`
+
+**Reserved Names:**
+- The following names are reserved and cannot be used for bundle names, repo names, or fetch names:
+  - `include`, `exclude`, `fetch`, `repo`
+- Using a reserved name triggers: `"'<name>' is a reserved name and cannot be used"`
+
+**Name Uniqueness:**
+- All `repo[].name` values must be unique within a bundle
+- All `fetch[].name` values must be unique within a bundle
+- No `repo[].name` can conflict with any `fetch[].name` in the same bundle
+
+**Type-Specific Requirements:**
+- `fetch[].type: url` → requires `url` field
+- `fetch[].type: vault` → requires both `mount` and `path` fields
+- `fetch[].type: api` → requires `endpoint` field
+
+**Target Requirements:**
+- Each target in `targets` must have at least one of: `includes`, `include_bundles`, or `compose`
+- Empty targets trigger: `"At least one of 'includes', 'include_bundles', or 'compose' must be provided"`
+
+**Inline PEM Entries:**
+- Dictionary entries in `repo[].include[]` must have either `inline` or `path` key
+- Invalid: `{"invalid_key": "value"}` → triggers error
+
+### Common Validation Errors
+
+**Error: Missing required field**
+```
+1 validation error for BundleConfig
+bundle_name
+  Field required [type=missing, input_value={...}, input_type=dict]
+```
+**Fix:** Add the required field:
+```yaml
+bundle_name: my-bundle
+description: My bundle description
+```
+
+---
+
+**Error: Empty string**
+```
+1 validation error for BundleConfig
+description
+  String should have at least 1 character [type=string_too_short, input_value='', input_type=str]
+```
+**Fix:** Provide a non-empty value:
+```yaml
+description: Internal CA roots for production
+```
+
+---
+
+**Error: Invalid output format**
+```
+1 validation error for CraftConfig
+output_formats
+  Value error, Invalid output format 'jsk'. Valid formats: der, jks, p12, p7b, pem, pkcs12
+```
+**Fix:** Use a valid format name:
+```yaml
+output_formats: [pem, jks, p7b, p12]  # Fixed: jsk → jks
+```
+
+---
+
+**Error: Insecure HTTP URL**
+```
+1 validation error for BundleConfig
+fetch.0.url
+  Value error, Only HTTPS URLs are allowed for security. Use https:// or file:// schemes.
+```
+**Fix:** Use HTTPS or file:// URLs:
+```yaml
+fetch:
+  - name: mozilla_roots
+    type: url
+    url: https://curl.se/ca/cacert.pem  # Changed from http:// to https://
+```
+
+---
+
+**Error: Reserved name**
+```
+1 validation error for BundleConfig
+bundle_name
+  Value error, 'fetch' is a reserved bundle name
+```
+**Fix:** Use a different name:
+```yaml
+bundle_name: mozilla-fetch  # Changed from 'fetch'
+```
+
+---
+
+**Error: Duplicate names**
+```
+1 validation error for BundleConfig
+  Value error, Duplicate repo names found: internal
+```
+**Fix:** Ensure all repo and fetch names are unique:
+```yaml
+repo:
+  - name: internal-roots
+    include: [sources/internal/roots/]
+  - name: internal-intermediates  # Changed from 'internal'
+    include: [sources/internal/intermediate/]
+```
+
+---
+
+**Error: No sources defined**
+```
+1 validation error for BundleConfig
+  Value error, Bundle must have at least one 'repo' or 'fetch' entry
+```
+**Fix:** Add at least one source:
+```yaml
+repo:
+  - name: local
+    include: [sources/internal/]
+```
+
+---
+
+**Error: Missing type-specific field**
+```
+1 validation error for BundleConfig
+fetch.0
+  Value error, 'url' is required for fetch type 'url'
+```
+**Fix:** Add the required field for the fetch type:
+```yaml
+fetch:
+  - name: mozilla
+    type: url
+    url: https://curl.se/ca/cacert.pem  # Added missing url field
+```
+
+---
+
+**Error: Key size too small**
+```
+1 validation error for DefaultsConfig
+filters.minimum_key_size_rsa
+  Value error, RSA key size must be at least 1024 bits for security
+```
+**Fix:** Use minimum required key sizes:
+```yaml
+filters:
+  minimum_key_size_rsa: 2048  # Changed from 512
+  minimum_key_size_ecc: 256   # Changed from 128
+```
+
+---
+
+**Error: Numeric policy_version**
+```
+# This is automatically handled - no error!
+# The validator converts numeric versions to strings:
+metadata:
+  policy_version: 1.0  # Automatically converted to "1.0"
+```
+
+### Validation Architecture
+
+- **Location:** `bundlecraft/helpers/config_schema.py`
+- **Framework:** Pydantic v2 with `ConfigDict` and field validators
+- **Validation Points:**
+  - Bundle configs: validated in `builder.py` and `fetch.py`
+  - Craft configs: validated in `builder.py`
+  - Defaults config: validated in `builder.py`
+- **Error Handling:** All validation errors are caught and re-raised as `ValueError` with full Pydantic error details
+- **Extra Fields:** Allowed via `ConfigDict(extra="allow")` for forward compatibility
+
+### Testing
+
+Comprehensive validation tests are located in `tests/test_config_validation.py` with 30+ test cases covering:
+- Missing required fields
+- Empty values
+- Invalid formats
+- Reserved names
+- Duplicate names
+- Name conflicts
+- Security constraints (HTTPS, key sizes)
+- Type-specific requirements
+- Valid configurations (positive tests)
+
+---
+
 ## Security Best Practices
 
 1. **Fetch verification**: Always pin `sha256` for public/static sources (Mozilla)
@@ -495,3 +726,5 @@ Supported values for `distribution_metadata.targets[].type`:
 3. **Secrets**: Never hardcode passwords; always use `*_env` keys to reference environment variables
 4. **Distribution**: Use `enabled: false` to disable distribution targets in lower environments
 5. **Tags**: Use environment tags to control CI/CD pipeline routing (e.g., only sign/publish `production` tagged envs)
+6. **HTTPS enforcement**: The schema automatically rejects insecure HTTP URLs (except localhost)
+7. **Key sizes**: Configure minimum key size requirements to enforce cryptographic standards
