@@ -316,7 +316,13 @@ def _verify_certificates(
     is_flag=True,
     help="Show what would be done without actually writing any files or executing commands",
 )
-def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose, force, dry_run):
+@click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    help="Emit machine-readable JSON output (suppresses human-readable output)",
+)
+def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose, force, dry_run, json_output):
     """Build trust bundles by orchestrating: fetch → convert → verify.
 
     This command coordinates the three core BundleCraft stages:
@@ -327,12 +333,17 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     The build always fetches unless --skip-fetch is used (for fast iteration).
     Use --dry-run to preview what would be done without making any changes.
     """
-    click.secho("\n🔐 BundleCraft Builder\n---------------------", fg="cyan")
+    # Track errors and targets for JSON output
+    json_errors = []
+    json_targets = []
+    
+    if not json_output:
+        click.secho("\n🔐 BundleCraft Builder\n---------------------", fg="cyan")
 
-    if dry_run:
-        click.secho(
-            "[DRY RUN MODE] No files will be written or commands executed\n", fg="yellow", bold=True
-        )
+        if dry_run:
+            click.secho(
+                "[DRY RUN MODE] No files will be written or commands executed\n", fg="yellow", bold=True
+            )
 
     # Load defaults and craft config with proper precedence
     from bundlecraft.helpers.utils import merge_configs
@@ -346,7 +357,18 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     cfg_path = craft_path if craft_path.exists() else legacy_env_path
 
     if not cfg_path.exists():
-        click.secho(f"[ERROR] Craft config not found: {env}", fg="red", err=True)
+        error_msg = f"Craft config not found: {env}"
+        if json_output:
+            json_errors.append(error_msg)
+            from bundlecraft.helpers.json_output import create_build_response, emit_json
+            emit_json(create_build_response(
+                success=False,
+                craft=env,
+                targets=[],
+                errors=json_errors
+            ))
+        else:
+            click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
         sys.exit(2)
 
     craft_cfg = load_yaml(cfg_path, required=True, validate=validate_craft_config)
@@ -388,11 +410,22 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             for tname, entry in targets_map.items():
                 targets_to_build.append((tname, list(entry["include_bundles"])))
         else:
-            click.secho(
-                "[ERROR] No targets found in craft config and no --bundle provided.",
-                fg="red",
-                err=True,
-            )
+            if not json_output:
+                click.secho(
+                    "[ERROR] No targets found in craft config and no --bundle provided.",
+                    fg="red",
+                    err=True,
+                )
+            else:
+                error_msg = "No targets found in craft config and no --bundle provided."
+                json_errors.append(error_msg)
+                from bundlecraft.helpers.json_output import create_build_response, emit_json
+                emit_json(create_build_response(
+                    success=False,
+                    craft=env,
+                    targets=[],
+                    errors=json_errors
+                ))
             sys.exit(2)
 
     # Precompute craft-safe path and output settings used during caching
@@ -422,26 +455,29 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     bundle_cache_dirs: dict[str, Path] = {}
 
     if not skip_fetch:
-        click.secho(
-            f"\n[STAGE 1/3] FETCH - Staging and caching {len(unique_bundles)} unique bundle(s)",
-            fg="blue",
-            bold=True,
-        )
+        if not json_output:
+            click.secho(
+                f"\n[STAGE 1/3] FETCH - Staging and caching {len(unique_bundles)} unique bundle(s)",
+                fg="blue",
+                bold=True,
+            )
         for bname in unique_bundles:
             try:
                 staging_dir = _stage_bundle_sources(
                     bname, env, ROOT, verbose=verbose, dry_run=dry_run
                 )
                 if dry_run:
-                    click.secho(
-                        f"  [cache] [dry-run] Would stage bundle: {bname} → {staging_dir.relative_to(ROOT)}",
-                        fg="yellow",
-                    )
+                    if not json_output:
+                        click.secho(
+                            f"  [cache] [dry-run] Would stage bundle: {bname} → {staging_dir.relative_to(ROOT)}",
+                            fg="yellow",
+                        )
                 else:
-                    click.secho(
-                        f"  [cache] ✓ Staged bundle: {bname} → {staging_dir.relative_to(ROOT)}",
-                        fg="green",
-                    )
+                    if not json_output:
+                        click.secho(
+                            f"  [cache] ✓ Staged bundle: {bname} → {staging_dir.relative_to(ROOT)}",
+                            fg="green",
+                        )
 
                 cache_dir = bundle_cache_root / bname
                 if not dry_run:
@@ -526,7 +562,8 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                     traceback.print_exc()
                 sys.exit(2)
     else:
-        click.secho("\n[STAGE 1/3] FETCH - Skipped (using existing staged sources)", fg="yellow")
+        if not json_output:
+            click.secho("\n[STAGE 1/3] FETCH - Skipped (using existing staged sources)", fg="yellow")
         for bname in unique_bundles:
             cache_dir = bundle_cache_root / bname
             bundle_cache_dirs[bname] = cache_dir
@@ -541,7 +578,8 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     # =========================================================================
     # STAGE 2: CONVERT
     # =========================================================================
-    click.secho("\n[STAGE 2/3] CONVERT - Aggregating and converting formats", fg="blue", bold=True)
+    if not json_output:
+        click.secho("\n[STAGE 2/3] CONVERT - Aggregating and converting formats", fg="blue", bold=True)
     craft_name_for_path = env_cfg.get("name") or env
     safe_craft = str(craft_name_for_path).replace("/", "-").replace(" ", "-")
 
@@ -656,8 +694,10 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     # =========================================================================
     # STAGE 3: VERIFY
     # =========================================================================
+    verify_results = {}  # Track verification results per target for JSON output
     if not skip_verify:
-        click.secho("\n[STAGE 3/3] VERIFY - Validating certificates", fg="blue", bold=True)
+        if not json_output:
+            click.secho("\n[STAGE 3/3] VERIFY - Validating certificates", fg="blue", bold=True)
         verify_cfg = env_cfg.get("verify") or {}
         fail_on_expired = (
             verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
@@ -668,35 +708,51 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
         for target_name, result in per_target_results.items():
             pem_blocks = result["pem_blocks"]
             errs, warns = _verify_certificates(pem_blocks, fail_on_expired, warn_days)
-            for e in errs:
-                click.secho(f"  [{target_name}] [ERROR] {e}", fg="red")
-            for w in warns:
-                click.secho(f"  [{target_name}] [WARN] {w}", fg="yellow")
+            verify_results[target_name] = {
+                "passed": len(errs) == 0,
+                "errors": errs,
+                "warnings": warns
+            }
+            if not json_output:
+                for e in errs:
+                    click.secho(f"  [{target_name}] [ERROR] {e}", fg="red")
+                for w in warns:
+                    click.secho(f"  [{target_name}] [WARN] {w}", fg="yellow")
             if errs:
-                click.secho(
-                    f"  [{target_name}] [SUMMARY] {len(errs)} expired/invalid certificate(s)",
-                    fg="red",
-                )
+                if not json_output:
+                    click.secho(
+                        f"  [{target_name}] [SUMMARY] {len(errs)} expired/invalid certificate(s)",
+                        fg="red",
+                    )
                 if fail_on_expired:
-                    click.secho("  Build FAILED due to expired certificates", fg="red", err=True)
-                    sys.exit(5)
-            if warns:
-                click.secho(
-                    f"  [{target_name}] [SUMMARY] {len(warns)} certificate(s) expiring within {warn_days} days",
-                    fg="yellow",
-                )
-            if not errs and not warns:
-                click.secho(
-                    f"  [{target_name}] ✓ All certificates are valid and healthy", fg="green"
-                )
+                    if not json_output:
+                        click.secho("  Build FAILED due to expired certificates", fg="red", err=True)
+                    else:
+                        # For JSON mode, we'll output at the end with success=False
+                        pass
+                    # Don't exit yet in JSON mode, let it collect all errors
+                    if not json_output:
+                        sys.exit(5)
+            if not json_output:
+                if warns:
+                    click.secho(
+                        f"  [{target_name}] [SUMMARY] {len(warns)} certificate(s) expiring within {warn_days} days",
+                        fg="yellow",
+                    )
+                if not errs and not warns:
+                    click.secho(
+                        f"  [{target_name}] ✓ All certificates are valid and healthy", fg="green"
+                    )
     else:
-        click.secho("\n[STAGE 3/3] VERIFY - Skipped", fg="yellow")
+        if not json_output:
+            click.secho("\n[STAGE 3/3] VERIFY - Skipped", fg="yellow")
 
     # =========================================================================
     # FINALIZE: Manifest and checksums
     # =========================================================================
     if not dry_run:
-        click.secho("\nFinalizing build artifacts...", fg="blue")
+        if not json_output:
+            click.secho("\nFinalizing build artifacts...", fg="blue")
 
         # Build manifest and checksums per target
         for target_name, result in per_target_results.items():
@@ -735,32 +791,91 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             manifest_path.write_text(
                 json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
-            click.secho(
-                f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}", fg="green"
-            )
+            if not json_output:
+                click.secho(
+                    f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}", fg="green"
+                )
 
             all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
             checksum_lines = [f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files]
             checksum_path = build_root / "checksums.sha256"
             checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
-            click.secho(
-                f"  [{target_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}",
-                fg="green",
-            )
+            if not json_output:
+                click.secho(
+                    f"  [{target_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}",
+                    fg="green",
+                )
 
-    if dry_run:
-        click.secho(
-            "\n✅ [DRY RUN] Build simulation complete for target(s): "
-            + ", ".join(per_target_results.keys()),
-            fg="yellow",
-            bold=True,
+    # =========================================================================
+    # OUTPUT RESULTS
+    # =========================================================================
+    # Collect target information for JSON output
+    for target_name, result in per_target_results.items():
+        build_root = result["build_root"]
+        pem_blocks = result["pem_blocks"]
+        output_formats = result["output_formats"]
+        
+        # Get bundles for this target
+        target_bundles = []
+        for tname, include_bundles in targets_to_build:
+            if tname == target_name:
+                target_bundles = include_bundles
+                break
+        
+        target_info = {
+            "name": target_name,
+            "certificate_count": len(pem_blocks),
+            "output_formats": output_formats,
+            "output_path": str(build_root.relative_to(ROOT)) if not dry_run else str(build_root),
+            "bundles": target_bundles,
+        }
+        
+        # Add verification results if available
+        if target_name in verify_results:
+            target_info["verification"] = verify_results[target_name]
+        
+        json_targets.append(target_info)
+    
+    # Check if any verification errors occurred
+    verification_failed = False
+    if not skip_verify:
+        verify_cfg = env_cfg.get("verify") or {}
+        fail_on_expired = (
+            verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
         )
+        for target_name in verify_results:
+            if verify_results[target_name]["errors"] and fail_on_expired:
+                verification_failed = True
+                break
+    
+    # Output results
+    if json_output:
+        from bundlecraft.helpers.json_output import create_build_response, emit_json
+        
+        emit_json(create_build_response(
+            success=not verification_failed and not json_errors,
+            craft=env_cfg.get("name") or env,
+            targets=json_targets,
+            errors=json_errors if json_errors else None,
+            dry_run=dry_run
+        ))
+        
+        if verification_failed:
+            sys.exit(5)
     else:
-        click.secho(
-            "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
-            fg="bright_green",
-            bold=True,
-        )
+        if dry_run:
+            click.secho(
+                "\n✅ [DRY RUN] Build simulation complete for target(s): "
+                + ", ".join(per_target_results.keys()),
+                fg="yellow",
+                bold=True,
+            )
+        else:
+            click.secho(
+                "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
+                fg="bright_green",
+                bold=True,
+            )
 
 
 if __name__ == "__main__":
