@@ -225,9 +225,16 @@ verify:
   warn_days_before_expiry: 30
 
 filters:
-  unique_by_fingerprint: true
-  not_expired_only: true
-  ca_certs_only: true
+  unique_by_fingerprint: true   # Deduplicate by SHA256 fingerprint
+  not_expired_only: true         # Exclude expired certificates
+  ca_certs_only: true            # Only CA certificates (BasicConstraints CA:TRUE)
+  root_certs_only: true          # Only self-signed root CAs (default: true)
+  # Optional filters (undefined by default):
+  # signature_algorithms:        # Filter by signature algorithm
+  #   include: ["sha256WithRSAEncryption", "ecdsa-with-SHA256"]
+  #   exclude: ["sha1WithRSAEncryption", "md5WithRSAEncryption"]
+  # minimum_key_size_rsa: 2048   # Minimum RSA key size in bits
+  # minimum_key_size_ecc: 256    # Minimum ECC key size in bits
 
 pem:
   include_subject_comments: true  # Add "# Subject:" comments
@@ -304,6 +311,8 @@ filters:
   unique_by_fingerprint: true
   not_expired_only: true
   ca_certs_only: true
+  root_certs_only: true  # Only self-signed roots (default)
+  # Optional: signature_algorithms, minimum_key_size_rsa, minimum_key_size_ecc
 
 format_overrides:
   jks:
@@ -366,6 +375,13 @@ filters:
   unique_by_fingerprint: true
   not_expired_only: true
   ca_certs_only: true
+  root_certs_only: true  # Only self-signed root CAs (default)
+  # Optional filters (undefined by default):
+  # signature_algorithms:
+  #   include: ["sha256WithRSAEncryption"]
+  #   exclude: ["sha1WithRSAEncryption"]
+  # minimum_key_size_rsa: 2048
+  # minimum_key_size_ecc: 256
 
 format_overrides:
   jks:

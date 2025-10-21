@@ -297,7 +297,10 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     """
     click.secho("\n🔐 BundleCraft Builder\n---------------------", fg="cyan")
 
-    # Load craft config
+    # Load defaults and craft config with proper precedence
+    from bundlecraft.helpers.utils import merge_configs
+
+    defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False) or {}
     craft_path = CONFIG_DIR / "crafts" / f"{env}.yaml"
     legacy_env_path = CONFIG_DIR / "envs" / f"{env}.yaml"
     cfg_path = craft_path if craft_path.exists() else legacy_env_path
@@ -306,7 +309,8 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
         click.secho(f"[ERROR] Craft config not found: {env}", fg="red", err=True)
         sys.exit(2)
 
-    env_cfg = load_yaml(cfg_path, required=True)
+    craft_cfg = load_yaml(cfg_path, required=True)
+    env_cfg = merge_configs(defaults, craft_cfg)
 
     # Normalize targets from craft config
     raw_targets = env_cfg.get("targets") or {}
@@ -404,7 +408,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                     )
                     sys.exit(2)
                 pem_blocks = _read_pem_chunks(pem_files)
-                pem_blocks = _dedupe_pem_blocks(pem_blocks)
+
+                # Apply filters from merged config
+                from bundlecraft.helpers.utils import apply_filters
+
+                filters_cfg = env_cfg.get("filters") or {}
+                pem_blocks = apply_filters(pem_blocks, filters_cfg)
+
                 if not pem_blocks:
                     click.secho(
                         f"  [cache] [ERROR] {bname} - no valid PEM parsed", fg="red", err=True
@@ -511,7 +521,12 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                 pem_files = _aggregate_staged_sources([bdir], verbose=verbose)
                 merged_blocks.extend(_read_pem_chunks(pem_files))
 
-        merged_blocks = _dedupe_pem_blocks(merged_blocks)
+        # Apply filters to merged blocks
+        from bundlecraft.helpers.utils import apply_filters
+
+        filters_cfg = env_cfg.get("filters") or {}
+        merged_blocks = apply_filters(merged_blocks, filters_cfg)
+
         if not merged_blocks:
             click.secho(
                 f"  [ERROR] [{target_name}] No valid PEM certificates parsed for merged target.",

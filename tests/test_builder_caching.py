@@ -117,6 +117,8 @@ targets:
   merged-target:
     includes: [bundle-a, bundle-b]
 output_formats: [pem]
+filters:
+  unique_by_fingerprint: true
         """.strip()
     )
 

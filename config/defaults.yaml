@@ -25,6 +25,12 @@ filters:
   unique_by_fingerprint: true  # Remove duplicates by SHA256 fingerprint
   not_expired_only: true  # Skip expired certs before writing outputs
   ca_certs_only: true  # Only include CA certificates (BasicConstraints: CA=TRUE)
+  root_certs_only: true  # Only include self-signed root CAs (filters out subordinates)
+  # signature_algorithms:  # Filter by signature algorithm (optional, undefined by default)
+  #   include: ["sha256WithRSAEncryption", "ecdsa-with-SHA256"]  # Whitelist specific algorithms
+  #   exclude: ["sha1WithRSAEncryption", "md5WithRSAEncryption"]  # Blacklist weak algorithms
+  # minimum_key_size_rsa: 2048  # Minimum RSA key size in bits (optional)
+  # minimum_key_size_ecc: 256  # Minimum ECC key size in bits (optional)
 # ---------------------------------------------------------------------
 # Default per-format overrides (non-sensitive defaults only)
 # ---------------------------------------------------------------------
