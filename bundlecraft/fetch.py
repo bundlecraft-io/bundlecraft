@@ -482,6 +482,24 @@ def _fetch_each_to_named_dirs(
         name = src.get("name") or f"fetched-{idx}"
         if name_filter and name != name_filter:
             continue
+        
+        if dry_run:
+            ftype = (src.get("type") or "url").lower()
+            logger.info(f"[dry-run] Would fetch: {name} (type: {ftype})")
+            if ftype == "url":
+                url = src.get("url")
+                logger.info(f"[dry-run]   from URL: {url}")
+            elif ftype == "api":
+                endpoint = src.get("endpoint") or src.get("url")
+                provider = src.get("provider") or "generic"
+                logger.info(f"[dry-run]   from API: {endpoint} (provider: {provider})")
+            elif ftype == "vault":
+                mount_point = src.get("mount_point") or src.get("mount") or src.get("engine") or "secret"
+                path = src.get("path")
+                logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
+            logger.info(f"[dry-run]   to directory: {staging_root / name}")
+            continue
+        
         subdir = staging_root / name
         ensure_dir(subdir)
         try:
@@ -592,33 +610,34 @@ def main(
         if not fetch_only:
             staged_paths += _stage_local_includes(cfg, staging_root, root, verbose, dry_run)
 
-        if dry_run:
-            # In dry-run, just show what would be fetched
-            for entry in fetch_cfg:
-                name = entry.get("name") or "unnamed"
-                ftype = entry.get("type") or "http"
-                if not fetch_name or name == fetch_name:
-                    logger.info(f"[dry-run] Would fetch: {name} (type: {ftype})")
-        else:
-            staged_paths += _fetch_each_to_named_dirs(
-                fetch_cfg, staging_root, root, verbose, fetch_name, dry_run
-            )
+        # Fetch remote sources
+        staged_paths += _fetch_each_to_named_dirs(
+            fetch_cfg, staging_root, root, verbose, fetch_name, dry_run
+        )
 
-            # Summarize directory structure and counts
-            if not dry_run and staging_root.exists():
-                click.secho("\n[SUMMARY] Staged artifacts:", fg="blue")
-                total = 0
-                for sub in sorted(staging_root.iterdir()):
-                    if not sub.is_dir():
-                        continue
-                    files = [p for p in sorted(sub.rglob("*")) if p.is_file()]
-                    count = len(files)
-                    total += count
-                    click.secho(f"  - {sub.name}/ : {count} file(s)", fg="blue")
-                click.secho(f"  Total: {total} file(s)\n", fg="blue")
-            elif dry_run:
-                click.secho("\n[SUMMARY] [dry-run] Would stage artifacts to:", fg="yellow")
-                click.secho(f"  {staging_root}\n", fg="yellow")
+        # Summarize directory structure and counts
+        if not dry_run and staging_root.exists():
+            click.secho("\n[SUMMARY] Staged artifacts:", fg="blue")
+            total = 0
+            for sub in sorted(staging_root.iterdir()):
+                if not sub.is_dir():
+                    continue
+                files = [p for p in sorted(sub.rglob("*")) if p.is_file()]
+                count = len(files)
+                total += count
+                click.secho(f"  - {sub.name}/ : {count} file(s)", fg="blue")
+            click.secho(f"  Total: {total} file(s)\n", fg="blue")
+        elif dry_run:
+            click.secho("\n[SUMMARY] [dry-run] Would stage artifacts to:", fg="yellow")
+            click.secho(f"  {staging_root}", fg="yellow")
+            if not no_clean:
+                click.secho("  [dry-run] Would clean staging directory before fetching", fg="yellow")
+            click.secho("", fg="yellow")  # Empty line for formatting
+
+        if dry_run:
+            click.secho("[SUCCESS] [dry-run] Fetch simulation completed.", fg="yellow")
+        else:
+            click.secho("[SUCCESS] Fetch completed.", fg="green")
 
     except click.ClickException as e:
         click.secho(f"[ERROR] {e}", fg="red", err=True)
@@ -626,11 +645,6 @@ def main(
     except Exception as e:
         click.secho(f"[ERROR] Fetch failed: {e}", fg="red", err=True)
         sys.exit(2)
-
-        if dry_run:
-            click.secho("[SUCCESS] [dry-run] Fetch simulation completed.", fg="yellow")
-        else:
-            click.secho("[SUCCESS] Fetch completed.", fg="green")
 
 
 if __name__ == "__main__":

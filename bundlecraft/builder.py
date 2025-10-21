@@ -732,6 +732,16 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
         )
         for target_name, result in per_target_results.items():
             pem_blocks = result["pem_blocks"]
+            if dry_run:
+                click.secho(
+                    f"  [{target_name}] [dry-run] Would verify {len(pem_blocks)} certificate(s)",
+                    fg="yellow",
+                )
+                click.secho(
+                    f"  [{target_name}] [dry-run] Would check for expiry (fail_on_expired={fail_on_expired}, warn_days={warn_days})",
+                    fg="yellow",
+                )
+                continue
             errs, warns = _verify_certificates(pem_blocks, fail_on_expired, warn_days)
             for e in errs:
                 click.secho(f"  [{target_name}] [ERROR] {e}", fg="red")

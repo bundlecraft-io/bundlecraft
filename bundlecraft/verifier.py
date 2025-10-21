@@ -257,11 +257,31 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
 )
 @click.option("--verify-all", is_flag=True, help="Verify both bundle files and manifest together")
 @click.option("--verbose", is_flag=True, help="Show detailed file metadata and hashes")
-def main(target, verify_manifest, verify_all, verbose):
-    """Verify the integrity and consistency of built trust bundles."""
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be verified without actually reading files",
+)
+def main(target, verify_manifest, verify_all, verbose, dry_run):
+    """Verify the integrity and consistency of built trust bundles.
+    
+    Use --dry-run to preview what would be verified without making any changes.
+    """
     click.secho("\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
+    
+    if dry_run:
+        click.secho(
+            "[DRY RUN MODE] No files will be read or verified\n", fg="yellow", bold=True
+        )
+    
     path = Path(target)
     if path.is_file():
+        if dry_run:
+            click.echo(f"[dry-run] Would verify single file: {path.name}")
+            click.echo("[dry-run] Would compute SHA256 hash")
+            if verbose:
+                click.echo("[dry-run] Would display file info")
+            return
         logger.info(f"Verifying single file: {path.name}")
         digest = sha256sum(path)
         logger.info(f"SHA256: {digest}")
@@ -270,6 +290,34 @@ def main(target, verify_manifest, verify_all, verbose):
         return
 
     ok = True
+    if dry_run:
+        if verify_manifest:
+            click.echo("[dry-run] Would display manifest info from: " + str(path))
+        elif verify_all:
+            click.echo("[dry-run] Would verify directory: " + str(path))
+            click.echo("[dry-run] Would display manifest info from: " + str(path))
+        else:
+            click.echo("[dry-run] Would verify directory: " + str(path))
+        
+        # Show what would be checked
+        checksum_path = path / CHECKSUM_FILE
+        if checksum_path.exists():
+            click.echo(f"[dry-run] Would load checksums from: {checksum_path.name}")
+            try:
+                checksums = load_checksums(checksum_path)
+                click.echo(f"[dry-run] Would verify {len(checksums)} file(s)")
+            except Exception as e:
+                click.echo(f"[dry-run] Note: Could not parse checksums: {e}", err=True)
+        else:
+            click.echo(f"[dry-run] Note: {CHECKSUM_FILE} not found", err=True)
+        
+        manifest_path = path / MANIFEST_FILE
+        if (verify_manifest or verify_all) and manifest_path.exists():
+            click.echo(f"[dry-run] Would display manifest from: {manifest_path.name}")
+        
+        click.echo("✅ [dry-run] Verification simulation complete")
+        return
+    
     if verify_manifest:
         show_manifest_info(path, verbose)
     elif verify_all:

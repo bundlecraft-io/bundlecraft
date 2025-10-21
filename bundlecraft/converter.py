@@ -141,7 +141,7 @@ def main(
         click.secho(f"[ERROR] Input file not found: {in_path}", fg="red", err=True)
         sys.exit(2)
 
-    if not out_dir.exists():
+    if not dry_run and not out_dir.exists():
         click.secho(f"[INFO] Creating output directory: {out_dir}", fg="yellow")
         out_dir.mkdir(parents=True, exist_ok=True)
 
