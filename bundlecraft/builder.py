@@ -57,7 +57,7 @@ def _clean_dir(path: Path) -> None:
 
 
 def _stage_bundle_sources(
-    bundle_name: str, env: str, workspace_root: Path, verbose: bool = False
+    bundle_name: str, env: str, workspace_root: Path, verbose: bool = False, dry_run: bool = False
 ) -> Path:
     """Stage a bundle's sources (includes + fetch) into sources/staged/<env>/<bundle>/.
 
@@ -80,6 +80,16 @@ def _stage_bundle_sources(
         raise click.ClickException(str(e)) from e
 
     staging_root = STAGED_DIR / env / bundle_name
+
+    if dry_run:
+        if verbose:
+            click.secho(
+                f"[Fetch] [dry-run] Would stage bundle sources to: {staging_root}",
+                fg="yellow",
+                err=True,
+            )
+        return staging_root
+
     ensure_dir(staging_root)
 
     # Clean staging dir
@@ -157,11 +167,22 @@ def _dedupe_pem_blocks(pem_blocks: list[str]) -> list[str]:
 
 
 def _write_canonical_pem(
-    dst: Path, pem_blocks: list[str], include_subject_comments: bool, *, force: bool = False
+    dst: Path,
+    pem_blocks: list[str],
+    include_subject_comments: bool,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
 ) -> None:
     """Write canonical PEM with optional subject comments."""
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
+
+    if dry_run:
+        click.secho(
+            f"  [dry-run] Would write {len(pem_blocks)} certificate(s) to: {dst}", fg="yellow"
+        )
+        return
 
     ensure_dir(dst.parent)
     lines = []
@@ -285,7 +306,12 @@ def _verify_certificates(
     is_flag=True,
     help="Overwrite existing output files (passes through to conversion stage)",
 )
-def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose, force):
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be done without actually writing any files or executing commands",
+)
+def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose, force, dry_run):
     """Build trust bundles by orchestrating: fetch → convert → verify.
 
     This command coordinates the three core BundleCraft stages:
@@ -294,8 +320,14 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
       3. VERIFY: Validate certificates and produce reports
 
     The build always fetches unless --skip-fetch is used (for fast iteration).
+    Use --dry-run to preview what would be done without making any changes.
     """
     click.secho("\n🔐 BundleCraft Builder\n---------------------", fg="cyan")
+
+    if dry_run:
+        click.secho(
+            "[DRY RUN MODE] No files will be written or commands executed\n", fg="yellow", bold=True
+        )
 
     # Load defaults and craft config with proper precedence
     from bundlecraft.helpers.utils import merge_configs
@@ -389,14 +421,41 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
         )
         for bname in unique_bundles:
             try:
-                staging_dir = _stage_bundle_sources(bname, env, ROOT, verbose=verbose)
-                click.secho(
-                    f"  [cache] ✓ Staged bundle: {bname} → {staging_dir.relative_to(ROOT)}",
-                    fg="green",
+                staging_dir = _stage_bundle_sources(
+                    bname, env, ROOT, verbose=verbose, dry_run=dry_run
                 )
+                if dry_run:
+                    click.secho(
+                        f"  [cache] [dry-run] Would stage bundle: {bname} → {staging_dir.relative_to(ROOT)}",
+                        fg="yellow",
+                    )
+                else:
+                    click.secho(
+                        f"  [cache] ✓ Staged bundle: {bname} → {staging_dir.relative_to(ROOT)}",
+                        fg="green",
+                    )
 
                 cache_dir = bundle_cache_root / bname
-                ensure_dir(cache_dir)
+                if not dry_run:
+                    ensure_dir(cache_dir)
+
+                if dry_run:
+                    # In dry-run, simulate having cached bundles
+                    click.secho(
+                        f"  [cache] [dry-run] Would write cached PEM to: {cache_dir / 'bundlecraft-ca-trust.pem'}",
+                        fg="yellow",
+                    )
+                    if (
+                        output_formats
+                        and len([fmt for fmt in output_formats if fmt.lower() != "pem"]) > 0
+                    ):
+                        extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
+                        click.secho(
+                            f"  [cache] [dry-run] Would convert to formats: {', '.join(extra_formats)}",
+                            fg="yellow",
+                        )
+                    bundle_cache_dirs[bname] = cache_dir
+                    continue
 
                 # Aggregate and write canonical PEM into cache
                 pem_files = _aggregate_staged_sources([staging_dir], verbose=verbose)
@@ -421,7 +480,9 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                     )
                     sys.exit(3)
                 cache_pem = cache_dir / "bundlecraft-ca-trust.pem"
-                _write_canonical_pem(cache_pem, pem_blocks, include_subject_comments, force=True)
+                _write_canonical_pem(
+                    cache_pem, pem_blocks, include_subject_comments, force=True, dry_run=dry_run
+                )
                 click.secho(
                     f"  [cache] ✓ Wrote cached canonical PEM: {cache_pem.relative_to(ROOT)}",
                     fg="green",
@@ -439,6 +500,7 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                         extra_formats,
                         fmt_overrides_combined,
                         "bundlecraft-ca-trust",
+                        dry_run=dry_run,
                     )
                     click.secho(
                         f"  [cache] ✓ Converted cached bundle to formats: {', '.join(extra_formats)}",
@@ -486,30 +548,43 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
 
     for target_name, bundle_dirs in staging_map.items():
         build_root = (Path(output_root) / safe_craft / target_name).resolve()
-        ensure_dir(build_root)
+        if not dry_run:
+            ensure_dir(build_root)
 
         # Single-bundle target: copy cached outputs directly
         if len(bundle_dirs) == 1:
-            bdir = bundle_dirs[0]
-            cache_pem = bdir / "bundlecraft-ca-trust.pem"
-            if cache_pem.exists():
-                for f in sorted([p for p in bdir.iterdir() if p.is_file()]):
-                    dst = build_root / f.name
-                    try:
-                        shutil.copy2(f, dst)
-                    except Exception:
-                        dst.write_bytes(f.read_bytes())
+            if dry_run:
                 click.secho(
-                    f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {build_root.relative_to(ROOT)}",
-                    fg="green",
+                    f"  [{target_name}] [dry-run] Would copy cached bundle to: {build_root.relative_to(ROOT)}",
+                    fg="yellow",
                 )
-                pem_blocks = _read_pem_chunks([cache_pem])
                 per_target_results[target_name] = {
                     "build_root": build_root,
-                    "pem_blocks": pem_blocks,
+                    "pem_blocks": ["# dry-run placeholder"],
                     "output_formats": output_formats,
                 }
                 continue
+
+        bdir = bundle_dirs[0]
+        cache_pem = bdir / "bundlecraft-ca-trust.pem"
+        if cache_pem.exists():
+            for f in sorted([p for p in bdir.iterdir() if p.is_file()]):
+                dst = build_root / f.name
+                try:
+                    shutil.copy2(f, dst)
+                except Exception:
+                    dst.write_bytes(f.read_bytes())
+            click.secho(
+                f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {build_root.relative_to(ROOT)}",
+                fg="green",
+            )
+        pem_blocks = _read_pem_chunks([cache_pem])
+        per_target_results[target_name] = {
+            "build_root": build_root,
+            "pem_blocks": pem_blocks,
+            "output_formats": output_formats,
+        }
+        continue
 
         # Multi-bundle target: merge cached canonical PEMs
         merged_blocks: list[str] = []
@@ -536,11 +611,14 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             sys.exit(3)
 
         pem_out = build_root / "bundlecraft-ca-trust.pem"
-        _write_canonical_pem(pem_out, merged_blocks, include_subject_comments, force=force)
-        click.secho(
-            f"  [{target_name}] ✓ Wrote merged canonical PEM: {pem_out.relative_to(ROOT)}",
-            fg="green",
+        _write_canonical_pem(
+            pem_out, merged_blocks, include_subject_comments, force=force, dry_run=dry_run
         )
+        if not dry_run:
+            click.secho(
+                f"  [{target_name}] ✓ Wrote merged canonical PEM: {pem_out.relative_to(ROOT)}",
+                fg="green",
+            )
 
         extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
         if extra_formats:
@@ -548,12 +626,18 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             if force:
                 fmt_overrides_combined["force"] = True
             convert_to_formats(
-                pem_out, build_root, extra_formats, fmt_overrides_combined, "bundlecraft-ca-trust"
+                pem_out,
+                build_root,
+                extra_formats,
+                fmt_overrides_combined,
+                "bundlecraft-ca-trust",
+                dry_run=dry_run,
             )
-            click.secho(
-                f"  [{target_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
-                fg="green",
-            )
+            if not dry_run:
+                click.secho(
+                    f"  [{target_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
+                    fg="green",
+                )
 
         per_target_results[target_name] = {
             "build_root": build_root,
@@ -603,62 +687,72 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     # =========================================================================
     # FINALIZE: Manifest and checksums
     # =========================================================================
-    click.secho("\nFinalizing build artifacts...", fg="blue")
+    if not dry_run:
+        click.secho("\nFinalizing build artifacts...", fg="blue")
 
-    # Build manifest and checksums per target
-    for target_name, result in per_target_results.items():
-        build_root = result["build_root"]
-        pem_blocks = result["pem_blocks"]
-        output_formats = result["output_formats"]
-        manifest_obj = {
-            "craft": env_cfg.get("name") or env,
-            "environment": env,  # retained for compatibility
-            "target": target_name,
-            "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "certificate_count": len(pem_blocks),
-            "output_formats": output_formats,
-        }
-        # Add verification summary if not skipped (same policy for all targets)
-        if not skip_verify:
-            manifest_obj["verification"] = {
-                "fail_on_expired": (
-                    verify_cfg.get("fail_on_expired", True)
-                    if isinstance(verify_cfg, dict)
-                    else True
-                ),
-                "warn_days": (
-                    verify_cfg.get("warn_days_before_expiry", 30)
-                    if isinstance(verify_cfg, dict)
-                    else 30
-                ),
+        # Build manifest and checksums per target
+        for target_name, result in per_target_results.items():
+            build_root = result["build_root"]
+            pem_blocks = result["pem_blocks"]
+            output_formats = result["output_formats"]
+            manifest_obj = {
+                "craft": env_cfg.get("name") or env,
+                "environment": env,  # retained for compatibility
+                "target": target_name,
+                "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "certificate_count": len(pem_blocks),
+                "output_formats": output_formats,
             }
-        output_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
-        manifest_obj["files"] = [
-            {"path": fname, "sha256": sha256_file(build_root / fname)}
-            for fname in output_files
-            if fname != "manifest.json"
-        ]
-        manifest_path = build_root / "manifest.json"
-        manifest_path.write_text(
-            json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        click.secho(
-            f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}", fg="green"
-        )
+            # Add verification summary if not skipped (same policy for all targets)
+            if not skip_verify:
+                manifest_obj["verification"] = {
+                    "fail_on_expired": (
+                        verify_cfg.get("fail_on_expired", True)
+                        if isinstance(verify_cfg, dict)
+                        else True
+                    ),
+                    "warn_days": (
+                        verify_cfg.get("warn_days_before_expiry", 30)
+                        if isinstance(verify_cfg, dict)
+                        else 30
+                    ),
+                }
+            output_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+            manifest_obj["files"] = [
+                {"path": fname, "sha256": sha256_file(build_root / fname)}
+                for fname in output_files
+                if fname != "manifest.json"
+            ]
+            manifest_path = build_root / "manifest.json"
+            manifest_path.write_text(
+                json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            click.secho(
+                f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}", fg="green"
+            )
 
-        all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
-        checksum_lines = [f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files]
-        checksum_path = build_root / "checksums.sha256"
-        checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
-        click.secho(
-            f"  [{target_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}", fg="green"
-        )
+            all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+            checksum_lines = [f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files]
+            checksum_path = build_root / "checksums.sha256"
+            checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+            click.secho(
+                f"  [{target_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}",
+                fg="green",
+            )
 
-    click.secho(
-        "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
-        fg="bright_green",
-        bold=True,
-    )
+    if dry_run:
+        click.secho(
+            "\n✅ [DRY RUN] Build simulation complete for target(s): "
+            + ", ".join(per_target_results.keys()),
+            fg="yellow",
+            bold=True,
+        )
+    else:
+        click.secho(
+            "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
+            fg="bright_green",
+            bold=True,
+        )
 
 
 if __name__ == "__main__":

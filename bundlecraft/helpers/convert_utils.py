@@ -68,6 +68,12 @@ def convert_to_formats(
                 continue
             if out_path.exists() and not fmt_overrides.get("force", False):
                 raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
+            # Proactively remove when forcing to avoid partial/append behaviors
+            if out_path.exists() and fmt_overrides.get("force", False):
+                try:
+                    out_path.unlink()
+                except Exception:
+                    pass
             out_path.write_text(
                 pem_path.read_text(encoding="utf-8", errors="ignore"), encoding="utf-8"
             )
@@ -246,6 +252,11 @@ def create_p7b(pem_path: Path, build_root: Path, output_basename: str, force: bo
     out_path = build_root / f"{output_basename}.p7b"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
+    if out_path.exists() and force:
+        try:
+            out_path.unlink()
+        except Exception:
+            pass
 
     text = pem_path.read_text(encoding="utf-8", errors="ignore")
     blocks = _split_pem_blocks(text)
@@ -300,6 +311,11 @@ def create_jks(
     out_path = build_root / f"{output_basename}.jks"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
+    if out_path.exists() and force:
+        try:
+            out_path.unlink()
+        except Exception:
+            pass
 
     text = pem_path.read_text(encoding="utf-8", errors="ignore")
     blocks = _split_pem_blocks(text)
@@ -370,6 +386,11 @@ def create_pkcs12(
     out_path = build_root / f"{output_basename}.p12"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
+    if out_path.exists() and force:
+        try:
+            out_path.unlink()
+        except Exception:
+            pass
 
     text = pem_path.read_text(encoding="utf-8", errors="ignore")
     blocks = _split_pem_blocks(text)
