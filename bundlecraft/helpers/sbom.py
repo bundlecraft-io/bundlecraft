@@ -20,7 +20,7 @@ import datetime as dt
 import platform
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -30,7 +30,6 @@ from cyclonedx.model import ExternalReference, ExternalReferenceType, HashAlgori
 from cyclonedx.model.bom import Bom
 from cyclonedx.model.component import Component, ComponentType
 from cyclonedx.output.json import JsonV1Dot5
-from cyclonedx.schema import OutputFormat, SchemaVersion
 
 
 def _extract_certificate_metadata(pem_block: str) -> dict[str, Any]:
@@ -62,6 +61,7 @@ def _extract_certificate_metadata(pem_block: str) -> dict[str, Any]:
         
         # Calculate fingerprints
         from hashlib import sha1, sha256
+
         from cryptography.hazmat.primitives.serialization import Encoding
         
         der = cert.public_bytes(encoding=Encoding.DER)
@@ -115,7 +115,7 @@ def generate_cyclonedx_sbom(
     build_dir: Path,
     manifest: dict[str, Any],
     pem_blocks: list[str],
-    output_path: Optional[Path] = None,
+    output_path: Path | None = None,
 ) -> Path:
     """Generate a CycloneDX SBOM for a BundleCraft build.
     
@@ -250,7 +250,7 @@ def generate_spdx_sbom(
     build_dir: Path,
     manifest: dict[str, Any],
     pem_blocks: list[str],
-    output_path: Optional[Path] = None,
+    output_path: Path | None = None,
 ) -> Path:
     """Generate an SPDX SBOM for a BundleCraft build.
     

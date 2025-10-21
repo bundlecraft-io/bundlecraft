@@ -59,6 +59,8 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 - **PKCS#12 (.p12/.pfx)** — multi-cert export, password-protected
 - **ZIP** (tarball of PEMs, one per cert)
 - Deterministic **manifest.json** and **checksums.sha256** (traceability)
+- **SBOM (Software Bill of Materials)** in CycloneDX format (automatic)
+- **GPG signatures (.asc)** for all artifacts (optional)
 
 ---
 
@@ -71,7 +73,9 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 - **Extensible config model:** defaults → environment → bundle
 - **Portable tooling:** Python + OpenSSL + Java keytool
 - **Manifest and checksum generation:** for auditing and release integrity
-- **GPG signing integration** (optional, for release artifacts)
+- **SBOM generation:** Automatic CycloneDX SBOM for supply chain transparency
+- **GPG signing integration:** Sign all release artifacts with detached signatures
+- **Signature verification:** Built-in verification for signed releases
 - **CI/CD ready:** Designed for (but not exclusive to) GitHub Actions, supports concurrency and artifact management
 - **Flexible bundle and environment definitions**: Easily add new trust bundles or environments
 
@@ -343,7 +347,30 @@ BundleCraft supports the following environment variables for configuration:
 - **Cross-format Verification:** Cert counts and file integrity checked for PEM, P7B, JKS, P12
 - **Fetch provenance:** `provenance.fetch.json` recorded in staging and embedded into `manifest.json` under `fetched`
 - **Network trust controls:** HTTPS only (for APIs and URLs), optional custom CA, optional TLS leaf fingerprint pinning, and optional content `sha256` pinning
-- **Optional GPG signing:** secure release integrity for distributed bundles in GitHub workflow
+- **GPG signing:** Sign all release artifacts with detached GPG signatures (.asc files)
+- **SBOM generation:** Automatic Software Bill of Materials in CycloneDX format
+- **Signature verification:** Built-in verification for signed releases with keyring support
+
+### Signing Release Artifacts
+
+Sign all release artifacts with GPG:
+```bash
+# Generate or use existing GPG key
+gpg --full-generate-key
+
+# Build and sign artifacts
+export GPG_KEY_ID=ABCD1234EFGH5678
+bundlecraft build --craft prod --bundle mozilla --sign
+
+# Verify signatures
+bundlecraft verify --target dist/Production/mozilla --verify-signatures
+```
+
+See [SIGNING-AND-SBOM.md](docs/SIGNING-AND-SBOM.md) for complete guide on:
+- GPG key generation and management
+- CI/CD integration with GitHub Actions
+- SBOM usage and validation
+- Key management best practices
 
 ---
 

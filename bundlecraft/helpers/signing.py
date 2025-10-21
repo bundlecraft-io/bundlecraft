@@ -23,14 +23,12 @@ Security Notes:
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
-from typing import Optional
 
 import gnupg
 
 
-def get_gpg_instance(gpg_home: Optional[Path] = None) -> gnupg.GPG:
+def get_gpg_instance(gpg_home: Path | None = None) -> gnupg.GPG:
     """Get a GPG instance with the specified home directory.
     
     Args:
@@ -46,10 +44,10 @@ def get_gpg_instance(gpg_home: Optional[Path] = None) -> gnupg.GPG:
 
 def sign_file(
     file_path: Path,
-    key_id: Optional[str] = None,
-    passphrase: Optional[str] = None,
-    output_path: Optional[Path] = None,
-    gpg_home: Optional[Path] = None,
+    key_id: str | None = None,
+    passphrase: str | None = None,
+    output_path: Path | None = None,
+    gpg_home: Path | None = None,
 ) -> Path:
     """Sign a file using GPG and return the .asc signature path.
     
@@ -131,9 +129,9 @@ def sign_file(
 
 def verify_signature(
     file_path: Path,
-    signature_path: Optional[Path] = None,
-    keyring: Optional[Path] = None,
-    gpg_home: Optional[Path] = None,
+    signature_path: Path | None = None,
+    keyring: Path | None = None,
+    gpg_home: Path | None = None,
 ) -> tuple[bool, str]:
     """Verify a GPG signature against a file.
     
@@ -188,7 +186,7 @@ def verify_signature(
         return False, f"Invalid signature: {status}"
 
 
-def list_available_keys(gpg_home: Optional[Path] = None) -> list[dict]:
+def list_available_keys(gpg_home: Path | None = None) -> list[dict]:
     """List available GPG secret keys in the keyring.
     
     Args:
@@ -203,7 +201,7 @@ def list_available_keys(gpg_home: Optional[Path] = None) -> list[dict]:
 
 
 def export_public_key(
-    key_id: str, output_path: Path, gpg_home: Optional[Path] = None
+    key_id: str, output_path: Path, gpg_home: Path | None = None
 ) -> None:
     """Export a public key to a file.
     
