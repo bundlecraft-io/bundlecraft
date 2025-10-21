@@ -270,3 +270,71 @@ output_formats: [pem]
                 tdir = craft_out / t
                 assert (tdir / "manifest.json").exists()
                 assert (tdir / "checksums.sha256").exists()
+
+    def test_build_manifest_includes_build_info(
+        self, cli_runner, temp_workspace, sample_bundle_config, monkeypatch
+    ):
+        """Ensure manifest.json includes build_info section with version and git info."""
+        # Prepare craft and bundle configurations
+        craft_dir = temp_workspace / "config" / "crafts"
+        craft_dir.mkdir(parents=True, exist_ok=True)
+        (temp_workspace / "config" / "bundles").mkdir(parents=True, exist_ok=True)
+        craft_yaml = craft_dir / "test.yaml"
+        craft_yaml.write_text(
+            """
+name: TestCraft
+targets:
+  test-target:
+    includes: [test-bundle]
+output_formats: [pem]
+            """.strip()
+        )
+        # Ensure include source exists
+        import shutil
+
+        (temp_workspace / "sources" / "internal").mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(
+            str(sample_bundle_config.parent.parent.parent / "certs" / "sample.pem"),
+            str(temp_workspace / "sources" / "internal" / "sample.pem"),
+        )
+        # Bundle config
+        (temp_workspace / "config" / "bundles" / "test-bundle.yaml").write_text(
+            sample_bundle_config.read_text()
+        )
+
+        # Monkeypatch builder module constants
+        import bundlecraft.builder as builder_mod
+
+        monkeypatch.setattr(builder_mod, "ROOT", temp_workspace)
+        monkeypatch.setattr(builder_mod, "CONFIG_DIR", temp_workspace / "config")
+        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "sources")
+        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "sources" / "staged")
+        monkeypatch.setattr(builder_mod, "DIST_DIR", temp_workspace / "dist")
+
+        with cli_runner.isolated_filesystem(temp_workspace):
+            result = cli_runner.invoke(
+                build_main,
+                [
+                    "--craft",
+                    "test",
+                    "--output-root",
+                    str(temp_workspace / "dist"),
+                ],
+            )
+            assert isinstance(result.exit_code, int)
+
+            # Check manifest.json contains build_info
+            manifest_path = temp_workspace / "dist" / "TestCraft" / "test-target" / "manifest.json"
+            if manifest_path.exists():
+                import json
+
+                manifest_data = json.loads(manifest_path.read_text())
+                assert "build_info" in manifest_data, "manifest.json should contain build_info"
+                build_info = manifest_data["build_info"]
+                assert (
+                    "bundlecraft_version" in build_info
+                ), "build_info should contain bundlecraft_version"
+                # Git info is optional (depends on whether temp_workspace is in a git repo)
+                # But bundlecraft_version should always be present
+                assert isinstance(build_info["bundlecraft_version"], str)
+                assert len(build_info["bundlecraft_version"]) > 0

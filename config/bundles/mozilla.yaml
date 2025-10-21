@@ -5,6 +5,7 @@ fetch:
   - name: mozilla_roots
     type: url
     url: https://curl.se/ca/cacert.pem
+    version: "2025-10-01"
 metadata:
   owner: mozilla-nss-maintainers
   purpose: Public web PKI trust anchors

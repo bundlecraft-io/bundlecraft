@@ -24,6 +24,7 @@ from pathlib import Path
 
 import click
 
+from bundlecraft.helpers.build_info import generate_build_info
 from bundlecraft.helpers.config_schema import (
     validate_bundle_config,
     validate_craft_config,
@@ -698,6 +699,12 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     if not dry_run:
         click.secho("\nFinalizing build artifacts...", fg="blue")
 
+        # Generate build_info once for all targets (same build metadata)
+        all_staging_dirs = []
+        for bundle_dirs in staging_map.values():
+            all_staging_dirs.extend(bundle_dirs)
+        build_info = generate_build_info(repo_root=ROOT, staging_dirs=all_staging_dirs)
+
         # Build manifest and checksums per target
         for target_name, result in per_target_results.items():
             build_root = result["build_root"]
@@ -710,6 +717,7 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                 "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "certificate_count": len(pem_blocks),
                 "output_formats": output_formats,
+                "build_info": build_info,
             }
             # Add verification summary if not skipped (same policy for all targets)
             if not skip_verify:
