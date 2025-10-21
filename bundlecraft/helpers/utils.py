@@ -3,10 +3,29 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 
-def load_yaml(path: Path, required: bool = True) -> dict[str, Any] | None:
+def load_yaml(
+    path: Path,
+    required: bool = True,
+    validate: Literal["bundle", "craft", "defaults"] | None = None,
+) -> dict[str, Any] | None:
+    """Load and optionally validate a YAML configuration file.
+
+    Args:
+        path: Path to YAML file
+        required: If True, raise FileNotFoundError if file doesn't exist
+        validate: Optional validation type - validates config against schema if provided
+
+    Returns:
+        Dictionary of config data, or None if file doesn't exist and not required
+
+    Raises:
+        FileNotFoundError: If required=True and file doesn't exist
+        RuntimeError: If PyYAML is not installed
+        ValueError: If validation fails (when validate is specified)
+    """
     if not path.exists():
         if required:
             raise FileNotFoundError(f"Missing YAML file: {path}")
@@ -15,8 +34,29 @@ def load_yaml(path: Path, required: bool = True) -> dict[str, Any] | None:
         import yaml  # PyYAML
     except ImportError as e:
         raise RuntimeError("PyYAML is required. Install with: pip install pyyaml") from e
+
     with path.open("r", encoding="utf-8") as fh:
-        return yaml.safe_load(fh) or {}
+        data = yaml.safe_load(fh) or {}
+
+    # Validate config if validation type is specified
+    if validate and data:
+        try:
+            from bundlecraft.config_schema import (
+                validate_bundle_config,
+                validate_craft_config,
+                validate_defaults_config,
+            )
+
+            if validate == "bundle":
+                validate_bundle_config(data)
+            elif validate == "craft":
+                validate_craft_config(data)
+            elif validate == "defaults":
+                validate_defaults_config(data)
+        except ValueError as e:
+            raise ValueError(f"Config validation failed for {path}: {e}") from e
+
+    return data
 
 
 def ensure_dir(path: Path) -> None:

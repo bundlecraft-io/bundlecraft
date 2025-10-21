@@ -267,8 +267,8 @@ def run_fetch(
         if (config_dir / "crafts" / f"{env}.yaml").exists()
         else (config_dir / "envs" / f"{env}.yaml")
     )
-    _ = load_yaml(cfg_path, required=True)
-    bundle_cfg = load_yaml(config_dir / "bundles" / f"{bundle}.yaml", required=True)
+    _ = load_yaml(cfg_path, required=True, validate="craft")
+    bundle_cfg = load_yaml(config_dir / "bundles" / f"{bundle}.yaml", required=True, validate="bundle")
     fetch_cfg = bundle_cfg.get("fetch") or []
     if not isinstance(fetch_cfg, list):
         raise click.ClickException("Config key 'fetch' must be a list of sources")
@@ -524,7 +524,7 @@ def main(
 
     try:
         root = workspace_root.resolve()
-        cfg = load_yaml(bundle_config_file, required=True)
+        cfg = load_yaml(bundle_config_file, required=True, validate="bundle")
         _validate_source_and_fetch_names(cfg)
         fetch_cfg = cfg.get("fetch") or []
         if not isinstance(fetch_cfg, list):

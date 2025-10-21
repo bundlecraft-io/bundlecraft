@@ -32,6 +32,8 @@ class TestFetch:
         bundle_dir.mkdir(parents=True, exist_ok=True)
         # Ensure sample exists at sources/sample.pem (conftest copies certs there)
         bundle_yaml = """
+        bundle_name: test-bundle
+        description: Test bundle with includes only
         include:
           - sources/sample.pem
         exclude: []
@@ -61,6 +63,8 @@ class TestFetch:
         bundle_dir.mkdir(parents=True, exist_ok=True)
         sha = _sha256_of(sample_pem)
         bundle_yaml = f"""
+        bundle_name: test-bundle
+        description: Test bundle with file URL fetch
         fetch:
           - name: sample
             type: url
@@ -93,12 +97,14 @@ class TestFetch:
         bundle_dir.mkdir(parents=True, exist_ok=True)
         wrong_sha = "0" * 64
         bundle_yaml = f"""
+        bundle_name: test-bundle
+        description: Test bundle with SHA mismatch
         fetch:
           - name: sample
             type: url
             url: file://{sample_pem}
             verify:
-              sha256: {wrong_sha}
+              sha256: "{wrong_sha}"
         include: []
         """
         (bundle_dir / "test-bundle.yaml").write_text(bundle_yaml, encoding="utf-8")
@@ -118,6 +124,8 @@ class TestFetch:
         bundle_dir = temp_workspace / "config" / "bundles"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
+        bundle_name: test-bundle
+        description: Test bundle with insecure HTTP
         fetch:
           - name: bad
             type: url
@@ -144,6 +152,8 @@ class TestFetch:
         sha = _sha256_of(sample_pem)
         (bundle_dir / "test-bundle.yaml").write_text(
             f"""
+            bundle_name: test-bundle
+            description: Test bundle for staging cleanup
             fetch:
               - name: sample
                 type: url
@@ -181,6 +191,8 @@ class TestFetch:
         bundle_dir = temp_workspace / "config" / "bundles"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
+        bundle_name: test-bundle
+        description: Test bundle with API fetch
         fetch:
           - name: api_bad
             type: api
@@ -205,6 +217,8 @@ class TestFetch:
         bundle_dir = temp_workspace / "config" / "bundles"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
+        bundle_name: test-bundle
+        description: Test bundle with Vault fetch
         fetch:
           - name: from_vault
             type: vault
@@ -265,6 +279,8 @@ class TestFetch:
         bundle_dir = temp_workspace / "config" / "bundles"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
+        bundle_name: test-bundle
+        description: Test bundle with Vault mock
         fetch:
           - name: from_vault
             type: vault

@@ -72,7 +72,10 @@ def _stage_bundle_sources(
     )
 
     bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle_name}.yaml"
-    bundle_cfg = load_yaml(bundle_cfg_path, required=True)
+    try:
+        bundle_cfg = load_yaml(bundle_cfg_path, required=True, validate="bundle")
+    except (ValueError, FileNotFoundError) as e:
+        raise click.ClickException(f"Failed to load bundle config '{bundle_name}': {e}") from e
     # Validate local repo and fetch names
     try:
         _validate_source_and_fetch_names(bundle_cfg)
@@ -300,7 +303,12 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     # Load defaults and craft config with proper precedence
     from bundlecraft.helpers.utils import merge_configs
 
-    defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False) or {}
+    try:
+        defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False, validate="defaults") or {}
+    except ValueError as e:
+        click.secho(f"[ERROR] Invalid defaults config: {e}", fg="red", err=True)
+        sys.exit(2)
+
     craft_path = CONFIG_DIR / "crafts" / f"{env}.yaml"
     legacy_env_path = CONFIG_DIR / "envs" / f"{env}.yaml"
     cfg_path = craft_path if craft_path.exists() else legacy_env_path
@@ -309,7 +317,12 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
         click.secho(f"[ERROR] Craft config not found: {env}", fg="red", err=True)
         sys.exit(2)
 
-    craft_cfg = load_yaml(cfg_path, required=True)
+    try:
+        craft_cfg = load_yaml(cfg_path, required=True, validate="craft")
+    except ValueError as e:
+        click.secho(f"[ERROR] Invalid craft config '{env}': {e}", fg="red", err=True)
+        sys.exit(2)
+
     env_cfg = merge_configs(defaults, craft_cfg)
 
     # Normalize targets from craft config
