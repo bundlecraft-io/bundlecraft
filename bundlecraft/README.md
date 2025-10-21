@@ -14,6 +14,7 @@ The BundleCraft framework consists of four primary components (Fetch → Build �
 | **Builder** (`builder.py`)     | Builds trust bundles from configured certificate sources.                   | `bundlecraft build`   |
 | **Verifier** (`verifier.py`)   | Verifies integrity, consistency, and certificate validity of built bundles. | `bundlecraft verify`  |
 | **Converter** (`converter.py`) | Converts certificate bundles between any supported formats (PEM, P7B, JKS, P12, ZIP). Accepts DER as input. | `bundlecraft convert` |
+| **Differ** (`differ.py`)       | Compares two bundle builds to identify added, removed, and unchanged certificates. | `bundlecraft diff`    |
 | **CLI Wrapper** (`cli.py`)     | Aggregates tools into a single cohesive interface.                          | `bundlecraft`         |
 
 Once installed via `pip install -e .`, the command `bundlecraft` becomes available system-wide.
@@ -53,9 +54,10 @@ Usage: bundlecraft [OPTIONS] COMMAND [ARGS]...
 
 Commands:
   fetch    Securely fetch and stage certificates from declared sources.
-  build     Build CA trust bundles from configured sources.
-  verify    Verify integrity and consistency of built bundles.
-  convert   Convert PEM bundles into alternate trust store formats.
+  build    Build CA trust bundles from configured sources.
+  verify   Verify integrity and consistency of built bundles.
+  convert  Convert PEM bundles into alternate trust store formats.
+  diff     Compare two bundle builds and generate diff reports.
 ```
 
 ### 🌐 `bundlecraft fetch`
@@ -328,6 +330,68 @@ All outputs use standardized naming: `bundlecraft-ca-trust.[FORMAT]`
 - Only one output format can be produced per invocation.
 - Any supported input format (PEM, DER, P7B, JKS, P12) can be converted to any supported output format (PEM, P7B, JKS, P12, ZIP).
 - DER is accepted as input only; use P7B for binary bundle output (DER is typically single-cert, not suitable for trust stores).
+
+---
+
+### 📊 `bundlecraft diff`
+
+**Purpose:** Compare two bundle builds to identify added, removed, and unchanged certificates. Useful for auditing changes between releases, verifying expected certificate updates, and tracking trust store evolution over time.
+
+**Usage:**
+
+```bash
+bundlecraft diff --from <old_bundle_dir> --to <new_bundle_dir> [OPTIONS]
+```
+
+**Options:**
+
+| Option            | Description                                                                 |
+| ----------------- | --------------------------------------------------------------------------- |
+| `--from`          | Path to the first (old) bundle directory. Required.                        |
+| `--to`            | Path to the second (new) bundle directory. Required.                       |
+| `--output-format` | Output format: `human` (default) or `json`.                                |
+| `-o, --output`    | Write output to file instead of stdout.                                    |
+
+**Examples:**
+
+```bash
+# Compare two bundle builds (human-readable)
+bundlecraft diff --from dist/prod/v1/internal --to dist/prod/v2/internal
+
+# Generate JSON diff report
+bundlecraft diff --from dist/prod/v1/internal --to dist/prod/v2/internal --output-format json
+
+# Save diff to file
+bundlecraft diff --from dist/prod/v1/internal --to dist/prod/v2/internal -o diff-report.txt
+
+# JSON output to file for CI/CD processing
+bundlecraft diff --from dist/prod/v1/internal --to dist/prod/v2/internal --output-format json -o diff.json
+```
+
+**Output:**
+
+Human-readable format includes:
+- Summary of changes (added, removed, unchanged counts)
+- Full details of added certificates (subject, fingerprint, issuer, validity period)
+- Full details of removed certificates
+- Manifest metadata from both bundles (craft, target, timestamp)
+
+JSON format provides structured data suitable for:
+- Automated CI/CD pipelines
+- Integration with monitoring systems
+- Historical tracking and analysis
+- Programmatic processing
+
+**Certificate Identification:**
+
+Certificates are uniquely identified by their SHA256 fingerprints, ensuring accurate change detection even when certificates have similar subjects or issuers.
+
+**Notes:**
+
+- Both bundle directories must contain a `bundlecraft-ca-trust.pem` file
+- Optionally reads `manifest.json` for metadata if present
+- Exit code 0 for both changes detected and no changes (success cases)
+- Exit code 1 for errors (missing files, parsing errors, etc.)
 
 ---
 

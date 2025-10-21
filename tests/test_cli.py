@@ -22,6 +22,7 @@ class TestCLI:
         assert "build" in result.output
         assert "verify" in result.output
         assert "convert" in result.output
+        assert "diff" in result.output
         assert "fetch" in result.output
 
     def test_cli_version(self, cli_runner):
@@ -30,7 +31,7 @@ class TestCLI:
         assert result.exit_code == 0
         assert "BundleCraft" in result.output
 
-    @pytest.mark.parametrize("command", ["build", "verify", "convert", "fetch"])
+    @pytest.mark.parametrize("command", ["build", "verify", "convert", "diff", "fetch"])
     def test_subcommand_help(self, cli_runner, command):
         """Test that each subcommand's --help output works."""
         result = cli_runner.invoke(cli, [command, "--help"])
