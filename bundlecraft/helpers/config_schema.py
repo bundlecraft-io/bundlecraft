@@ -376,3 +376,44 @@ def get_fetcher_categories() -> dict[str, list[str]]:
             FETCHER_TYPE_API,
         ],
     }
+
+
+# Stub validation functions for backwards compatibility
+# These allow existing code to work without pydantic validation
+def validate_bundle_config(data: dict[str, Any], config_path: str = "") -> dict[str, Any]:
+    """Pass-through validation for bundle config (stub implementation).
+    
+    Args:
+        data: Raw configuration dictionary
+        config_path: Path to config file (for error messages)
+    
+    Returns:
+        The input data unchanged
+    """
+    return data
+
+
+def validate_craft_config(data: dict[str, Any], config_path: str = "") -> dict[str, Any]:
+    """Pass-through validation for craft config (stub implementation).
+    
+    Args:
+        data: Raw configuration dictionary
+        config_path: Path to config file (for error messages)
+    
+    Returns:
+        The input data unchanged
+    """
+    return data
+
+
+def validate_defaults_config(data: dict[str, Any], config_path: str = "") -> dict[str, Any]:
+    """Pass-through validation for defaults config (stub implementation).
+    
+    Args:
+        data: Raw configuration dictionary
+        config_path: Path to config file (for error messages)
+    
+    Returns:
+        The input data unchanged
+    """
+    return data

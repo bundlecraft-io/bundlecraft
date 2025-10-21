@@ -33,6 +33,7 @@ from bundlecraft.fetchers.microsoft_roots import fetch_microsoft_roots
 from bundlecraft.fetchers.mozilla_roots import fetch_mozilla_roots
 from bundlecraft.fetchers.s3 import fetch_s3
 from bundlecraft.fetchers.vault import fetch_vault
+from bundlecraft.helpers.config_schema import validate_bundle_config
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
 CURRENT_DIR = Path(__file__).resolve().parent
