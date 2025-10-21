@@ -375,7 +375,7 @@ def _verify_certificates(
     is_flag=True,
     help="Emit machine-readable JSON output (suppresses human-readable output)",
 )
-def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose, force, dry_run, json_output):
+@click.option(
     "--keep-temp",
     is_flag=True,
     help="Preserve temporary build directories on failure (for debugging)",
@@ -390,6 +390,7 @@ def main(
     verbose,
     force,
     dry_run,
+    json_output,
     keep_temp,
 ):
     """Build trust bundles by orchestrating: fetch → convert → verify.
@@ -1101,12 +1102,6 @@ def main(
         verify_cfg = env_cfg.get("verify") or {}
         fail_on_expired = (
             verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
-    if dry_run:
-        click.secho(
-            "\n✅ [DRY RUN] Build simulation complete for target(s): "
-            + ", ".join(per_target_results.keys()),
-            fg="yellow",
-            bold=True,
         )
         for target_name in verify_results:
             if verify_results[target_name]["errors"] and fail_on_expired:
@@ -1141,15 +1136,10 @@ def main(
                 fg="bright_green",
                 bold=True,
             )
-        click.secho(
-            "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
-            fg="bright_green",
-            bold=True,
-        )
-        click.secho(
-            "All targets committed atomically to final locations.",
-            fg="green",
-        )
+            click.secho(
+                "All targets committed atomically to final locations.",
+                fg="green",
+            )
 
 
 if __name__ == "__main__":
