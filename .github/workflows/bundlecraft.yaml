@@ -150,30 +150,44 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: trust-store-*
           path: dist/
+          merge-multiple: false
       - name: Rehydrate to pki-ca-trust/<env>/<bundle> and package
         run: |
           set -euo pipefail
           echo "=== Contents of dist/ after artifact download ==="
-          find dist -maxdepth 3 -type d || true
+          ls -laR dist/ || true
           echo "=================================================="
           rm -rf pki-ca-trust
           mkdir -p pki-ca-trust
           shopt -s nullglob dotglob
+          artifact_count=0
           for artifact_dir in dist/*; do
+            if [ ! -d "$artifact_dir" ]; then
+              echo "Skipping non-directory: $artifact_dir"
+              continue
+            fi
             base="$(basename "$artifact_dir")"
+            echo "Processing artifact: $base"
             if [[ "$base" =~ ^trust-store-([^-/]+)-(.+)$ ]]; then
               env="${BASH_REMATCH[1]}"
               bundle="${BASH_REMATCH[2]}"
               dest="pki-ca-trust/${env}/${bundle}"
               mkdir -p "$dest"
               cp -R "${artifact_dir}/"* "$dest"/ || true
-              echo "Rehydrated: $base -> $dest"
+              echo "  ✓ Rehydrated: $base -> $dest"
+              ((artifact_count++))
             else
-              echo "Skipping unexpected artifact dir name: $base"
+              echo "  ⚠ Skipping unexpected artifact dir name: $base"
             fi
           done
           shopt -u nullglob dotglob
+          echo "Processed $artifact_count artifact(s)"
+          if [ "$artifact_count" -eq 0 ]; then
+            echo "::error::No valid artifacts were processed. Check the build job outputs."
+            exit 1
+          fi
           echo "=== pki-ca-trust (rehydrated) ==="
           find pki-ca-trust -maxdepth 3 -type d || true
           echo "================================="
