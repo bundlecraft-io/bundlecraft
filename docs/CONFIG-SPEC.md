@@ -141,6 +141,11 @@ fetch:
     url: https://curl.se/ca/cacert.pem
     verify:
       sha256: <expected_sha256>  # Content pinning (recommended)
+    # Optional: Override fetch retry/timeout settings
+    timeout: 60         # Request timeout in seconds (default: 30)
+    retries: 5          # Number of retry attempts (default: 3)
+    backoff_factor: 2.0 # Exponential backoff multiplier (default: 2.0)
+    retry_on_status: [429, 502, 503, 504]  # HTTP status codes to retry
 
   - name: partner_roots
     type: api
@@ -149,6 +154,9 @@ fetch:
     verify:
       ca_file: sources/partner-ca.pem
       tls_fingerprint_sha256: <cert_pin>
+    # Example: Slower API needs longer timeout
+    timeout: 120
+    retries: 5
 
   - name: vault_roots
     type: vault
@@ -158,6 +166,22 @@ fetch:
     addr: http://127.0.0.1:8200
     token_ref: VAULT_TOKEN
 ```
+
+**Fetch Retry and Timeout Configuration:**
+
+All fetch operations support configurable timeout and retry behavior to handle transient network failures gracefully:
+
+- **`timeout`** (integer, 1-600): Request timeout in seconds. Default: 30
+- **`retries`** (integer, 0-10): Number of retry attempts on transient failures. Default: 3
+- **`backoff_factor`** (float, 1.0-10.0): Exponential backoff multiplier between retries. Default: 2.0
+  - Retry delays: backoff_factor^attempt with random jitter (e.g., 2.0^0=1s, 2.0^1=2s, 2.0^2=4s)
+- **`retry_on_status`** (list of integers): HTTP status codes that trigger retry. Default: [429, 502, 503, 504]
+  - 429: Too Many Requests (rate limiting)
+  - 502: Bad Gateway (temporary proxy error)
+  - 503: Service Unavailable (temporary service error)
+  - 504: Gateway Timeout (temporary timeout)
+
+These settings can be configured globally in `config/defaults.yaml` under the `fetch:` section, or overridden per-source in bundle configs. Network errors (timeouts, connection failures) are always retried automatically.
 
 ### Metadata
 
@@ -257,6 +281,91 @@ format_overrides:
     # alias_format: '{subject.CN}-{fingerprint}'
 ```
 
+### Output Metadata for GitOps
+
+BundleCraft supports attaching structured metadata (annotations and labels) to build outputs for GitOps orchestration systems like ArgoCD, Flux, and Kubernetes.
+
+```yaml
+output_metadata:
+  annotations:
+    # Static annotations
+    argocd.argoproj.io/sync-wave: "1"
+    kustomize.toolkit.fluxcd.io/prune: "true"
+    
+    # Dynamic annotations with template variables
+    build-timestamp: "{{timestamp}}"
+    bundle-version: "{{bundle}}-{{env}}-{{date}}"
+    git-commit: "{{git_commit}}"
+    
+  labels:
+    # Static labels
+    app.kubernetes.io/component: "trust-bundle"
+    app.kubernetes.io/managed-by: "bundlecraft"
+    
+    # Dynamic labels with template variables
+    environment: "{{env}}"
+    bundle-id: "{{bundle}}"
+```
+
+**Template Variables:**
+
+- `{{bundle}}` - Target name (e.g., "internal-prod")
+- `{{env}}` - Craft/environment name (e.g., "production")
+- `{{timestamp}}` - ISO 8601 timestamp in UTC (e.g., "2025-10-21T12:00:00Z")
+- `{{date}}` - Date in YYYY-MM-DD format (e.g., "2025-10-21")
+- `{{git_commit}}` - Git commit hash (short form, 7 chars, or "unknown")
+
+**Output:**
+
+1. **manifest.json** - Expanded metadata is always included in the `output_metadata` field
+2. **metadata.yaml** - Optional YAML sidecar for Kubernetes ConfigMap/Secret generation
+
+**Example manifest.json snippet:**
+
+```json
+{
+  "craft": "Production",
+  "target": "internal-prod",
+  "timestamp_utc": "2025-10-21T12:00:00Z",
+  "output_metadata": {
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "1",
+      "build-timestamp": "2025-10-21T12:00:00Z",
+      "bundle-version": "internal-prod-production-2025-10-21",
+      "git-commit": "d0dfaa2"
+    },
+    "labels": {
+      "app.kubernetes.io/component": "trust-bundle",
+      "environment": "production",
+      "bundle-id": "internal-prod"
+    }
+  }
+}
+```
+
+**Example metadata.yaml:**
+
+```yaml
+annotations:
+  argocd.argoproj.io/sync-wave: '1'
+  build-timestamp: '2025-10-21T12:00:00Z'
+  bundle-version: internal-prod-production-2025-10-21
+  git-commit: d0dfaa2
+labels:
+  app.kubernetes.io/component: trust-bundle
+  bundle-id: internal-prod
+  environment: production
+```
+
+**Use Cases:**
+
+- **ArgoCD Sync Waves**: Control deployment order with `argocd.argoproj.io/sync-wave`
+- **Flux Prune Policy**: Manage resource cleanup with `kustomize.toolkit.fluxcd.io/prune`
+- **Kubernetes Labels**: Organize and select resources with standard labels
+- **Versioning**: Track bundle versions with dynamic template variables
+- **Traceability**: Link builds to git commits for audit trails
+```
+
 ### Distribution Metadata (for CI/CD pipeline use only)
 
 ```yaml
@@ -282,6 +391,20 @@ distribution_metadata:
     - production
     - signed
     - automated-build
+
+# Output metadata for GitOps orchestration (ArgoCD, Flux, Kubernetes)
+output_metadata:
+  annotations:
+    # Template variables: {{bundle}}, {{env}}, {{timestamp}}, {{date}}, {{git_commit}}
+    build-timestamp: "{{timestamp}}"
+    bundle-version: "{{bundle}}-{{env}}-{{date}}"
+    git-commit: "{{git_commit}}"
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    environment: "{{env}}"
+    bundle-id: "{{bundle}}"
+    app.kubernetes.io/component: "trust-bundle"
+    app.kubernetes.io/managed-by: "bundlecraft"
 ```
 
 ### Complete Craft Config Example
@@ -319,6 +442,17 @@ format_overrides:
     storepass_env: TRUST_JKS_PASSWORD
   pkcs12:
     password_env: TRUST_P12_PASSWORD
+
+output_metadata:
+  annotations:
+    build-timestamp: "{{timestamp}}"
+    bundle-version: "{{bundle}}-{{env}}-{{date}}"
+    git-commit: "{{git_commit}}"
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    environment: "{{env}}"
+    bundle-id: "{{bundle}}"
+    app.kubernetes.io/component: "trust-bundle"
 
 distribution_metadata:
   # NOTE: BundleCraft CLI does NOT publish or upload bundles directly.
@@ -370,6 +504,12 @@ package: false
 
 pem:
   include_subject_comments: true
+
+fetch:
+  timeout: 30  # Request timeout in seconds (1-600)
+  retries: 3   # Number of retry attempts on transient failures (0-10)
+  backoff_factor: 2.0  # Exponential backoff multiplier (1.0-10.0)
+  retry_on_status: [429, 502, 503, 504]  # HTTP status codes that trigger retry
 
 filters:
   unique_by_fingerprint: true

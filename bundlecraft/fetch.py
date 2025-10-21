@@ -125,7 +125,11 @@ def _write_provenance(dir_path: Path, records: list[dict[str, Any]]) -> None:
 
 
 def _fetch_from_config(
-    fetch_cfg: list[dict[str, Any]], dest_dir: Path, root: Path, verbose: bool = False
+    fetch_cfg: list[dict[str, Any]],
+    dest_dir: Path,
+    root: Path,
+    verbose: bool = False,
+    defaults: dict | None = None,
 ) -> list[Path]:
     outputs: list[Path] = []
     provenance: list[dict[str, Any]] = []
@@ -134,6 +138,12 @@ def _fetch_from_config(
         ftype = (src.get("type") or "url").lower()
         name = src.get("name") or f"fetched-{idx}"
         verify = src.get("verify") or {}
+
+        # Extract retry/timeout configuration from source
+        timeout = src.get("timeout")
+        retries = src.get("retries")
+        backoff_factor = src.get("backoff_factor")
+        retry_on_status = src.get("retry_on_status")
 
         logger.info(f"[Fetch {idx}/{len(fetch_cfg)}] Type: {ftype}, Name: {name}")
         if verbose:
@@ -147,7 +157,18 @@ def _fetch_from_config(
                 logger.info(f"  Fetching from URL: {url}")
                 if verbose and verify:
                     logger.debug(f"  Verification config: {json.dumps(verify, indent=2)}")
-                out_path = fetch_url(url, dest_dir, name=name, verify=verify, root=root)
+                out_path = fetch_url(
+                    url,
+                    dest_dir,
+                    name=name,
+                    verify=verify,
+                    root=root,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
+                )
             elif ftype == "api":
                 endpoint = src.get("endpoint") or src.get("url")
                 if not endpoint:
@@ -169,6 +190,11 @@ def _fetch_from_config(
                     token_ref=token_ref,
                     headers=headers,
                     verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
                 )
             elif ftype == "vault":
                 mount_point = (

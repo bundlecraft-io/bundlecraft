@@ -26,6 +26,7 @@ import tarfile
 from pathlib import Path
 
 import click
+import yaml
 
 from bundlecraft.helpers.atomic_build import AtomicBuildContext
 from bundlecraft.helpers.config_schema import (
@@ -34,6 +35,7 @@ from bundlecraft.helpers.config_schema import (
     validate_defaults_config,
 )
 from bundlecraft.helpers.convert_utils import convert_to_formats
+from bundlecraft.helpers.template_utils import expand_output_metadata
 from bundlecraft.helpers.json_output import suppress_output
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
@@ -1090,11 +1092,12 @@ def main(
                 )
 
             # Prepare manifest object
+            timestamp_utc = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             manifest_obj = {
                 "craft": env_cfg.get("name") or env,
                 "environment": env,  # retained for compatibility
                 "target": target_name,
-                "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "timestamp_utc": timestamp_utc,
                 "certificate_count": len(pem_blocks),
                 "output_formats": output_formats,
             }
@@ -1128,6 +1131,19 @@ def main(
             ]
 
             # Write manifest
+            # Add expanded output metadata if configured
+            expanded_metadata = None
+            output_metadata_cfg = env_cfg.get("output_metadata")
+            if output_metadata_cfg:
+                expanded_metadata = expand_output_metadata(
+                    output_metadata_cfg,
+                    bundle=target_name,
+                    env=env,
+                    timestamp_utc=timestamp_utc,
+                )
+                if expanded_metadata:
+                    manifest_obj["output_metadata"] = expanded_metadata
+
             output_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
             manifest_obj["files"] = [
                 {"path": fname, "sha256": sha256_file(build_root / fname)}
@@ -1146,6 +1162,18 @@ def main(
             if not json_output:
                 click.secho(
                     f"  [{target_name}] ✓ Wrote manifest: {display_path}",
+                    fg="green",
+                )
+
+            # Write optional YAML sidecar for Kubernetes ConfigMap/Secret generation
+            if expanded_metadata:
+                sidecar_path = build_root / "metadata.yaml"
+                sidecar_path.write_text(
+                    yaml.dump(expanded_metadata, default_flow_style=False, sort_keys=True),
+                    encoding="utf-8",
+                )
+                click.secho(
+                    f"  [{target_name}] ✓ Wrote metadata sidecar: {sidecar_path.relative_to(ROOT)}",
                     fg="green",
                 )
 
