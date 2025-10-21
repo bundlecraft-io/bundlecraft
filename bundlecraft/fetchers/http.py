@@ -10,6 +10,8 @@ from pathlib import Path
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 
+from bundlecraft.helpers.fetch_utils import get_fetch_config, retry_with_backoff
+
 
 def _safe_filename_from_url(url: str, name: str | None = None) -> str:
     """Derive a safe output filename from URL or provided name.
@@ -50,6 +52,11 @@ def fetch_url(
     name: str | None = None,
     verify: dict | None = None,
     root: Path | None = None,
+    timeout: int | None = None,
+    retries: int | None = None,
+    backoff_factor: float | None = None,
+    retry_on_status: list[int] | None = None,
+    defaults: dict | None = None,
 ) -> Path:
     """Fetch a URL (https or file) and save to dest_dir.
 
@@ -57,6 +64,17 @@ def fetch_url(
     - file:// URLs are copied directly
     Returns the output file path.
     """
+    # Get fetch configuration with overrides
+    fetch_config = get_fetch_config(
+        source_config={
+            "timeout": timeout,
+            "retries": retries,
+            "backoff_factor": backoff_factor,
+            "retry_on_status": retry_on_status,
+        } if any(x is not None for x in [timeout, retries, backoff_factor, retry_on_status]) else None,
+        defaults=defaults,
+    )
+
     dest_dir.mkdir(parents=True, exist_ok=True)
     out_name = _safe_filename_from_url(url, name)
     out_path = dest_dir / out_name
@@ -89,9 +107,19 @@ def fetch_url(
                     f"TLS fingerprint mismatch for {host}:{port} (expected {tls_fp}, got {actual_fp})"
                 )
 
-        req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
-            data = resp.read()
+        # Apply retry logic to the actual fetch
+        @retry_with_backoff(
+            retries=fetch_config["retries"],
+            backoff_factor=fetch_config["backoff_factor"],
+            retry_on_status=fetch_config["retry_on_status"],
+            timeout=fetch_config["timeout"],
+        )
+        def _do_fetch():
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, context=ctx, timeout=fetch_config["timeout"]) as resp:
+                return resp.read()
+
+        data = _do_fetch()
         out_path.write_bytes(data)
         return out_path
 
