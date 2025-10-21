@@ -1,0 +1,186 @@
+---
+# Example bundle configuration demonstrating extended fetchers
+# This file showcases all available fetcher types in BundleCraft
+#
+# Note: This is an example configuration. To use it, you need to:
+# 1. Install required dependencies: pip install 'bundlecraft[cloud,fetchers]'
+# 2. Configure appropriate environment variables for authentication
+# 3. Update the configuration with actual values for your environment
+#
+# See docs/FETCHERS.md for detailed documentation
+
+bundle_name: extended-fetchers-example
+description: Example bundle demonstrating all extended fetcher types
+
+fetch:
+  # ============================================================================
+  # Public Root Certificate Programs
+  # ============================================================================
+  
+  # Mozilla trusted roots (recommended with SHA256 pinning)
+  - name: mozilla-roots
+    type: mozilla_roots
+    verify:
+      # Update SHA256 hash when Mozilla bundle changes
+      # Get current hash from: curl -sL https://curl.se/ca/cacert.pem | sha256sum
+      sha256: your-sha256-hash-here
+
+  # Microsoft trusted roots
+  - name: microsoft-roots
+    type: microsoft_roots
+    verify:
+      sha256: your-sha256-hash-here
+
+  # Apple trusted roots
+  - name: apple-roots
+    type: apple_roots
+    verify:
+      sha256: your-sha256-hash-here
+
+  # ============================================================================
+  # Cloud Storage Providers
+  # ============================================================================
+
+  # AWS S3 (requires: pip install 'bundlecraft[cloud]')
+  # Environment: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (optional with IAM role)
+  - name: s3-corporate-root
+    type: s3
+    bucket: my-pki-bucket
+    key: certificates/corporate-root.pem
+    region: us-east-1
+    verify:
+      sha256: your-sha256-hash-here
+
+  # S3-compatible storage (e.g., MinIO)
+  - name: minio-cert
+    type: s3
+    bucket: certificates
+    key: internal/intermediate.pem
+    endpoint_url: https://minio.company.local:9000
+    access_key_ref: MINIO_ACCESS_KEY
+    secret_key_ref: MINIO_SECRET_KEY
+
+  # Azure Blob Storage (requires: pip install 'bundlecraft[cloud]')
+  # Environment: AZURE_STORAGE_CONNECTION_STRING or use account_url with Managed Identity
+  - name: azure-blob-cert
+    type: azure_blob
+    container: pki-certificates
+    blob_name: certificates/partner-ca.pem
+    # Option 1: Use connection string
+    connection_string_ref: AZURE_STORAGE_CONNECTION_STRING
+    # Option 2: Use account URL with Managed Identity (comment out connection_string_ref)
+    # account_url: https://myaccount.blob.core.windows.net
+
+  # Google Cloud Storage (requires: pip install 'bundlecraft[cloud]')
+  # Environment: GOOGLE_APPLICATION_CREDENTIALS (path to service account JSON)
+  - name: gcs-cert
+    type: gcs
+    bucket: company-pki-bucket
+    blob_name: certificates/vendor-root.pem
+    project: my-gcp-project
+
+  # ============================================================================
+  # Artifact Repositories
+  # ============================================================================
+
+  # JFrog Artifactory (requires HTTPS)
+  # Environment: ARTIFACTORY_TOKEN (recommended) or ARTIFACTORY_USERNAME + ARTIFACTORY_PASSWORD
+  - name: artifactory-cert
+    type: artifactory
+    url: https://artifactory.company.com/artifactory
+    repository: libs-release-local
+    path: com/company/pki/certificates/rootCA.pem
+    token_ref: ARTIFACTORY_TOKEN
+    verify:
+      sha256: your-sha256-hash-here
+
+  # GitHub Releases (public or private repos)
+  # Environment: GITHUB_TOKEN (optional for public repos, required for private)
+  - name: github-release-cert
+    type: github_release
+    owner: myorganization
+    repo: pki-certificates
+    asset_name: corporate-ca-bundle.pem
+    tag: v2024.01.01  # or omit for latest release
+    token_ref: GITHUB_TOKEN
+    verify:
+      sha256: your-sha256-hash-here
+
+  # ============================================================================
+  # Key Management Systems
+  # ============================================================================
+
+  # Azure Key Vault (requires: pip install 'bundlecraft[cloud]')
+  # Environment: AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+  #              or use Managed Identity (omit tenant/client credentials)
+  - name: keyvault-cert
+    type: azure_keyvault
+    vault_url: https://myvault.vault.azure.net/
+    certificate_name: corporate-root-ca
+    # Optional: specify version for reproducibility
+    # version: a1b2c3d4e5f6789012345678901234567890
+    # For service principal authentication:
+    tenant_id_ref: AZURE_TENANT_ID
+    client_id_ref: AZURE_CLIENT_ID
+    client_secret_ref: AZURE_CLIENT_SECRET
+
+  # HashiCorp Vault (requires: pip install 'bundlecraft[fetchers]')
+  # Environment: VAULT_ADDR, VAULT_TOKEN
+  - name: vault-cert
+    type: vault
+    mount_point: secret
+    path: pki/trusted-roots
+    pem_field: certificate
+    addr: https://vault.company.com:8200
+    token_ref: VAULT_TOKEN
+    # Optional: Vault Enterprise namespace
+    # namespace: production
+    verify:
+      # Optional: custom CA for Vault TLS verification
+      # ca_file: config/certs/vault-ca.pem
+
+  # ============================================================================
+  # Generic Sources
+  # ============================================================================
+
+  # HTTPS URL (built-in, no extra dependencies)
+  - name: https-cert
+    type: url
+    url: https://pki.company.com/certificates/partner-ca.pem
+    verify:
+      sha256: your-sha256-hash-here
+      # Optional: TLS certificate pinning
+      tls_fingerprint_sha256: your-tls-fingerprint-here
+      # Optional: custom CA for TLS verification
+      ca_file: config/certs/company-ca.pem
+
+  # Generic REST API with Bearer token authentication
+  # Environment: API_TOKEN (or your custom env var)
+  - name: api-cert
+    type: api
+    endpoint: https://api.pki.company.com/v1/certificates/latest
+    token_ref: API_TOKEN
+    verify:
+      headers:
+        X-API-Version: "2024"
+        Accept: application/x-pem-file
+
+# No local sources in this example (focusing on fetchers)
+include: []
+exclude: []
+
+metadata:
+  owner: security-team@example.com
+  purpose: Demonstration of all extended fetcher capabilities
+  tags: [example, fetchers, documentation]
+  notes: |
+    This is an example configuration file. Before using:
+    1. Install dependencies: pip install 'bundlecraft[cloud,fetchers]'
+    2. Configure authentication (environment variables)
+    3. Update with actual values for your environment
+    4. Replace placeholder SHA256 hashes with actual values
+    
+    For detailed documentation on each fetcher type, see:
+    - docs/FETCHERS.md - Comprehensive fetcher guide
+    - docs/CONFIG-SPEC.md - Configuration specification
+    - docs/adr-0002-fetch.md - Fetch architecture decisions
