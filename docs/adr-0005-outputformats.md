@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** October 18, 2025
-- **Owners:** BundleCraft maintainers
+- **Owners:** Chris J. Pich
 
 ---
 
