@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
 # Example script demonstrating JSON output from all BundleCraft commands
 # This script shows how to use the --json flag for CI/CD automation
+#
+# Dependencies:
+#   - jq: Command-line JSON processor (sudo apt-get install jq)
 
 set -e
+
+# Check for jq
+if ! command -v jq &> /dev/null; then
+    echo "Error: jq is not installed. Please install it first:"
+    echo "  Ubuntu/Debian: sudo apt-get install jq"
+    echo "  macOS: brew install jq"
+    echo "  Other: https://jqlang.github.io/jq/download/"
+    exit 1
+fi
 
 echo "=== BundleCraft JSON Output Examples ==="
 echo ""

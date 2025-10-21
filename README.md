@@ -237,6 +237,9 @@ These can be overridden by environment or bundle configs.
 ```bash
 # Required for conversions and verification
 sudo apt-get install openssl openjdk-17-jre-headless  # (for keytool)
+
+# Optional: jq (required for scripts/json-output-examples.sh)
+sudo apt-get install jq
 ```
 
 **Python dependencies:**
@@ -633,8 +636,8 @@ bundlecraft verify --target dist/prod/mozilla --json | jq -r '.verified_files'
 - **CI/CD friendly** - No ANSI colors, emojis, or unparseable output
 - **Consistent** - All commands follow the same base schema pattern
 
-📖 **Full documentation:** [docs/JSON-OUTPUT.md](docs/JSON-OUTPUT.md)  
-🔍 **Examples:** [docs/examples/json-output-examples.sh](docs/examples/json-output-examples.sh)
+📖 **Full documentation:** [docs/JSON-OUTPUT.md](docs/JSON-OUTPUT.md)
+🔍 **Examples:** [scripts/json-output-examples.sh](scripts/json-output-examples.sh)
 
 ### Configuration Files
 
