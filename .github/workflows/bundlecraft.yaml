@@ -123,11 +123,9 @@ jobs:
         run: |
           echo "Building target: ${{ matrix.item.target }} in environment: ${{ matrix.item.env }}"
           bundlecraft build \
-            --env ${{ matrix.item.env }} \
+            --craft ${{ matrix.item.env }} \
             --bundle ${{ matrix.item.target }} \
-            --prefetch \
-            --output-root "${{ matrix.item.output_root }}" \
-            --package
+            --output-root "${{ matrix.item.output_root }}"
       - name: Show output directory structure
         run: |
           echo "=== output directory structure ==="
