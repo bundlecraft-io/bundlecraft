@@ -206,16 +206,16 @@ jobs:
           sha256sum bundlecraft-trust.tar.gz > bundlecraft-trust.sha256
           echo "Created tarball and checksum:"
           sha256sum bundlecraft-trust.tar.gz
-          echo "=== Creating per-craft-target tarballs ==="
+          echo "=== Creating per-craft-bundle tarballs (flat contents) ==="
           mapfile -t TARGETS < <(find pki-ca-trust -mindepth 2 -maxdepth 2 -type d | sort)
           for dir in "${TARGETS[@]}"; do
             craft="$(echo "$dir" | awk -F/ '{print $2}')"
-            target="$(echo "$dir" | awk -F/ '{print $3}')"
-            name="bundlecraft-trust-craft-${craft}-target-${target}.tar.gz"
-            # Create tarball with structure: <craft>/<target>/<files>
-            tar -czf "$name" -C "pki-ca-trust" "${craft}/${target}"
+            bundle="$(echo "$dir" | awk -F/ '{print $3}')"
+            name="bundlecraft-trust-craft-${craft}-bundle-${bundle}.tar.gz"
+            # Create a flat tarball with the contents of the bundle at the archive root
+            tar -czf "$name" -C "pki-ca-trust/${craft}/${bundle}" .
             sha256sum "$name" > "${name%.tar.gz}.sha256"
-            echo "Created per-target tarball: $name"
+            echo "Created per-bundle tarball: $name"
           done
       - name: Upload combined directory
         uses: actions/upload-artifact@v4
@@ -229,13 +229,13 @@ jobs:
           path: |
             bundlecraft-trust.tar.gz
             bundlecraft-trust.sha256
-      - name: Upload per-target tarballs
+      - name: Upload per-bundle tarballs
         uses: actions/upload-artifact@v4
         with:
           name: truststore-target-bundles
           path: |
-            bundlecraft-trust-craft-*-target-*.tar.gz
-            bundlecraft-trust-craft-*-target-*.sha256
+            bundlecraft-trust-craft-*-bundle-*.tar.gz
+            bundlecraft-trust-craft-*-bundle-*.sha256
   verify:
     name: Verify builds and tarball
     needs: collect
@@ -316,7 +316,7 @@ jobs:
         with:
           name: truststore-bundle
           path: release/
-      - name: Download per-target artifacts
+      - name: Download per-bundle artifacts
         uses: actions/download-artifact@v4
         with:
           name: truststore-target-bundles
@@ -421,7 +421,7 @@ jobs:
           fi
           perenv_md=""
           shopt -s nullglob
-          files=(release/bundlecraft-trust-craft-*-target-*.tar.gz)
+          files=(release/bundlecraft-trust-craft-*-bundle-*.tar.gz)
           if [ ${#files[@]} -eq 0 ]; then
             perenv_md="(none)\n"
           else
@@ -451,7 +451,7 @@ jobs:
             sha_lines+=$(cat release/bundlecraft-trust.sha256)
             sha_lines+=$'\n'
           fi
-          for s in release/bundlecraft-trust-craft-*-target-*.sha256; do
+          for s in release/bundlecraft-trust-craft-*-bundle-*.sha256; do
             [ -f "$s" ] || continue
             sha_lines+=$(cat "$s")
             sha_lines+=$'\n'
@@ -461,13 +461,13 @@ jobs:
             printf "%b" "$sha_lines"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-      - name: Summarize per-target assets
+      - name: Summarize per-bundle assets
         id: percraft
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-          files=(release/bundlecraft-trust-craft-*-target-*.tar.gz)
+          files=(release/bundlecraft-trust-craft-*-bundle-*.tar.gz)
           if [ ${#files[@]} -eq 0 ]; then
             echo "craft_count=0" >> "$GITHUB_OUTPUT"
             {
@@ -477,14 +477,14 @@ jobs:
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          mapfile -t PAIRS < <(printf "%s\n" "${files[@]}" | sed -E 's#^.*/bundlecraft-trust-craft-([^/]+)-target-(.+)\.tar\.gz$#\1/\2#' | sort)
+          mapfile -t PAIRS < <(printf "%s\n" "${files[@]}" | sed -E 's#^.*/bundlecraft-trust-craft-([^/]+)-bundle-(.+)\.tar\.gz$#\1/\2#' | sort)
           count=${#PAIRS[@]}
           echo "craft_count=$count" >> "$GITHUB_OUTPUT"
           {
             echo "craft_list_markdown<<EOF"
             for p in "${PAIRS[@]}"; do
-              craft="${p%%/*}"; target="${p#*/}"
-              echo "- ${craft}/${target} (bundlecraft-trust-craft-${craft}-target-${target}.tar.gz)"
+              craft="${p%%/*}"; bundle="${p#*/}"
+              echo "- ${craft}/${bundle} (bundlecraft-trust-craft-${craft}-bundle-${bundle}.tar.gz)"
             done
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
@@ -510,7 +510,7 @@ jobs:
             ### Download assets
             - Combined (all envs):
             ${{ steps.assets.outputs.assets_combined_markdown }}
-            - Per-target bundles:
+            - Per-craft/bundle assets:
             ${{ steps.assets.outputs.assets_perenv_markdown }}
 
             ### SHA256 checksums
@@ -533,16 +533,16 @@ jobs:
             If you do not see 'Good signature', the artifact may be tampered with.
 
             ### Consumers: quick start
-            Per-craft-target bundle (recommended for targeted usage):
+            Per-craft/bundle archive (recommended for targeted usage):
             ```bash
             # Verify checksum
-            sha256sum -c bundlecraft-trust-craft-<craft>-target-<target>.sha256
+            sha256sum -c bundlecraft-trust-craft-<craft>-bundle-<bundle>.sha256
 
-            # Extract (creates <craft>/<target>/ directory structure)
-            tar -xzf bundlecraft-trust-craft-<craft>-target-<target>.tar.gz
+            # Extract (flat contents at archive root)
+            tar -xzf bundlecraft-trust-craft-<craft>-bundle-<bundle>.tar.gz
 
             # Access bundle files
-            ls <craft>/<target>/
+            ls -la
             ```
             Combined bundle (all crafts and targets):
             ```bash
@@ -560,8 +560,8 @@ jobs:
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
             release/bundlecraft-trust.tar.gz.asc
-            release/bundlecraft-trust-craft-*-target-*.tar.gz
-            release/bundlecraft-trust-craft-*-target-*.sha256
+            release/bundlecraft-trust-craft-*-bundle-*.tar.gz
+            release/bundlecraft-trust-craft-*-bundle-*.sha256
             release/TRUST_MATRIX.md
             release/trust-matrix.json
       - name: Create GitHub Release (unsigned)
@@ -626,8 +626,8 @@ jobs:
           files: |-
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
-            release/bundlecraft-trust-craft-*-target-*.tar.gz
-            release/bundlecraft-trust-craft-*-target-*.sha256
+            release/bundlecraft-trust-craft-*-bundle-*.tar.gz
+            release/bundlecraft-trust-craft-*-bundle-*.sha256
             release/TRUST_MATRIX.md
             release/trust-matrix.json
             release/bundlecraft-trust-env-*-bundle-*.sha256
