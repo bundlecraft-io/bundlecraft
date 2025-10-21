@@ -78,12 +78,7 @@ jobs:
           echo '::endgroup::'
           if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
             {
-              echo '## BundleCraft Build Summary'
-              echo
-              echo '### Build Artifacts'
-              echo 'The following artifacts will be produced:'
-              echo '- `bundlecraft-trust.tar.gz` (combined bundle)'
-              echo '- Per-target bundles: `bundlecraft-trust-*-bundle-*.tar.gz`'
+              echo '## Build selection'
               echo
               echo "- Selected environments: ${SELECTED_SORTED:-'(all)'}"
               echo -n "- Available environments: "
@@ -126,7 +121,7 @@ jobs:
           pip install -e ".[dev]"
       - name: Build bundle target
         run: |
-          echo "Building target: ${{ matrix.item.target }} in environment: ${{ matrix.item.env }}"
+          echo "Building target: ${{ matrix.item.target }} in craft: ${{ matrix.item.env }}"
           bundlecraft build \
             --craft ${{ matrix.item.env }} \
             --bundle ${{ matrix.item.target }} \
@@ -136,27 +131,21 @@ jobs:
           echo "=== output directory structure ==="
           (tree "${{ matrix.item.output_root }}/" || find "${{ matrix.item.output_root }}/") || true
           echo "=================================="
-      - name: Check built target path exists
+      - name: Validate build output exists
         run: |
           set -euo pipefail
           shopt -s nullglob
-          ROOT="${{ matrix.item.output_root }}"
-          CANDIDATES=("${ROOT}"/*/"${{ matrix.item.target }}"/)
-          echo "Searching for build output in: ${ROOT}/*/${{ matrix.item.target }}/"
-          if [ ${#CANDIDATES[@]} -eq 0 ]; then
-            echo "::error::Build output directory not found for target '${{ matrix.item.target }}' under ${ROOT}/*/"
-            echo "Listing ${ROOT}/ for debugging:" && (ls -laR "${ROOT}/" || true)
+          matches=("${{ matrix.item.output_root }}"/*/"${{ matrix.item.target }}")
+          if [ ${#matches[@]} -eq 0 ]; then
+            echo "::error::No build output found at ${{ matrix.item.output_root }}/*/${{ matrix.item.target }}/"
             exit 1
           fi
-          echo "Found ${#CANDIDATES[@]} candidate(s):"
-          printf ' - %s\n' "${CANDIDATES[@]}"
-          shopt -u nullglob
+          echo "Found build output: ${matches[0]}"
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
           name: trust-store-${{ matrix.item.env }}-${{ matrix.item.target }}
-          path: |
-            ${{ matrix.item.output_root }}/*/${{ matrix.item.target }}/
+          path: ${{ matrix.item.output_root }}/*/${{ matrix.item.target }}/
           if-no-files-found: error
   collect:
     name: Collect and package all builds
@@ -164,42 +153,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        id: download
         uses: actions/download-artifact@v4
         with:
           path: dist/
-          merge-multiple: false
-        continue-on-error: true
-      - name: Check download status
-        run: |
-          if [ "${{ steps.download.outcome }}" != "success" ]; then
-            echo "::error::Artifact download failed or found no matching artifacts"
-            echo "Build job may have failed or artifacts were not uploaded"
-            exit 1
-          fi
-          echo "Artifact download succeeded"
-      - name: Debug - List downloaded artifacts
-        run: |
-          echo "=== Checking if dist/ exists ==="
-          ls -la . || true
-          echo "=== Contents of current directory ==="
-          find . -maxdepth 2 -type d || true
-          echo "=== Contents of dist/ (if exists) ==="
-          if [ -d dist ]; then
-            ls -laR dist/ || true
-          else
-            echo "dist/ directory does not exist!"
-          fi
       - name: Rehydrate to pki-ca-trust/<env>/<bundle> and package
         run: |
           set -euo pipefail
           echo "=== Contents of dist/ after artifact download ==="
-          if [ ! -d dist ]; then
-            echo "::error::dist/ directory was not created by artifact download"
-            echo "This means no artifacts matching 'trust-store-*' were found"
-            echo "Check that the build job completed successfully and uploaded artifacts"
-            exit 1
-          fi
           ls -laR dist/ || true
           echo "=================================================="
           rm -rf pki-ca-trust
@@ -207,39 +167,36 @@ jobs:
           shopt -s nullglob dotglob
           artifact_count=0
           for artifact_dir in dist/*; do
-            if [ ! -d "$artifact_dir" ]; then
-              echo "Skipping non-directory: $artifact_dir"
-              continue
-            fi
+            [ -d "$artifact_dir" ] || continue
+            artifact_count=$((artifact_count + 1))
             base="$(basename "$artifact_dir")"
-            echo "Processing artifact: $base"
             if [[ "$base" =~ ^trust-store-([^-/]+)-(.+)$ ]]; then
               env="${BASH_REMATCH[1]}"
               bundle="${BASH_REMATCH[2]}"
               dest="pki-ca-trust/${env}/${bundle}"
               mkdir -p "$dest"
-              # Determine actual source directory inside the artifact
+
+              # Detect nested layout: artifact may contain craft-dir/target-dir structure
+              # Look for subdirectories matching the bundle name
               shopt -s nullglob
-              C_SRC=("${artifact_dir}"/*/"${bundle}")
-              shopt -u nullglob
-              if [ ${#C_SRC[@]} -gt 0 ] && [ -d "${C_SRC[0]}" ]; then
-                src_dir="${C_SRC[0]}"
-                echo "  Detected nested layout; copying from: $src_dir"
-                cp -R "${src_dir}/"* "$dest"/ || true
+              nested_sources=("${artifact_dir}"/*/"${bundle}")
+              if [ ${#nested_sources[@]} -gt 0 ] && [ -d "${nested_sources[0]}" ]; then
+                # Found nested structure: copy from craft-dir/target-dir
+                echo "  Detected nested layout; copying from: ${nested_sources[0]}"
+                cp -R "${nested_sources[0]}/"* "$dest"/ || true
               else
-                echo "  Using artifact root as source"
+                # Flat structure or direct target content: copy from artifact root
                 cp -R "${artifact_dir}/"* "$dest"/ || true
               fi
-              echo "  ✓ Rehydrated: $base -> $dest"
-              ((artifact_count++))
+              shopt -u nullglob
+              echo "✓ Rehydrated: $base -> $dest"
             else
-              echo "  ⚠ Skipping unexpected artifact dir name: $base"
+              echo "⚠ Skipping unexpected artifact dir name: $base"
             fi
           done
           shopt -u nullglob dotglob
-          echo "Processed $artifact_count artifact(s)"
-          if [ "$artifact_count" -eq 0 ]; then
-            echo "::error::No valid artifacts were processed. Check the build job outputs."
+          if [ $artifact_count -eq 0 ]; then
+            echo "::error::No artifacts were downloaded"
             exit 1
           fi
           echo "=== pki-ca-trust (rehydrated) ==="
@@ -249,18 +206,14 @@ jobs:
           sha256sum bundlecraft-trust.tar.gz > bundlecraft-trust.sha256
           echo "Created tarball and checksum:"
           sha256sum bundlecraft-trust.tar.gz
-          echo "=== Creating per-target tarballs (root=certs) ==="
+          echo "=== Creating per-craft-target tarballs ==="
           mapfile -t TARGETS < <(find pki-ca-trust -mindepth 2 -maxdepth 2 -type d | sort)
           for dir in "${TARGETS[@]}"; do
-            env="$(echo "$dir" | awk -F/ '{print $2}')"
-            bundle="$(echo "$dir" | awk -F/ '{print $3}')"
-            name="bundlecraft-trust-env-${env}-bundle-${bundle}.tar.gz"
-            if [ -d "$dir/certs" ]; then
-              tar -czf "$name" -C "$dir" certs
-            else
-              # Fallback: if certs/ missing, include full target directory (keeps structure)
-              tar -czf "$name" -C "pki-ca-trust/${env}" "$bundle"
-            fi
+            craft="$(echo "$dir" | awk -F/ '{print $2}')"
+            target="$(echo "$dir" | awk -F/ '{print $3}')"
+            name="bundlecraft-trust-craft-${craft}-target-${target}.tar.gz"
+            # Create tarball with structure: <craft>/<target>/<files>
+            tar -czf "$name" -C "pki-ca-trust" "${craft}/${target}"
             sha256sum "$name" > "${name%.tar.gz}.sha256"
             echo "Created per-target tarball: $name"
           done
@@ -281,8 +234,8 @@ jobs:
         with:
           name: truststore-target-bundles
           path: |
-            bundlecraft-trust-env-*-bundle-*.tar.gz
-            bundlecraft-trust-env-*-bundle-*.sha256
+            bundlecraft-trust-craft-*-target-*.tar.gz
+            bundlecraft-trust-craft-*-target-*.sha256
   verify:
     name: Verify builds and tarball
     needs: collect
@@ -468,7 +421,7 @@ jobs:
           fi
           perenv_md=""
           shopt -s nullglob
-          files=(release/bundlecraft-trust-env-*-bundle-*.tar.gz)
+          files=(release/bundlecraft-trust-craft-*-target-*.tar.gz)
           if [ ${#files[@]} -eq 0 ]; then
             perenv_md="(none)\n"
           else
@@ -498,7 +451,7 @@ jobs:
             sha_lines+=$(cat release/bundlecraft-trust.sha256)
             sha_lines+=$'\n'
           fi
-          for s in release/bundlecraft-trust-env-*-bundle-*.sha256; do
+          for s in release/bundlecraft-trust-craft-*-target-*.sha256; do
             [ -f "$s" ] || continue
             sha_lines+=$(cat "$s")
             sha_lines+=$'\n'
@@ -509,29 +462,29 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
       - name: Summarize per-target assets
-        id: perenv
+        id: percraft
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-          files=(release/bundlecraft-trust-env-*-bundle-*.tar.gz)
+          files=(release/bundlecraft-trust-craft-*-target-*.tar.gz)
           if [ ${#files[@]} -eq 0 ]; then
-            echo "env_count=0" >> "$GITHUB_OUTPUT"
+            echo "craft_count=0" >> "$GITHUB_OUTPUT"
             {
-              echo "env_list_markdown<<EOF"
+              echo "craft_list_markdown<<EOF"
               echo "(none)"
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          mapfile -t PAIRS < <(printf "%s\n" "${files[@]}" | sed -E 's#^.*/bundlecraft-trust-env-([^/]+)-bundle-(.+)\.tar\.gz$#\1/\2#' | sort)
+          mapfile -t PAIRS < <(printf "%s\n" "${files[@]}" | sed -E 's#^.*/bundlecraft-trust-craft-([^/]+)-target-(.+)\.tar\.gz$#\1/\2#' | sort)
           count=${#PAIRS[@]}
-          echo "env_count=$count" >> "$GITHUB_OUTPUT"
+          echo "craft_count=$count" >> "$GITHUB_OUTPUT"
           {
-            echo "env_list_markdown<<EOF"
+            echo "craft_list_markdown<<EOF"
             for p in "${PAIRS[@]}"; do
-              env="${p%%/*}"; bundle="${p#*/}"
-              echo "- ${env}/${bundle} (bundlecraft-trust-env-${env}-bundle-${bundle}.tar.gz)"
+              craft="${p%%/*}"; target="${p#*/}"
+              echo "- ${craft}/${target} (bundlecraft-trust-craft-${craft}-target-${target}.tar.gz)"
             done
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
@@ -580,32 +533,35 @@ jobs:
             If you do not see 'Good signature', the artifact may be tampered with.
 
             ### Consumers: quick start
-            Per-target bundle (recommended for targeted usage):
+            Per-craft-target bundle (recommended for targeted usage):
             ```bash
             # Verify checksum
-            sha256sum -c bundlecraft-trust-env-<env>-bundle-<bundle>.sha256
+            sha256sum -c bundlecraft-trust-craft-<craft>-target-<target>.sha256
 
-            # Extract into current directory
-            tar -xzf bundlecraft-trust-env-<env>-bundle-<bundle>.tar.gz
+            # Extract (creates <craft>/<target>/ directory structure)
+            tar -xzf bundlecraft-trust-craft-<craft>-target-<target>.tar.gz
 
-            # Explore
-            ls -R certs/
+            # Access bundle files
+            ls <craft>/<target>/
             ```
-            Combined bundle (all environments):
+            Combined bundle (all crafts and targets):
             ```bash
             # Verify checksum and signature (if provided)
             sha256sum -c bundlecraft-trust.sha256
             gpg --verify bundlecraft-trust.tar.gz.asc bundlecraft-trust.tar.gz
 
-            # Extract
+            # Extract (creates pki-ca-trust/ directory)
             tar -xzf bundlecraft-trust.tar.gz
+
+            # Explore structure
+            ls -R pki-ca-trust/
             ```
           files: |-
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
             release/bundlecraft-trust.tar.gz.asc
-            release/bundlecraft-trust-env-*-bundle-*.tar.gz
-            release/bundlecraft-trust-env-*-bundle-*.sha256
+            release/bundlecraft-trust-craft-*-target-*.tar.gz
+            release/bundlecraft-trust-craft-*-target-*.sha256
             release/TRUST_MATRIX.md
             release/trust-matrix.json
       - name: Create GitHub Release (unsigned)
@@ -645,29 +601,35 @@ jobs:
             - manifest.json
 
             ### Consumers: quick start
-            Per-target bundle (recommended for targeted usage):
+            Per-craft-target bundle (recommended for targeted usage):
             ```bash
             # Verify checksum
-            sha256sum -c bundlecraft-trust-env-<env>-bundle-<bundle>.sha256
+            sha256sum -c bundlecraft-trust-craft-<craft>-target-<target>.sha256
 
-            # Extract into current directory
-            tar -xzf bundlecraft-trust-env-<env>-bundle-<bundle>.tar.gz
+            # Extract (creates <craft>/<target>/ directory structure)
+            tar -xzf bundlecraft-trust-craft-<craft>-target-<target>.tar.gz
 
-            # Explore
-            ls -R certs/
+            # Access bundle files
+            ls <craft>/<target>/
             ```
-            Combined bundle (all environments):
+            Combined bundle (all crafts and targets):
             ```bash
             # Verify checksum
             sha256sum -c bundlecraft-trust.sha256
 
-            # Extract
+            # Extract (creates pki-ca-trust/ directory)
             tar -xzf bundlecraft-trust.tar.gz
+
+            # Explore structure
+            ls -R pki-ca-trust/
             ```
           files: |-
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
-            release/bundlecraft-trust-env-*-bundle-*.tar.gz
+            release/bundlecraft-trust-craft-*-target-*.tar.gz
+            release/bundlecraft-trust-craft-*-target-*.sha256
+            release/TRUST_MATRIX.md
+            release/trust-matrix.json
             release/bundlecraft-trust-env-*-bundle-*.sha256
             release/TRUST_MATRIX.md
             release/trust-matrix.json
