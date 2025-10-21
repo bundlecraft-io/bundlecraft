@@ -868,3 +868,11 @@ Comprehensive validation tests are located in `tests/test_config_validation.py` 
 5. **Tags**: Use environment tags to control CI/CD pipeline routing (e.g., only sign/publish `production` tagged envs)
 6. **HTTPS enforcement**: The schema automatically rejects insecure HTTP URLs (except localhost)
 7. **Key sizes**: Configure minimum key size requirements to enforce cryptographic standards
+
+---
+
+## Related Documentation
+
+- **[Exit Codes](./exit-codes.md)** — CLI exit codes for CI/CD integration and error handling
+- **[JSON Output Format](./JSON-OUTPUT.md)** — Structured output for programmatic consumption
+- **[Troubleshooting Guide](./troubleshooting.md)** — Common issues and solutions

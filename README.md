@@ -461,6 +461,7 @@ When triggering manually, you can optionally filter environments:
 
 - **CLI reference:** [`bundlecraft/README.md`](bundlecraft/README.md)
 - **Configuration spec:** [`docs/CONFIG-SPEC.md`](docs/CONFIG-SPEC.md)
+- **Exit codes:** [`docs/exit-codes.md`](docs/exit-codes.md) — CI/CD integration guide
 - **Contributing guide:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - **Security policy:** [`SECURITY.md`](SECURITY.md)
 - **Test documentation:** [`tests/README.md`](tests/README.md)

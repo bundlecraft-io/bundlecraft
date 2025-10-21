@@ -23,11 +23,6 @@ Exit code reference (from bundlecraft/helpers/exit_codes.py):
     51  - PERMISSION_ERROR
 """
 
-import json
-import subprocess
-import tempfile
-from pathlib import Path
-
 import pytest
 from click.testing import CliRunner
 
