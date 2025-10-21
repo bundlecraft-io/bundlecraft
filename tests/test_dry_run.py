@@ -2,7 +2,6 @@
 
 import pytest
 from click.testing import CliRunner
-from pathlib import Path
 
 from bundlecraft.builder import main as build_main
 from bundlecraft.converter import main as convert_main
@@ -103,7 +102,7 @@ class TestBuilderDryRun:
     def test_builder_dry_run_no_directories_created(self, cli_runner, temp_dir):
         """Test that builder --dry-run does not create any directories."""
         output_dir = temp_dir / "dist"
-        result = cli_runner.invoke(
+        _ = cli_runner.invoke(
             build_main,
             [
                 "--craft",
@@ -147,14 +146,16 @@ class TestFetchDryRun:
     def test_fetch_dry_run_shows_preview(self, cli_runner, temp_dir):
         """Test that fetch --dry-run shows what would be fetched."""
         bundle_config = temp_dir / "bundle.yaml"
-        bundle_config.write_text("""
+        bundle_config.write_text(
+            """
 bundle_name: test-bundle
 description: Test bundle
 fetch:
   - type: url
     name: test-source
     url: https://example.com/cert.pem
-""")
+"""
+        )
         result = cli_runner.invoke(
             fetch_main,
             [
@@ -174,14 +175,16 @@ fetch:
     def test_fetch_dry_run_no_network_requests(self, cli_runner, temp_dir):
         """Test that fetch --dry-run does not make network requests."""
         bundle_config = temp_dir / "bundle.yaml"
-        bundle_config.write_text("""
+        bundle_config.write_text(
+            """
 bundle_name: test-bundle
 description: Test bundle
 fetch:
   - type: url
     name: test-source
     url: https://example.com/cert.pem
-""")
+"""
+        )
         result = cli_runner.invoke(
             fetch_main,
             [
@@ -199,16 +202,18 @@ fetch:
     def test_fetch_dry_run_no_files_written(self, cli_runner, temp_dir):
         """Test that fetch --dry-run does not write any files."""
         bundle_config = temp_dir / "bundle.yaml"
-        bundle_config.write_text("""
+        bundle_config.write_text(
+            """
 bundle_name: test-bundle
 description: Test bundle
 repo:
   - name: local-source
     include:
       - "*.pem"
-""")
+"""
+        )
         staging_dir = temp_dir / "sources" / "staged" / "test-bundle"
-        result = cli_runner.invoke(
+        _ = cli_runner.invoke(
             fetch_main,
             [
                 "--bundle-config-file",
@@ -233,7 +238,7 @@ class TestVerifierDryRun:
         build_dir.mkdir()
         checksums_file = build_dir / "checksums.sha256"
         checksums_file.write_text("abc123  test.pem\n")
-        
+
         result = cli_runner.invoke(
             verify_main,
             [
@@ -246,13 +251,17 @@ class TestVerifierDryRun:
         output_lower = result.output.lower()
         assert "[dry run" in output_lower or "[dry-run]" in output_lower
         # Should show what would be verified
-        assert "would verify" in output_lower or "would load" in output_lower or "would display" in output_lower
+        assert (
+            "would verify" in output_lower
+            or "would load" in output_lower
+            or "would display" in output_lower
+        )
 
     def test_verifier_dry_run_single_file(self, cli_runner, temp_dir):
         """Test that verifier --dry-run works with single files."""
         test_file = temp_dir / "test.pem"
         test_file.write_text("test content")
-        
+
         result = cli_runner.invoke(
             verify_main,
             [
@@ -271,7 +280,7 @@ class TestVerifierDryRun:
         build_dir.mkdir()
         manifest_file = build_dir / "manifest.json"
         manifest_file.write_text('{"test": "data"}')
-        
+
         result = cli_runner.invoke(
             verify_main,
             [
@@ -298,7 +307,7 @@ class TestDryRunConsistency:
             (fetch_main, "fetch"),
             (verify_main, "verify"),
         ]
-        
+
         for cmd_func, cmd_name in commands:
             result = cli_runner.invoke(cmd_func, ["--help"])
             assert result.exit_code == 0

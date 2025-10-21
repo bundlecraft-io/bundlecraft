@@ -264,16 +264,14 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
 )
 def main(target, verify_manifest, verify_all, verbose, dry_run):
     """Verify the integrity and consistency of built trust bundles.
-    
+
     Use --dry-run to preview what would be verified without making any changes.
     """
     click.secho("\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
-    
+
     if dry_run:
-        click.secho(
-            "[DRY RUN MODE] No files will be read or verified\n", fg="yellow", bold=True
-        )
-    
+        click.secho("[DRY RUN MODE] No files will be read or verified\n", fg="yellow", bold=True)
+
     path = Path(target)
     if path.is_file():
         if dry_run:
@@ -298,7 +296,7 @@ def main(target, verify_manifest, verify_all, verbose, dry_run):
             click.echo("[dry-run] Would display manifest info from: " + str(path))
         else:
             click.echo("[dry-run] Would verify directory: " + str(path))
-        
+
         # Show what would be checked
         checksum_path = path / CHECKSUM_FILE
         if checksum_path.exists():
@@ -310,14 +308,14 @@ def main(target, verify_manifest, verify_all, verbose, dry_run):
                 click.echo(f"[dry-run] Note: Could not parse checksums: {e}", err=True)
         else:
             click.echo(f"[dry-run] Note: {CHECKSUM_FILE} not found", err=True)
-        
+
         manifest_path = path / MANIFEST_FILE
         if (verify_manifest or verify_all) and manifest_path.exists():
             click.echo(f"[dry-run] Would display manifest from: {manifest_path.name}")
-        
+
         click.echo("✅ [dry-run] Verification simulation complete")
         return
-    
+
     if verify_manifest:
         show_manifest_info(path, verbose)
     elif verify_all:

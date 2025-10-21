@@ -482,7 +482,7 @@ def _fetch_each_to_named_dirs(
         name = src.get("name") or f"fetched-{idx}"
         if name_filter and name != name_filter:
             continue
-        
+
         if dry_run:
             ftype = (src.get("type") or "url").lower()
             logger.info(f"[dry-run] Would fetch: {name} (type: {ftype})")
@@ -494,12 +494,14 @@ def _fetch_each_to_named_dirs(
                 provider = src.get("provider") or "generic"
                 logger.info(f"[dry-run]   from API: {endpoint} (provider: {provider})")
             elif ftype == "vault":
-                mount_point = src.get("mount_point") or src.get("mount") or src.get("engine") or "secret"
+                mount_point = (
+                    src.get("mount_point") or src.get("mount") or src.get("engine") or "secret"
+                )
                 path = src.get("path")
                 logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
             logger.info(f"[dry-run]   to directory: {staging_root / name}")
             continue
-        
+
         subdir = staging_root / name
         ensure_dir(subdir)
         try:
@@ -631,7 +633,9 @@ def main(
             click.secho("\n[SUMMARY] [dry-run] Would stage artifacts to:", fg="yellow")
             click.secho(f"  {staging_root}", fg="yellow")
             if not no_clean:
-                click.secho("  [dry-run] Would clean staging directory before fetching", fg="yellow")
+                click.secho(
+                    "  [dry-run] Would clean staging directory before fetching", fg="yellow"
+                )
             click.secho("", fg="yellow")  # Empty line for formatting
 
         if dry_run:

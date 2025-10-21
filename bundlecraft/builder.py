@@ -232,23 +232,25 @@ def _aggregate_staged_sources(staging_dirs: list[Path], verbose: bool = False) -
 
 def _create_deterministic_tar(build_root: Path, output_name: str = "package") -> Path:
     """Create a deterministic tar.gz archive with normalized metadata.
-    
+
     All files in build_root (except the tar itself) are added with:
     - mtime=0 (epoch time)
     - uid=0, gid=0
     - uname='', gname=''
     - Sorted entries for consistent ordering
     - gzip mtime=0 for deterministic compression
-    
+
     Returns the path to the created tar.gz file.
     """
     import io
-    
+
     tar_path = build_root / f"{output_name}.tar.gz"
-    
+
     # Collect all files except the tar itself, sorted for consistency
-    files_to_add = sorted([f for f in build_root.glob("*") if f.is_file() and f.name != tar_path.name])
-    
+    files_to_add = sorted(
+        [f for f in build_root.glob("*") if f.is_file() and f.name != tar_path.name]
+    )
+
     # Create tar in memory first
     tar_buffer = io.BytesIO()
     with tarfile.open(fileobj=tar_buffer, mode="w", format=tarfile.PAX_FORMAT) as tar:
@@ -260,16 +262,16 @@ def _create_deterministic_tar(build_root: Path, output_name: str = "package") ->
             tarinfo.gid = 0
             tarinfo.uname = ""
             tarinfo.gname = ""
-            
+
             # Add file with normalized metadata
-            with open(file_path, 'rb') as f:
+            with open(file_path, "rb") as f:
                 tar.addfile(tarinfo, f)
-    
+
     # Write compressed tar with mtime=0 for gzip determinism
     tar_buffer.seek(0)
-    with gzip.GzipFile(filename='', fileobj=open(tar_path, 'wb'), mode='wb', mtime=0) as gz:
+    with gzip.GzipFile(filename="", fileobj=open(tar_path, "wb"), mode="wb", mtime=0) as gz:
         gz.write(tar_buffer.read())
-    
+
     return tar_path
 
 
@@ -781,7 +783,7 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             build_root = result["build_root"]
             pem_blocks = result["pem_blocks"]
             output_formats = result["output_formats"]
-            
+
             # Create deterministic tar package if enabled (before computing checksums)
             if package_enabled:
                 tar_path = _create_deterministic_tar(build_root, "package")
@@ -794,7 +796,7 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                     f"  [{target_name}] ✓ Created deterministic package: {display_path}",
                     fg="green",
                 )
-            
+
             # Prepare manifest object
             manifest_obj = {
                 "craft": env_cfg.get("name") or env,
@@ -818,19 +820,21 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                         else 30
                     ),
                 }
-            
+
             # Collect all output files except manifest.json and checksums.sha256
-            output_files = sorted([
-                f.name for f in build_root.glob("*") 
-                if f.is_file() and f.name not in ("manifest.json", "checksums.sha256")
-            ])
-            
+            output_files = sorted(
+                [
+                    f.name
+                    for f in build_root.glob("*")
+                    if f.is_file() and f.name not in ("manifest.json", "checksums.sha256")
+                ]
+            )
+
             # Compute checksums once for all files (including tar if created)
             manifest_obj["files"] = [
-                {"path": fname, "sha256": sha256_file(build_root / fname)}
-                for fname in output_files
+                {"path": fname, "sha256": sha256_file(build_root / fname)} for fname in output_files
             ]
-            
+
             # Write manifest
             manifest_path = build_root / "manifest.json"
             manifest_path.write_text(
@@ -841,9 +845,7 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                 display_path = manifest_path.relative_to(ROOT)
             except ValueError:
                 display_path = manifest_path
-            click.secho(
-                f"  [{target_name}] ✓ Wrote manifest: {display_path}", fg="green"
-            )
+            click.secho(f"  [{target_name}] ✓ Wrote manifest: {display_path}", fg="green")
 
             # Write checksums file with all files including manifest
             all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
