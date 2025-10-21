@@ -18,8 +18,10 @@ Changes from legacy builder:
 from __future__ import annotations
 
 import datetime as dt
+import gzip
 import json
 import sys
+import tarfile
 from pathlib import Path
 
 import click
@@ -221,6 +223,54 @@ def _aggregate_staged_sources(staging_dirs: list[Path], verbose: bool = False) -
                 if verbose:
                     click.echo(f"[Convert] Including: {pem_path.relative_to(ROOT)}", err=True)
     return pem_files
+
+
+# ---------------------------------------------------------------------
+# Deterministic tar packaging
+# ---------------------------------------------------------------------
+
+
+def _create_deterministic_tar(build_root: Path, output_name: str = "package") -> Path:
+    """Create a deterministic tar.gz archive with normalized metadata.
+    
+    All files in build_root (except the tar itself) are added with:
+    - mtime=0 (epoch time)
+    - uid=0, gid=0
+    - uname='', gname=''
+    - Sorted entries for consistent ordering
+    - gzip mtime=0 for deterministic compression
+    
+    Returns the path to the created tar.gz file.
+    """
+    import io
+    
+    tar_path = build_root / f"{output_name}.tar.gz"
+    
+    # Collect all files except the tar itself, sorted for consistency
+    files_to_add = sorted([f for f in build_root.glob("*") if f.is_file() and f.name != tar_path.name])
+    
+    # Create tar in memory first
+    tar_buffer = io.BytesIO()
+    with tarfile.open(fileobj=tar_buffer, mode="w", format=tarfile.PAX_FORMAT) as tar:
+        for file_path in files_to_add:
+            # Create TarInfo with normalized metadata
+            tarinfo = tar.gettarinfo(file_path, arcname=file_path.name)
+            tarinfo.mtime = 0  # Epoch time for determinism
+            tarinfo.uid = 0
+            tarinfo.gid = 0
+            tarinfo.uname = ""
+            tarinfo.gname = ""
+            
+            # Add file with normalized metadata
+            with open(file_path, 'rb') as f:
+                tar.addfile(tarinfo, f)
+    
+    # Write compressed tar with mtime=0 for gzip determinism
+    tar_buffer.seek(0)
+    with gzip.GzipFile(filename='', fileobj=open(tar_path, 'wb'), mode='wb', mtime=0) as gz:
+        gz.write(tar_buffer.read())
+    
+    return tar_path
 
 
 # ---------------------------------------------------------------------
@@ -562,8 +612,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
         # Single-bundle target: copy cached outputs directly
         if len(bundle_dirs) == 1:
             if dry_run:
+                # Use absolute path if outside ROOT, otherwise relative
+                try:
+                    display_path = build_root.relative_to(ROOT)
+                except ValueError:
+                    display_path = build_root
                 click.secho(
-                    f"  [{target_name}] [dry-run] Would copy cached bundle to: {build_root.relative_to(ROOT)}",
+                    f"  [{target_name}] [dry-run] Would copy cached bundle to: {display_path}",
                     fg="yellow",
                 )
                 per_target_results[target_name] = {
@@ -582,8 +637,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                     shutil.copy2(f, dst)
                 except Exception:
                     dst.write_bytes(f.read_bytes())
+            # Use absolute path if outside ROOT, otherwise relative
+            try:
+                display_path = build_root.relative_to(ROOT)
+            except ValueError:
+                display_path = build_root
             click.secho(
-                f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {build_root.relative_to(ROOT)}",
+                f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {display_path}",
                 fg="green",
             )
         pem_blocks = _read_pem_chunks([cache_pem])
@@ -623,8 +683,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             pem_out, merged_blocks, include_subject_comments, force=force, dry_run=dry_run
         )
         if not dry_run:
+            # Use absolute path if outside ROOT, otherwise relative
+            try:
+                display_path = pem_out.relative_to(ROOT)
+            except ValueError:
+                display_path = pem_out
             click.secho(
-                f"  [{target_name}] ✓ Wrote merged canonical PEM: {pem_out.relative_to(ROOT)}",
+                f"  [{target_name}] ✓ Wrote merged canonical PEM: {display_path}",
                 fg="green",
             )
 
@@ -698,11 +763,29 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     if not dry_run:
         click.secho("\nFinalizing build artifacts...", fg="blue")
 
+        # Check if packaging is enabled
+        package_enabled = env_cfg.get("package", True)
+
         # Build manifest and checksums per target
         for target_name, result in per_target_results.items():
             build_root = result["build_root"]
             pem_blocks = result["pem_blocks"]
             output_formats = result["output_formats"]
+            
+            # Create deterministic tar package if enabled (before computing checksums)
+            if package_enabled:
+                tar_path = _create_deterministic_tar(build_root, "package")
+                # Use absolute path if outside ROOT, otherwise relative
+                try:
+                    display_path = tar_path.relative_to(ROOT)
+                except ValueError:
+                    display_path = tar_path
+                click.secho(
+                    f"  [{target_name}] ✓ Created deterministic package: {display_path}",
+                    fg="green",
+                )
+            
+            # Prepare manifest object
             manifest_obj = {
                 "craft": env_cfg.get("name") or env,
                 "environment": env,  # retained for compatibility
@@ -725,26 +808,45 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                         else 30
                     ),
                 }
-            output_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+            
+            # Collect all output files except manifest.json and checksums.sha256
+            output_files = sorted([
+                f.name for f in build_root.glob("*") 
+                if f.is_file() and f.name not in ("manifest.json", "checksums.sha256")
+            ])
+            
+            # Compute checksums once for all files (including tar if created)
             manifest_obj["files"] = [
                 {"path": fname, "sha256": sha256_file(build_root / fname)}
                 for fname in output_files
-                if fname != "manifest.json"
             ]
+            
+            # Write manifest
             manifest_path = build_root / "manifest.json"
             manifest_path.write_text(
                 json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
+            # Use absolute path if outside ROOT, otherwise relative
+            try:
+                display_path = manifest_path.relative_to(ROOT)
+            except ValueError:
+                display_path = manifest_path
             click.secho(
-                f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}", fg="green"
+                f"  [{target_name}] ✓ Wrote manifest: {display_path}", fg="green"
             )
 
+            # Write checksums file with all files including manifest
             all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
             checksum_lines = [f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files]
             checksum_path = build_root / "checksums.sha256"
             checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+            # Use absolute path if outside ROOT, otherwise relative
+            try:
+                display_path = checksum_path.relative_to(ROOT)
+            except ValueError:
+                display_path = checksum_path
             click.secho(
-                f"  [{target_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}",
+                f"  [{target_name}] ✓ Wrote checksums: {display_path}",
                 fg="green",
             )
 
