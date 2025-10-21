@@ -8,7 +8,6 @@ to support CI/CD automation and scripting use cases.
 """
 
 import json
-import sys
 from datetime import datetime, timezone
 from typing import Any
 

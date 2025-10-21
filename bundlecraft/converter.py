@@ -240,16 +240,33 @@ def main(
                 ))
             sys.exit(0)
 
-        convert_from_any(
-            in_path,
-            out_dir,
-            formats,
-            input_format=input_format,
-            password=resolved_password,
-            verbose=verbose,
-            force=force,
-            output_basename=output_basename,
-        )
+        # Suppress stdout when using JSON output
+        if json_output:
+            import contextlib
+            import io
+            
+            with contextlib.redirect_stdout(io.StringIO()):
+                convert_from_any(
+                    in_path,
+                    out_dir,
+                    formats,
+                    input_format=input_format,
+                    password=resolved_password,
+                    verbose=False,  # Suppress verbose output in JSON mode
+                    force=force,
+                    output_basename=output_basename,
+                )
+        else:
+            convert_from_any(
+                in_path,
+                out_dir,
+                formats,
+                input_format=input_format,
+                password=resolved_password,
+                verbose=verbose,
+                force=force,
+                output_basename=output_basename,
+            )
         
         # Count certificates in output
         # Try to read the output file to count certs

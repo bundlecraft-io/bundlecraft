@@ -609,6 +609,33 @@ bundlecraft build --env prod --bundle internal --package
 bundlecraft convert --input bundlecraft-ca-trust.der --output-dir ./ --output-format pem --force
 ```
 
+### 🤖 Machine-Readable Output (JSON)
+
+All BundleCraft commands support `--json` flag for CI/CD automation and scripting:
+
+```bash
+# Get structured output for automation
+bundlecraft build --craft prod --bundle mozilla --json | jq .
+
+# Parse specific fields in scripts
+SUCCESS=$(bundlecraft fetch --bundle-config-file config/bundles/mozilla.yaml --json | jq -r '.success')
+if [ "$SUCCESS" = "true" ]; then
+  echo "Fetch succeeded"
+fi
+
+# Extract verification results
+bundlecraft verify --target dist/prod/mozilla --json | jq -r '.verified_files'
+```
+
+**Benefits:**
+- **Stable schemas** - Documented, versioned JSON schemas for reliable parsing
+- **Error handling** - Structured error messages in JSON even on failures
+- **CI/CD friendly** - No ANSI colors, emojis, or unparseable output
+- **Consistent** - All commands follow the same base schema pattern
+
+📖 **Full documentation:** [docs/JSON-OUTPUT.md](docs/JSON-OUTPUT.md)  
+🔍 **Examples:** [docs/examples/json-output-examples.sh](docs/examples/json-output-examples.sh)
+
 ### Configuration Files
 
 - `config/defaults.yaml` - Global baseline settings
