@@ -2,7 +2,7 @@
 
 **Status:** Accepted (implemented)
 **Date:** October 16 2025
-**Owner:** BundleCraft maintainers
+**Owner:** Chris J. Pich
 **Related:** ADR-000X (Containerized Distribution), SECURITY.md, CONFIG-SPEC.md
 
 ---

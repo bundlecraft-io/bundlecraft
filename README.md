@@ -241,6 +241,9 @@ These can be overridden by environment or bundle configs.
 ```bash
 # Required for conversions and verification
 sudo apt-get install openssl openjdk-17-jre-headless  # (for keytool)
+
+# Optional: jq (required for scripts/json-output-examples.sh)
+sudo apt-get install jq
 ```
 
 **Python dependencies:**
@@ -635,6 +638,33 @@ bundlecraft build --env prod --bundle internal --package
 # Force overwrite during conversion
 bundlecraft convert --input bundlecraft-ca-trust.der --output-dir ./ --output-format pem --force
 ```
+
+### 🤖 Machine-Readable Output (JSON)
+
+All BundleCraft commands support `--json` flag for CI/CD automation and scripting:
+
+```bash
+# Get structured output for automation
+bundlecraft build --craft prod --bundle mozilla --json | jq .
+
+# Parse specific fields in scripts
+SUCCESS=$(bundlecraft fetch --bundle-config-file config/bundles/mozilla.yaml --json | jq -r '.success')
+if [ "$SUCCESS" = "true" ]; then
+  echo "Fetch succeeded"
+fi
+
+# Extract verification results
+bundlecraft verify --target dist/prod/mozilla --json | jq -r '.verified_files'
+```
+
+**Benefits:**
+- **Stable schemas** - Documented, versioned JSON schemas for reliable parsing
+- **Error handling** - Structured error messages in JSON even on failures
+- **CI/CD friendly** - No ANSI colors, emojis, or unparseable output
+- **Consistent** - All commands follow the same base schema pattern
+
+📖 **Full documentation:** [docs/JSON-OUTPUT.md](docs/JSON-OUTPUT.md)
+🔍 **Examples:** [scripts/json-output-examples.sh](scripts/json-output-examples.sh)
 
 ### Configuration Files
 

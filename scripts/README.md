@@ -11,6 +11,7 @@ Quick catalog:
 | `generate_test_cas.py` | Generate self-signed test CA certificates with automatic private key disposal (TESTING ONLY) |
 | `test-server-local.py` | Local HTTPS test server for CI and development with Swagger UI |
 | `vault-local.py` | Spin up a local HashiCorp Vault dev instance for testing the Vault fetcher |
+| `json-output-examples.sh` | Demonstration of JSON output from BundleCraft commands for CI/CD automation (requires `jq`) |
 
 ---
 

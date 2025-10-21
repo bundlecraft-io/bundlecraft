@@ -1,6 +1,6 @@
 # ADR-0003: Distribute BundleCraft via multiple channels — OCI-first, with optional pipx/PyPI, zipapp, and a first-class GitHub Action
 
-Status: Accepted
+Status: Deferred (amended by ADR-0003, ADR-0006)
 Date: October 18, 2025
 Owner: BundleCraft maintainers
 Related: ADR-0001, README, SECURITY.md, RELEASE.md, CI/CD workflows
