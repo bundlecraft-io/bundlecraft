@@ -6,8 +6,8 @@ These tests verify that invalid YAML configurations are properly rejected
 with clear error messages.
 """
 
+
 import pytest
-from pathlib import Path
 from click.testing import CliRunner
 
 from bundlecraft.config_schema import (
@@ -392,8 +392,8 @@ fetch:
 
     def test_build_command_with_invalid_craft_fails(self, cli_runner, temp_workspace, monkeypatch):
         """Test that build command rejects invalid craft configs."""
-        from bundlecraft.builder import main as build_main
         import bundlecraft.builder as builder_mod
+        from bundlecraft.builder import main as build_main
 
         # Setup directories
         crafts_dir = temp_workspace / "config" / "crafts"

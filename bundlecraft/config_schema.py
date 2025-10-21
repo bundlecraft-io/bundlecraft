@@ -15,7 +15,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 # =====================================================================
 # Bundle Configuration Schema
 # =====================================================================
@@ -274,7 +273,7 @@ class CraftMetadata(BaseModel):
     compliance: str | None = None
     approval_required: bool | None = None
     maintainer: str | None = None
-    policy_version: str | None = None
+    policy_version: str | float | None = None  # Allow both string and numeric versions
 
 
 class CraftConfig(BaseModel):
