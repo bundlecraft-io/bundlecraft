@@ -183,6 +183,9 @@ def create_zip(pem_path: Path, build_root: Path, output_basename: str, force: bo
                 tarinfo.gid = 0
                 tarinfo.uname = ""
                 tarinfo.gname = ""
+                if tarinfo.pax_headers:
+                    for key in ("atime", "ctime"):
+                        tarinfo.pax_headers.pop(key, None)
 
                 # Add file with normalized metadata
                 with open(tmp.name, "rb") as f:

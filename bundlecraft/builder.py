@@ -35,8 +35,8 @@ from bundlecraft.helpers.config_schema import (
     validate_defaults_config,
 )
 from bundlecraft.helpers.convert_utils import convert_to_formats
-from bundlecraft.helpers.template_utils import expand_output_metadata
 from bundlecraft.helpers.json_output import suppress_output
+from bundlecraft.helpers.template_utils import expand_output_metadata
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
 # ---------------------------------------------------------------------
@@ -279,6 +279,9 @@ def _create_deterministic_tar(build_root: Path, output_name: str = "package") ->
             tarinfo.gid = 0
             tarinfo.uname = ""
             tarinfo.gname = ""
+            if tarinfo.pax_headers:
+                for key in ("atime", "ctime"):
+                    tarinfo.pax_headers.pop(key, None)
 
             # Add file with normalized metadata
             with open(file_path, "rb") as f:

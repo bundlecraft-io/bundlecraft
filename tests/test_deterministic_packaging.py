@@ -60,6 +60,8 @@ class TestDeterministicTarPackaging:
                 assert member.gid == 0, "gid should be 0"
                 assert member.uname == "", "uname should be empty"
                 assert member.gname == "", "gname should be empty"
+                assert "atime" not in member.pax_headers, "atime should be stripped"
+                assert "ctime" not in member.pax_headers, "ctime should be stripped"
 
     def test_tar_entries_sorted(self, temp_dir):
         """Test that tar entries are sorted for determinism."""
@@ -198,6 +200,8 @@ class TestDeterministicZipFormat:
         with tarfile.open(zip_path, "r:gz") as tar:
             for member in tar.getmembers():
                 assert member.mtime == 0, "mtime should be 0"
+                assert "atime" not in member.pax_headers, "atime should be stripped"
+                assert "ctime" not in member.pax_headers, "ctime should be stripped"
                 assert member.uid == 0, "uid should be 0"
                 assert member.gid == 0, "gid should be 0"
                 assert member.uname == "", "uname should be empty"
@@ -218,9 +222,7 @@ class TestSinglePassChecksums:
         all_files = sorted([f.name for f in temp_dir.glob("*") if f.is_file()])
         from bundlecraft.helpers.utils import sha256_file
 
-        checksum_lines = [
-            f"{sha256_file(temp_dir / fname)}  {fname}" for fname in all_files
-        ]
+        checksum_lines = [f"{sha256_file(temp_dir / fname)}  {fname}" for fname in all_files]
         checksum_path = temp_dir / "checksums.sha256"
         checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
 
