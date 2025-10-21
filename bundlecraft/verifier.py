@@ -23,6 +23,8 @@ from pathlib import Path
 import click
 from cryptography.hazmat.primitives.serialization import pkcs7, pkcs12
 
+from bundlecraft.signer import SignerConfig, verify_file
+
 # --- logging setup ---
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -138,6 +140,67 @@ def count_certs_in_store(file: Path) -> int | None:
     except Exception as e:
         logger.debug(f"Error counting certs in {file.name}: {e}")
     return None
+
+
+def verify_signatures_in_directory(
+    build_dir: Path, signature_required: bool = False, verbose: bool = False
+) -> bool:
+    """Verify signatures for artifacts in a build directory.
+
+    Args:
+        build_dir: Path to the build directory
+        signature_required: If True, fail if signatures are missing
+        verbose: Enable verbose output
+
+    Returns:
+        True if all signatures are valid (or not required), False otherwise
+    """
+    success = True
+    config = SignerConfig.from_env()
+
+    # Files to check for signatures
+    manifest_path = build_dir / MANIFEST_FILE
+    files_to_check = []
+    if manifest_path.exists():
+        files_to_check.append(manifest_path)
+
+    if not files_to_check:
+        logger.warning("⚠️  No files to verify signatures for")
+        return not signature_required
+
+    for file_path in files_to_check:
+        # Check for signature files
+        sig_extensions = [".asc", ".sig", ".gpg"]
+        sig_found = False
+        sig_valid = False
+
+        for ext in sig_extensions:
+            sig_path = file_path.with_suffix(file_path.suffix + ext)
+            if sig_path.exists():
+                sig_found = True
+                if verbose:
+                    logger.info(f"Found signature: {sig_path.name}")
+
+                try:
+                    sig_valid = verify_file(file_path, config=config)
+                    if sig_valid:
+                        logger.info(f"✅ Signature valid: {file_path.name}")
+                    else:
+                        logger.error(f"❌ Signature invalid: {file_path.name}")
+                        success = False
+                except Exception as e:
+                    logger.error(f"❌ Signature verification failed for {file_path.name}: {e}")
+                    success = False
+                break
+
+        if not sig_found:
+            if signature_required:
+                logger.error(f"❌ Missing required signature for: {file_path.name}")
+                success = False
+            else:
+                logger.info(f"⏭️  No signature found for: {file_path.name} (optional)")
+
+    return success
 
 
 def show_manifest_info(build_dir: Path, verbose: bool = False) -> None:
@@ -257,7 +320,17 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
 )
 @click.option("--verify-all", is_flag=True, help="Verify both bundle files and manifest together")
 @click.option("--verbose", is_flag=True, help="Show detailed file metadata and hashes")
-def main(target, verify_manifest, verify_all, verbose):
+@click.option(
+    "--verify-signatures",
+    is_flag=True,
+    help="Verify artifact signatures (GPG/Sigstore)",
+)
+@click.option(
+    "--signature-required",
+    is_flag=True,
+    help="Fail if signatures are missing (requires --verify-signatures)",
+)
+def main(target, verify_manifest, verify_all, verbose, verify_signatures, signature_required):
     """Verify the integrity and consistency of built trust bundles."""
     click.secho("\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
     path = Path(target)
@@ -277,6 +350,12 @@ def main(target, verify_manifest, verify_all, verbose):
         show_manifest_info(path, verbose)
     else:
         ok = verify_directory(path, verbose)
+
+    # Verify signatures if requested
+    if verify_signatures:
+        logger.info("🔐 Verifying artifact signatures...")
+        sig_ok = verify_signatures_in_directory(path, signature_required, verbose)
+        ok = ok and sig_ok
 
     if ok:
         logger.info("✅ All verifications passed.")

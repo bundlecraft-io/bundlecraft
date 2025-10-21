@@ -26,6 +26,7 @@ import click
 
 from bundlecraft.helpers.convert_utils import convert_to_formats
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
+from bundlecraft.signer import SignerConfig, sign_file
 
 # ---------------------------------------------------------------------
 # Path constants
@@ -311,7 +312,17 @@ def _verify_certificates(
     is_flag=True,
     help="Show what would be done without actually writing any files or executing commands",
 )
-def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose, force, dry_run):
+@click.option(
+    "--sign",
+    is_flag=True,
+    help="Sign artifacts using configured method (env: BUNDLECRAFT_SIGN_METHOD)",
+)
+@click.option(
+    "--sign-method",
+    type=click.Choice(["gpg", "sigstore"], case_sensitive=False),
+    help="Override signing method (defaults to BUNDLECRAFT_SIGN_METHOD env var)",
+)
+def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose, force, dry_run, sign, sign_method):
     """Build trust bundles by orchestrating: fetch → convert → verify.
 
     This command coordinates the three core BundleCraft stages:
@@ -739,6 +750,45 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                 f"  [{target_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}",
                 fg="green",
             )
+
+    # =========================================================================
+    # OPTIONAL: SIGN ARTIFACTS
+    # =========================================================================
+    if sign and not dry_run:
+        click.secho("\nSigning artifacts...", fg="blue")
+        
+        # Build signing config
+        signer_config = SignerConfig.from_env()
+        if sign_method:
+            signer_config.method = sign_method.lower()  # type: ignore
+        elif signer_config.method == "none":
+            # If --sign flag is used but no method specified, default to GPG
+            signer_config.method = "gpg"
+        
+        click.echo(f"Signing method: {signer_config.method}")
+        
+        for target_name, result in per_target_results.items():
+            build_root = result["build_root"]
+            
+            # Sign manifest.json (primary artifact)
+            manifest_path = build_root / "manifest.json"
+            if manifest_path.exists():
+                try:
+                    sig_path = sign_file(manifest_path, signer_config)
+                    if sig_path:
+                        click.secho(
+                            f"  [{target_name}] ✓ Signed manifest: {sig_path.name}",
+                            fg="green",
+                        )
+                except Exception as e:
+                    click.secho(
+                        f"  [{target_name}] ✗ Failed to sign manifest: {e}",
+                        fg="red",
+                        err=True,
+                    )
+                    if verbose:
+                        import traceback
+                        traceback.print_exc()
 
     if dry_run:
         click.secho(

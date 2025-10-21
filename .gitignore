@@ -26,6 +26,16 @@ personal*/
 */key.pem
 *.key
 
+# Signature files (generated artifacts)
+*.asc
+*.sig
+*.gpg
+
+# GPG keyring directories (local testing)
+gpg-home/
+.gnupg/
+**/gpg-home/
+
 ########################################
 # Python cache and bytecode
 ########################################

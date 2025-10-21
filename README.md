@@ -71,7 +71,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 - **Extensible config model:** defaults → environment → bundle
 - **Portable tooling:** Python + OpenSSL + Java keytool
 - **Manifest and checksum generation:** for auditing and release integrity
-- **GPG signing integration** (optional, for release artifacts)
+- **Artifact signing and verification:** Optional GPG or Sigstore signing for manifest and artifacts
 - **CI/CD ready:** Designed for (but not exclusive to) GitHub Actions, supports concurrency and artifact management
 - **Flexible bundle and environment definitions**: Easily add new trust bundles or environments
 
@@ -596,11 +596,23 @@ Best config practices:
 # Build a bundle
 bundlecraft build --env prod --bundle internal
 
+# Build and sign artifacts
+bundlecraft build --env prod --bundle internal --sign
+
 # Verify a bundle
 bundlecraft verify --target dist/prod/internal --verify-all
 
+# Verify bundle with signature checking
+bundlecraft verify --target dist/prod/internal --verify-signatures
+
 # Convert formats
 bundlecraft convert --input bundlecraft-ca-trust.pem --output-dir ./ --output-format jks
+
+# Sign an artifact
+bundlecraft sign --file manifest.json --method gpg
+
+# Verify a signature
+bundlecraft sign --verify --file manifest.json
 
 # Build with packaging
 bundlecraft build --env prod --bundle internal --package
@@ -643,10 +655,18 @@ Every build produces:
 
 ---
 
+## 📚 Documentation
+
+- [Artifact Signing Guide](./docs/signing.md) - GPG and Sigstore signing and verification
+- [Configuration Specification](./docs/CONFIG-SPEC.md) - Detailed config reference
+- [Troubleshooting Guide](./docs/troubleshooting.md) - Common issues and solutions
+
 ## 🔗 Related Projects & References
 
 - [OpenSSL Documentation](https://www.openssl.org/docs/)
 - [Java Keytool Documentation](https://docs.oracle.com/javase/8/docs/technotes/tools/unix/keytool.html)
+- [GPG Documentation](https://gnupg.org/documentation/)
+- [Sigstore Documentation](https://docs.sigstore.dev/)
 - [PKI Concepts](https://en.wikipedia.org/wiki/Public_key_infrastructure)
 
 ---
