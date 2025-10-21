@@ -77,8 +77,13 @@ jobs:
           echo "Targets count: ${TARGETS_COUNT}"
           echo '::endgroup::'
           if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-                  bundlecraft-trust-*-bundle-*.tar.gz
-                  bundlecraft-trust-*-bundle-*.sha256
+            {
+              echo '## BundleCraft Build Summary'
+              echo
+              echo '### Build Artifacts'
+              echo 'The following artifacts will be produced:'
+              echo '- `bundlecraft-trust.tar.gz` (combined bundle)'
+              echo '- Per-target bundles: `bundlecraft-trust-*-bundle-*.tar.gz`'
               echo
               echo "- Selected environments: ${SELECTED_SORTED:-'(all)'}"
               echo -n "- Available environments: "
