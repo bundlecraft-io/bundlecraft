@@ -728,8 +728,9 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                         else 30
                     ),
                 }
-            
+
             # Add expanded output metadata if configured
+            expanded_metadata = None
             output_metadata_cfg = env_cfg.get("output_metadata")
             if output_metadata_cfg:
                 expanded_metadata = expand_output_metadata(
@@ -740,7 +741,7 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                 )
                 if expanded_metadata:
                     manifest_obj["output_metadata"] = expanded_metadata
-            
+
             output_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
             manifest_obj["files"] = [
                 {"path": fname, "sha256": sha256_file(build_root / fname)}
@@ -754,17 +755,17 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             click.secho(
                 f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}", fg="green"
             )
-            
+
             # Write optional YAML sidecar for Kubernetes ConfigMap/Secret generation
             if expanded_metadata:
                 sidecar_path = build_root / "metadata.yaml"
                 sidecar_path.write_text(
                     yaml.dump(expanded_metadata, default_flow_style=False, sort_keys=True),
-                    encoding="utf-8"
+                    encoding="utf-8",
                 )
                 click.secho(
                     f"  [{target_name}] ✓ Wrote metadata sidecar: {sidecar_path.relative_to(ROOT)}",
-                    fg="green"
+                    fg="green",
                 )
 
             all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])

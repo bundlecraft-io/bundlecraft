@@ -1,9 +1,6 @@
 """Tests for output metadata templating functionality."""
 
 import datetime as dt
-from pathlib import Path
-
-import pytest
 
 from bundlecraft.helpers.template_utils import (
     expand_metadata_dict,
@@ -39,9 +36,7 @@ class TestExpandTemplateVariables:
 
     def test_expand_multiple_variables(self):
         """Test expansion of multiple variables."""
-        result = expand_template_variables(
-            "{{bundle}}-{{env}}", bundle="internal", env="prod"
-        )
+        result = expand_template_variables("{{bundle}}-{{env}}", bundle="internal", env="prod")
         assert result == "internal-prod"
 
     def test_expand_date_variable(self):
@@ -70,9 +65,7 @@ class TestExpandTemplateVariables:
     def test_expand_with_custom_timestamp(self):
         """Test expansion with provided timestamp."""
         timestamp = "2025-10-21T12:00:00Z"
-        result = expand_template_variables(
-            "{{date}}-{{timestamp}}", timestamp_utc=timestamp
-        )
+        result = expand_template_variables("{{date}}-{{timestamp}}", timestamp_utc=timestamp)
         assert result == "2025-10-21-2025-10-21T12:00:00Z"
 
     def test_expand_no_variables(self):
@@ -219,7 +212,7 @@ class TestTemplateExpansionIntegration:
         result = expand_output_metadata(
             output_metadata, bundle="internal-prod", env="production", timestamp_utc=timestamp
         )
-        
+
         assert result is not None
         assert result["annotations"]["argocd.argoproj.io/sync-wave"] == "1"
         assert result["annotations"]["build-timestamp"] == timestamp
@@ -240,8 +233,117 @@ class TestTemplateExpansionIntegration:
                 "environment": "{{env}}",
             },
         }
-        result = expand_output_metadata(output_metadata, env="dev", timestamp_utc="2025-10-21T12:00:00Z")
-        
+        result = expand_output_metadata(
+            output_metadata, env="dev", timestamp_utc="2025-10-21T12:00:00Z"
+        )
+
         assert result is not None
         assert result["labels"]["environment"] == "dev"
         assert result["annotations"]["build-date"] == "2025-10-21"
+
+
+class TestOutputMetadataInBuild:
+    """Integration tests for output metadata in actual builds."""
+
+    def test_output_metadata_in_manifest(self, tmp_path):
+        """Test that output metadata appears in manifest.json."""
+        import json
+        import shutil
+        from pathlib import Path
+
+        import yaml
+        from click.testing import CliRunner
+
+        from bundlecraft.builder import main as build_main
+
+        # Setup test workspace
+        temp = tmp_path
+        (temp / "config" / "crafts").mkdir(parents=True, exist_ok=True)
+        (temp / "config" / "bundles").mkdir(parents=True, exist_ok=True)
+        (temp / "sources" / "internal").mkdir(parents=True, exist_ok=True)
+
+        # Create craft config with output_metadata
+        craft_yaml = temp / "config" / "crafts" / "test.yaml"
+        craft_yaml.write_text(
+            """
+name: TestCraft
+description: Test craft
+targets:
+  test-target:
+    includes: [test-bundle]
+output_formats: [pem]
+output_metadata:
+  annotations:
+    build-timestamp: "{{timestamp}}"
+    bundle-version: "{{bundle}}-{{env}}"
+  labels:
+    environment: "{{env}}"
+    bundle-id: "{{bundle}}"
+""".strip()
+        )
+
+        # Create bundle config
+        bundle_yaml = temp / "config" / "bundles" / "test-bundle.yaml"
+        bundle_yaml.write_text(
+            """
+bundle_name: test-bundle
+description: Test bundle
+repo:
+  - name: internal
+    include: [sources/internal/]
+""".strip()
+        )
+
+        # Copy sample certificate
+        sample_pem_src = Path(
+            "/home/runner/work/pki-ca-trust/pki-ca-trust/tests/data/certs/sample.pem"
+        )
+        if sample_pem_src.exists():
+            shutil.copyfile(sample_pem_src, temp / "sources" / "internal" / "sample.pem")
+
+        # Monkeypatch
+        import bundlecraft.builder as builder_mod
+
+        builder_mod.ROOT = temp
+        builder_mod.CONFIG_DIR = temp / "config"
+        builder_mod.SOURCES_DIR = temp / "sources"
+        builder_mod.STAGED_DIR = temp / "sources" / "staged"
+        builder_mod.DIST_DIR = temp / "dist"
+
+        # Run build
+        runner = CliRunner()
+        result = runner.invoke(build_main, ["--craft", "test", "--output-root", str(temp / "dist")])
+
+        # Check that build succeeded
+        assert result.exit_code == 0, f"Build failed: {result.output}"
+
+        # Check manifest.json exists
+        manifest_path = temp / "dist" / "TestCraft" / "test-target" / "manifest.json"
+        assert manifest_path.exists(), "manifest.json not created"
+
+        # Load and validate manifest
+        manifest = json.loads(manifest_path.read_text())
+        assert "output_metadata" in manifest, "output_metadata not in manifest"
+
+        # Check annotations
+        assert "annotations" in manifest["output_metadata"]
+        annotations = manifest["output_metadata"]["annotations"]
+        assert "build-timestamp" in annotations
+        assert "bundle-version" in annotations
+        assert annotations["bundle-version"] == "test-target-test"
+
+        # Check labels
+        assert "labels" in manifest["output_metadata"]
+        labels = manifest["output_metadata"]["labels"]
+        assert labels["environment"] == "test"
+        assert labels["bundle-id"] == "test-target"
+
+        # Check that metadata.yaml sidecar exists
+        metadata_yaml_path = temp / "dist" / "TestCraft" / "test-target" / "metadata.yaml"
+        assert metadata_yaml_path.exists(), "metadata.yaml sidecar not created"
+
+        # Validate YAML sidecar content
+        metadata_yaml = yaml.safe_load(metadata_yaml_path.read_text())
+        assert "annotations" in metadata_yaml
+        assert "labels" in metadata_yaml
+        assert metadata_yaml["labels"]["environment"] == "test"

@@ -250,10 +250,12 @@ class OutputMetadata(BaseModel):
     model_config = ConfigDict(extra="allow")  # Allow additional metadata fields
 
     annotations: dict[str, str] = Field(
-        default_factory=dict, description="Annotations for Kubernetes/GitOps (e.g., ArgoCD sync-wave)"
+        default_factory=dict,
+        description="Annotations for Kubernetes/GitOps (e.g., ArgoCD sync-wave)",
     )
     labels: dict[str, str] = Field(
-        default_factory=dict, description="Labels for Kubernetes/GitOps (e.g., environment, component)"
+        default_factory=dict,
+        description="Labels for Kubernetes/GitOps (e.g., environment, component)",
     )
 
 
