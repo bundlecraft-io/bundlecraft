@@ -612,8 +612,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
         # Single-bundle target: copy cached outputs directly
         if len(bundle_dirs) == 1:
             if dry_run:
+                # Use absolute path if outside ROOT, otherwise relative
+                try:
+                    display_path = build_root.relative_to(ROOT)
+                except ValueError:
+                    display_path = build_root
                 click.secho(
-                    f"  [{target_name}] [dry-run] Would copy cached bundle to: {build_root.relative_to(ROOT)}",
+                    f"  [{target_name}] [dry-run] Would copy cached bundle to: {display_path}",
                     fg="yellow",
                 )
                 per_target_results[target_name] = {
@@ -632,8 +637,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                     shutil.copy2(f, dst)
                 except Exception:
                     dst.write_bytes(f.read_bytes())
+            # Use absolute path if outside ROOT, otherwise relative
+            try:
+                display_path = build_root.relative_to(ROOT)
+            except ValueError:
+                display_path = build_root
             click.secho(
-                f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {build_root.relative_to(ROOT)}",
+                f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {display_path}",
                 fg="green",
             )
         pem_blocks = _read_pem_chunks([cache_pem])
@@ -673,8 +683,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             pem_out, merged_blocks, include_subject_comments, force=force, dry_run=dry_run
         )
         if not dry_run:
+            # Use absolute path if outside ROOT, otherwise relative
+            try:
+                display_path = pem_out.relative_to(ROOT)
+            except ValueError:
+                display_path = pem_out
             click.secho(
-                f"  [{target_name}] ✓ Wrote merged canonical PEM: {pem_out.relative_to(ROOT)}",
+                f"  [{target_name}] ✓ Wrote merged canonical PEM: {display_path}",
                 fg="green",
             )
 
@@ -760,8 +775,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             # Create deterministic tar package if enabled (before computing checksums)
             if package_enabled:
                 tar_path = _create_deterministic_tar(build_root, "package")
+                # Use absolute path if outside ROOT, otherwise relative
+                try:
+                    display_path = tar_path.relative_to(ROOT)
+                except ValueError:
+                    display_path = tar_path
                 click.secho(
-                    f"  [{target_name}] ✓ Created deterministic package: {tar_path.relative_to(ROOT)}",
+                    f"  [{target_name}] ✓ Created deterministic package: {display_path}",
                     fg="green",
                 )
             
@@ -806,8 +826,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             manifest_path.write_text(
                 json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
+            # Use absolute path if outside ROOT, otherwise relative
+            try:
+                display_path = manifest_path.relative_to(ROOT)
+            except ValueError:
+                display_path = manifest_path
             click.secho(
-                f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}", fg="green"
+                f"  [{target_name}] ✓ Wrote manifest: {display_path}", fg="green"
             )
 
             # Write checksums file with all files including manifest
@@ -815,8 +840,13 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             checksum_lines = [f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files]
             checksum_path = build_root / "checksums.sha256"
             checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+            # Use absolute path if outside ROOT, otherwise relative
+            try:
+                display_path = checksum_path.relative_to(ROOT)
+            except ValueError:
+                display_path = checksum_path
             click.secho(
-                f"  [{target_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}",
+                f"  [{target_name}] ✓ Wrote checksums: {display_path}",
                 fg="green",
             )
 

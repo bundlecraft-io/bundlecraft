@@ -3,9 +3,6 @@
 import hashlib
 import tarfile
 import time
-from pathlib import Path
-
-import pytest
 
 from bundlecraft.builder import _create_deterministic_tar
 
