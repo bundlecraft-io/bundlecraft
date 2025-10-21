@@ -20,18 +20,21 @@ from __future__ import annotations
 import datetime as dt
 import gzip
 import json
+import logging
 import sys
 import tarfile
 from pathlib import Path
 
 import click
 
+from bundlecraft.helpers.atomic_build import AtomicBuildContext
 from bundlecraft.helpers.config_schema import (
     validate_bundle_config,
     validate_craft_config,
     validate_defaults_config,
 )
 from bundlecraft.helpers.convert_utils import convert_to_formats
+from bundlecraft.helpers.json_output import suppress_output
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
 # ---------------------------------------------------------------------
@@ -64,7 +67,12 @@ def _clean_dir(path: Path) -> None:
 
 
 def _stage_bundle_sources(
-    bundle_name: str, env: str, workspace_root: Path, verbose: bool = False, dry_run: bool = False
+    bundle_name: str,
+    env: str,
+    workspace_root: Path,
+    verbose: bool = False,
+    dry_run: bool = False,
+    json_output: bool = False,
 ) -> Path:
     """Stage a bundle's sources (includes + fetch) into sources/staged/<env>/<bundle>/.
 
@@ -77,6 +85,13 @@ def _stage_bundle_sources(
         _validate_source_and_fetch_names,
         load_yaml,
     )
+    from bundlecraft.fetch import logger as fetch_logger
+
+    # Suppress fetch logging in JSON mode
+    if json_output:
+        fetch_logger.setLevel(logging.CRITICAL)
+    else:
+        fetch_logger.setLevel(logging.INFO)
 
     bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle_name}.yaml"
     bundle_cfg = load_yaml(bundle_cfg_path, required=True, validate=validate_bundle_config)
@@ -368,7 +383,30 @@ def _verify_certificates(
     is_flag=True,
     help="Show what would be done without actually writing any files or executing commands",
 )
-def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose, force, dry_run):
+@click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    help="Emit machine-readable JSON output (suppresses human-readable output)",
+)
+@click.option(
+    "--keep-temp",
+    is_flag=True,
+    help="Preserve temporary build directories on failure (for debugging)",
+)
+def main(
+    env,
+    bundle,
+    verify_only,
+    skip_fetch,
+    skip_verify,
+    output_root,
+    verbose,
+    force,
+    dry_run,
+    json_output,
+    keep_temp,
+):
     """Build trust bundles by orchestrating: fetch → convert → verify.
 
     This command coordinates the three core BundleCraft stages:
@@ -379,12 +417,19 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     The build always fetches unless --skip-fetch is used (for fast iteration).
     Use --dry-run to preview what would be done without making any changes.
     """
-    click.secho("\n🔐 BundleCraft Builder\n---------------------", fg="cyan")
+    # Track errors and targets for JSON output
+    json_errors = []
+    json_targets = []
 
-    if dry_run:
-        click.secho(
-            "[DRY RUN MODE] No files will be written or commands executed\n", fg="yellow", bold=True
-        )
+    if not json_output:
+        click.secho("\n🔐 BundleCraft Builder\n---------------------", fg="cyan")
+
+        if dry_run:
+            click.secho(
+                "[DRY RUN MODE] No files will be written or commands executed\n",
+                fg="yellow",
+                bold=True,
+            )
 
     # Load defaults and craft config with proper precedence
     from bundlecraft.helpers.utils import merge_configs
@@ -398,7 +443,16 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     cfg_path = craft_path if craft_path.exists() else legacy_env_path
 
     if not cfg_path.exists():
-        click.secho(f"[ERROR] Craft config not found: {env}", fg="red", err=True)
+        error_msg = f"Craft config not found: {env}"
+        if json_output:
+            json_errors.append(error_msg)
+            from bundlecraft.helpers.json_output import create_build_response, emit_json
+
+            emit_json(
+                create_build_response(success=False, craft=env, targets=[], errors=json_errors)
+            )
+        else:
+            click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
         sys.exit(2)
 
     craft_cfg = load_yaml(cfg_path, required=True, validate=validate_craft_config)
@@ -440,11 +494,20 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             for tname, entry in targets_map.items():
                 targets_to_build.append((tname, list(entry["include_bundles"])))
         else:
-            click.secho(
-                "[ERROR] No targets found in craft config and no --bundle provided.",
-                fg="red",
-                err=True,
-            )
+            if not json_output:
+                click.secho(
+                    "[ERROR] No targets found in craft config and no --bundle provided.",
+                    fg="red",
+                    err=True,
+                )
+            else:
+                error_msg = "No targets found in craft config and no --bundle provided."
+                json_errors.append(error_msg)
+                from bundlecraft.helpers.json_output import create_build_response, emit_json
+
+                emit_json(
+                    create_build_response(success=False, craft=env, targets=[], errors=json_errors)
+                )
             sys.exit(2)
 
     # Precompute craft-safe path and output settings used during caching
@@ -474,26 +537,29 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     bundle_cache_dirs: dict[str, Path] = {}
 
     if not skip_fetch:
-        click.secho(
-            f"\n[STAGE 1/3] FETCH - Staging and caching {len(unique_bundles)} unique bundle(s)",
-            fg="blue",
-            bold=True,
-        )
+        if not json_output:
+            click.secho(
+                f"\n[STAGE 1/3] FETCH - Staging and caching {len(unique_bundles)} unique bundle(s)",
+                fg="blue",
+                bold=True,
+            )
         for bname in unique_bundles:
             try:
                 staging_dir = _stage_bundle_sources(
-                    bname, env, ROOT, verbose=verbose, dry_run=dry_run
+                    bname, env, ROOT, verbose=verbose, dry_run=dry_run, json_output=json_output
                 )
                 if dry_run:
-                    click.secho(
-                        f"  [cache] [dry-run] Would stage bundle: {bname} → {staging_dir.relative_to(ROOT)}",
-                        fg="yellow",
-                    )
+                    if not json_output:
+                        click.secho(
+                            f"  [cache] [dry-run] Would stage bundle: {bname} → {staging_dir.relative_to(ROOT)}",
+                            fg="yellow",
+                        )
                 else:
-                    click.secho(
-                        f"  [cache] ✓ Staged bundle: {bname} → {staging_dir.relative_to(ROOT)}",
-                        fg="green",
-                    )
+                    if not json_output:
+                        click.secho(
+                            f"  [cache] ✓ Staged bundle: {bname} → {staging_dir.relative_to(ROOT)}",
+                            fg="green",
+                        )
 
                 cache_dir = bundle_cache_root / bname
                 if not dry_run:
@@ -543,10 +609,11 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                 _write_canonical_pem(
                     cache_pem, pem_blocks, include_subject_comments, force=True, dry_run=dry_run
                 )
-                click.secho(
-                    f"  [cache] ✓ Wrote cached canonical PEM: {cache_pem.relative_to(ROOT)}",
-                    fg="green",
-                )
+                if not json_output:
+                    click.secho(
+                        f"  [cache] ✓ Wrote cached canonical PEM: {cache_pem.relative_to(ROOT)}",
+                        fg="green",
+                    )
 
                 # Convert cached canonical PEM to configured extra formats (once)
                 extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
@@ -554,18 +621,31 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                     fmt_overrides_combined = dict(fmt_overrides)
                     if force:
                         fmt_overrides_combined["force"] = True
-                    convert_to_formats(
-                        cache_pem,
-                        cache_dir,
-                        extra_formats,
-                        fmt_overrides_combined,
-                        "bundlecraft-ca-trust",
-                        dry_run=dry_run,
-                    )
-                    click.secho(
-                        f"  [cache] ✓ Converted cached bundle to formats: {', '.join(extra_formats)}",
-                        fg="green",
-                    )
+                    # Suppress print output in JSON mode
+                    if json_output:
+                        with suppress_output():
+                            convert_to_formats(
+                                cache_pem,
+                                cache_dir,
+                                extra_formats,
+                                fmt_overrides_combined,
+                                "bundlecraft-ca-trust",
+                                dry_run=dry_run,
+                            )
+                    else:
+                        convert_to_formats(
+                            cache_pem,
+                            cache_dir,
+                            extra_formats,
+                            fmt_overrides_combined,
+                            "bundlecraft-ca-trust",
+                            dry_run=dry_run,
+                        )
+                    if not json_output:
+                        click.secho(
+                            f"  [cache] ✓ Converted cached bundle to formats: {', '.join(extra_formats)}",
+                            fg="green",
+                        )
 
                 bundle_cache_dirs[bname] = cache_dir
             except Exception as e:
@@ -578,7 +658,10 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                     traceback.print_exc()
                 sys.exit(2)
     else:
-        click.secho("\n[STAGE 1/3] FETCH - Skipped (using existing staged sources)", fg="yellow")
+        if not json_output:
+            click.secho(
+                "\n[STAGE 1/3] FETCH - Skipped (using existing staged sources)", fg="yellow"
+            )
         for bname in unique_bundles:
             cache_dir = bundle_cache_root / bname
             bundle_cache_dirs[bname] = cache_dir
@@ -593,7 +676,10 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     # =========================================================================
     # STAGE 2: CONVERT
     # =========================================================================
-    click.secho("\n[STAGE 2/3] CONVERT - Aggregating and converting formats", fg="blue", bold=True)
+    if not json_output:
+        click.secho(
+            "\n[STAGE 2/3] CONVERT - Aggregating and converting formats", fg="blue", bold=True
+        )
     craft_name_for_path = env_cfg.get("name") or env
     safe_craft = str(craft_name_for_path).replace("/", "-").replace(" ", "-")
 
@@ -606,125 +692,316 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     per_target_results: dict[str, dict] = {}
     import shutil
 
+    # Process each target atomically
     for target_name, bundle_dirs in staging_map.items():
-        build_root = (Path(output_root) / safe_craft / target_name).resolve()
-        if not dry_run:
-            ensure_dir(build_root)
+        final_build_root = (Path(output_root) / safe_craft / target_name).resolve()
 
-        # Single-bundle target: copy cached outputs directly
-        if len(bundle_dirs) == 1:
-            if dry_run:
-                # Use absolute path if outside ROOT, otherwise relative
-                try:
-                    display_path = build_root.relative_to(ROOT)
-                except ValueError:
-                    display_path = build_root
-                click.secho(
-                    f"  [{target_name}] [dry-run] Would copy cached bundle to: {display_path}",
-                    fg="yellow",
-                )
+        # Use atomic build context for each target
+        with AtomicBuildContext(
+            final_build_root, keep_temp=keep_temp, verbose=verbose, dry_run=dry_run
+        ) as build_root:
+            # Ensure build directory exists (atomic context handles this)
+            if not dry_run:
+                ensure_dir(build_root)
+
+            # Single-bundle target: copy cached outputs directly
+            if len(bundle_dirs) == 1:
+                if dry_run:
+                    # Use absolute path if outside ROOT, otherwise relative
+                    try:
+                        display_path = final_build_root.relative_to(ROOT)
+                    except ValueError:
+                        display_path = final_build_root
+                    click.secho(
+                        f"  [{target_name}] [dry-run] Would copy cached bundle to: {display_path}",
+                        fg="yellow",
+                    )
+                    per_target_results[target_name] = {
+                        "build_root": final_build_root,
+                        "pem_blocks": ["# dry-run placeholder"],
+                        "output_formats": output_formats,
+                    }
+                    continue
+
+                bdir = bundle_dirs[0]
+                cache_pem = bdir / "bundlecraft-ca-trust.pem"
+                if cache_pem.exists():
+                    for f in sorted([p for p in bdir.iterdir() if p.is_file()]):
+                        dst = build_root / f.name
+                        try:
+                            shutil.copy2(f, dst)
+                        except Exception:
+                            dst.write_bytes(f.read_bytes())
+                    # Use absolute path if outside ROOT, otherwise relative
+                    try:
+                        display_path = final_build_root.relative_to(ROOT)
+                    except ValueError:
+                        display_path = final_build_root
+                    if not json_output:
+                        click.secho(
+                            f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {display_path}",
+                            fg="green",
+                        )
+                pem_blocks = _read_pem_chunks([cache_pem])
                 per_target_results[target_name] = {
-                    "build_root": build_root,
-                    "pem_blocks": ["# dry-run placeholder"],
+                    "build_root": final_build_root,
+                    "pem_blocks": pem_blocks,
                     "output_formats": output_formats,
                 }
+
+                # Write manifest and checksums for single-bundle target too
+                if not dry_run:
+                    # Check if packaging is enabled
+                    package_enabled = env_cfg.get("package", True)
+
+                    # Create deterministic tar package if enabled (before computing checksums)
+                    if package_enabled:
+                        tar_path = _create_deterministic_tar(build_root, "package")
+                        if verbose:
+                            click.echo(
+                                f"  [{target_name}] ✓ Created deterministic package: {tar_path.name}",
+                                err=True,
+                            )
+
+                    # Prepare manifest object
+                    manifest_obj = {
+                        "craft": env_cfg.get("name") or env,
+                        "environment": env,  # retained for compatibility
+                        "target": target_name,
+                        "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime(
+                            "%Y-%m-%dT%H:%M:%SZ"
+                        ),
+                        "certificate_count": len(pem_blocks),
+                        "output_formats": output_formats,
+                    }
+
+                    # Add verification summary if not skipped
+                    if not skip_verify:
+                        verify_cfg = env_cfg.get("verify") or {}
+                        manifest_obj["verification"] = {
+                            "fail_on_expired": (
+                                verify_cfg.get("fail_on_expired", True)
+                                if isinstance(verify_cfg, dict)
+                                else True
+                            ),
+                            "warn_days": (
+                                verify_cfg.get("warn_days_before_expiry", 30)
+                                if isinstance(verify_cfg, dict)
+                                else 30
+                            ),
+                        }
+
+                    # Collect all output files except manifest.json and checksums.sha256
+                    output_files = sorted(
+                        [
+                            f.name
+                            for f in build_root.glob("*")
+                            if f.is_file() and f.name not in ("manifest.json", "checksums.sha256")
+                        ]
+                    )
+
+                    # Compute checksums once for all files (including tar if created)
+                    manifest_obj["files"] = [
+                        {"path": fname, "sha256": sha256_file(build_root / fname)}
+                        for fname in output_files
+                    ]
+
+                    # Write manifest
+                    manifest_path = build_root / "manifest.json"
+                    manifest_path.write_text(
+                        json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                    )
+                    if verbose:
+                        click.echo(
+                            f"  [{target_name}] ✓ Wrote manifest: {manifest_path.name}",
+                            err=True,
+                        )
+
+                    # Write checksums file with all files including manifest
+                    all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+                    checksum_lines = [
+                        f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files
+                    ]
+                    checksum_path = build_root / "checksums.sha256"
+                    checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+                    if verbose:
+                        click.echo(
+                            f"  [{target_name}] ✓ Wrote checksums: {checksum_path.name}",
+                            err=True,
+                        )
+
+                # Continue to next target (exit atomic context)
                 continue
 
-        bdir = bundle_dirs[0]
-        cache_pem = bdir / "bundlecraft-ca-trust.pem"
-        if cache_pem.exists():
-            for f in sorted([p for p in bdir.iterdir() if p.is_file()]):
-                dst = build_root / f.name
-                try:
-                    shutil.copy2(f, dst)
-                except Exception:
-                    dst.write_bytes(f.read_bytes())
-            # Use absolute path if outside ROOT, otherwise relative
-            try:
-                display_path = build_root.relative_to(ROOT)
-            except ValueError:
-                display_path = build_root
-            click.secho(
-                f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {display_path}",
-                fg="green",
-            )
-        pem_blocks = _read_pem_chunks([cache_pem])
-        per_target_results[target_name] = {
-            "build_root": build_root,
-            "pem_blocks": pem_blocks,
-            "output_formats": output_formats,
-        }
-        continue
+            # Multi-bundle target: merge cached canonical PEMs
+            merged_blocks: list[str] = []
+            for bdir in bundle_dirs:
+                cache_pem = bdir / "bundlecraft-ca-trust.pem"
+                if cache_pem.exists():
+                    merged_blocks.extend(_read_pem_chunks([cache_pem]))
+                else:
+                    pem_files = _aggregate_staged_sources([bdir], verbose=verbose)
+                    merged_blocks.extend(_read_pem_chunks(pem_files))
 
-        # Multi-bundle target: merge cached canonical PEMs
-        merged_blocks: list[str] = []
-        for bdir in bundle_dirs:
-            cache_pem = bdir / "bundlecraft-ca-trust.pem"
-            if cache_pem.exists():
-                merged_blocks.extend(_read_pem_chunks([cache_pem]))
-            else:
-                pem_files = _aggregate_staged_sources([bdir], verbose=verbose)
-                merged_blocks.extend(_read_pem_chunks(pem_files))
+            # Apply filters to merged blocks
+            from bundlecraft.helpers.utils import apply_filters
 
-        # Apply filters to merged blocks
-        from bundlecraft.helpers.utils import apply_filters
+            filters_cfg = env_cfg.get("filters") or {}
+            merged_blocks = apply_filters(merged_blocks, filters_cfg)
 
-        filters_cfg = env_cfg.get("filters") or {}
-        merged_blocks = apply_filters(merged_blocks, filters_cfg)
+            if not merged_blocks:
+                click.secho(
+                    f"  [ERROR] [{target_name}] No valid PEM certificates parsed for merged target.",
+                    fg="red",
+                    err=True,
+                )
+                sys.exit(3)
 
-        if not merged_blocks:
-            click.secho(
-                f"  [ERROR] [{target_name}] No valid PEM certificates parsed for merged target.",
-                fg="red",
-                err=True,
-            )
-            sys.exit(3)
-
-        pem_out = build_root / "bundlecraft-ca-trust.pem"
-        _write_canonical_pem(
-            pem_out, merged_blocks, include_subject_comments, force=force, dry_run=dry_run
-        )
-        if not dry_run:
-            # Use absolute path if outside ROOT, otherwise relative
-            try:
-                display_path = pem_out.relative_to(ROOT)
-            except ValueError:
-                display_path = pem_out
-            click.secho(
-                f"  [{target_name}] ✓ Wrote merged canonical PEM: {display_path}",
-                fg="green",
-            )
-
-        extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
-        if extra_formats:
-            fmt_overrides_combined = dict(fmt_overrides)
-            if force:
-                fmt_overrides_combined["force"] = True
-            convert_to_formats(
-                pem_out,
-                build_root,
-                extra_formats,
-                fmt_overrides_combined,
-                "bundlecraft-ca-trust",
-                dry_run=dry_run,
+            pem_out = build_root / "bundlecraft-ca-trust.pem"
+            _write_canonical_pem(
+                pem_out, merged_blocks, include_subject_comments, force=force, dry_run=dry_run
             )
             if not dry_run:
-                click.secho(
-                    f"  [{target_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
-                    fg="green",
+                # Use absolute path if outside ROOT, otherwise relative
+                try:
+                    display_path = final_build_root.relative_to(ROOT)
+                except ValueError:
+                    display_path = final_build_root
+                if not json_output:
+                    click.secho(
+                        f"  [{target_name}] ✓ Wrote merged canonical PEM: {display_path}/bundlecraft-ca-trust.pem",
+                        fg="green",
+                    )
+
+            extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
+            if extra_formats:
+                fmt_overrides_combined = dict(fmt_overrides)
+                if force:
+                    fmt_overrides_combined["force"] = True
+                # Suppress print output in JSON mode
+                if json_output:
+                    with suppress_output():
+                        convert_to_formats(
+                            pem_out,
+                            build_root,
+                            extra_formats,
+                            fmt_overrides_combined,
+                            "bundlecraft-ca-trust",
+                            dry_run=dry_run,
+                        )
+                else:
+                    convert_to_formats(
+                        pem_out,
+                        build_root,
+                        extra_formats,
+                        fmt_overrides_combined,
+                        "bundlecraft-ca-trust",
+                        dry_run=dry_run,
+                    )
+                if not dry_run and not json_output:
+                    click.secho(
+                        f"  [{target_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
+                        fg="green",
+                    )
+
+            per_target_results[target_name] = {
+                "build_root": final_build_root,
+                "pem_blocks": merged_blocks,
+                "output_formats": output_formats,
+            }
+
+            # =========================================================================
+            # FINALIZE (inside atomic context): Manifest and checksums
+            # =========================================================================
+            if not dry_run:
+                # Check if packaging is enabled
+                package_enabled = env_cfg.get("package", True)
+
+                # Create deterministic tar package if enabled (before computing checksums)
+                if package_enabled:
+                    tar_path = _create_deterministic_tar(build_root, "package")
+                    if verbose:
+                        click.echo(
+                            f"  [{target_name}] ✓ Created deterministic package: {tar_path.name}",
+                            err=True,
+                        )
+
+                # Prepare manifest object
+                manifest_obj = {
+                    "craft": env_cfg.get("name") or env,
+                    "environment": env,  # retained for compatibility
+                    "target": target_name,
+                    "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"
+                    ),
+                    "certificate_count": len(merged_blocks),
+                    "output_formats": output_formats,
+                }
+
+                # Add verification summary if not skipped
+                if not skip_verify:
+                    verify_cfg = env_cfg.get("verify") or {}
+                    manifest_obj["verification"] = {
+                        "fail_on_expired": (
+                            verify_cfg.get("fail_on_expired", True)
+                            if isinstance(verify_cfg, dict)
+                            else True
+                        ),
+                        "warn_days": (
+                            verify_cfg.get("warn_days_before_expiry", 30)
+                            if isinstance(verify_cfg, dict)
+                            else 30
+                        ),
+                    }
+
+                # Collect all output files except manifest.json and checksums.sha256
+                output_files = sorted(
+                    [
+                        f.name
+                        for f in build_root.glob("*")
+                        if f.is_file() and f.name not in ("manifest.json", "checksums.sha256")
+                    ]
                 )
 
-        per_target_results[target_name] = {
-            "build_root": build_root,
-            "pem_blocks": merged_blocks,
-            "output_formats": output_formats,
-        }
+                # Compute checksums once for all files (including tar if created)
+                manifest_obj["files"] = [
+                    {"path": fname, "sha256": sha256_file(build_root / fname)}
+                    for fname in output_files
+                ]
+
+                # Write manifest
+                manifest_path = build_root / "manifest.json"
+                manifest_path.write_text(
+                    json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                )
+                if verbose:
+                    click.echo(
+                        f"  [{target_name}] ✓ Wrote manifest: {manifest_path.name}",
+                        err=True,
+                    )
+
+                # Write checksums file with all files including manifest
+                all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+                checksum_lines = [
+                    f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files
+                ]
+                checksum_path = build_root / "checksums.sha256"
+                checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+                if verbose:
+                    click.echo(
+                        f"  [{target_name}] ✓ Wrote checksums: {checksum_path.name}",
+                        err=True,
+                    )
+
+            # Atomic context commits temp → final on successful __exit__
 
     # =========================================================================
     # STAGE 3: VERIFY
     # =========================================================================
+    verify_results = {}  # Track verification results per target for JSON output
     if not skip_verify:
-        click.secho("\n[STAGE 3/3] VERIFY - Validating certificates", fg="blue", bold=True)
+        if not json_output:
+            click.secho("\n[STAGE 3/3] VERIFY - Validating certificates", fg="blue", bold=True)
         verify_cfg = env_cfg.get("verify") or {}
         fail_on_expired = (
             verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
@@ -745,38 +1022,53 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
                 )
                 continue
             errs, warns = _verify_certificates(pem_blocks, fail_on_expired, warn_days)
-            for e in errs:
-                click.secho(f"  [{target_name}] [ERROR] {e}", fg="red")
-            for w in warns:
-                click.secho(f"  [{target_name}] [WARN] {w}", fg="yellow")
+            verify_results[target_name] = {
+                "passed": len(errs) == 0,
+                "errors": errs,
+                "warnings": warns,
+            }
+            if not json_output:
+                for e in errs:
+                    click.secho(f"  [{target_name}] [ERROR] {e}", fg="red")
+                for w in warns:
+                    click.secho(f"  [{target_name}] [WARN] {w}", fg="yellow")
             if errs:
-                click.secho(
-                    f"  [{target_name}] [SUMMARY] {len(errs)} expired/invalid certificate(s)",
-                    fg="red",
-                )
+                if not json_output:
+                    click.secho(
+                        f"  [{target_name}] [SUMMARY] {len(errs)} expired/invalid certificate(s)",
+                        fg="red",
+                    )
                 if fail_on_expired:
-                    click.secho("  Build FAILED due to expired certificates", fg="red", err=True)
-                    sys.exit(5)
-            if warns:
-                click.secho(
-                    f"  [{target_name}] [SUMMARY] {len(warns)} certificate(s) expiring within {warn_days} days",
-                    fg="yellow",
-                )
-            if not errs and not warns:
-                click.secho(
-                    f"  [{target_name}] ✓ All certificates are valid and healthy", fg="green"
-                )
+                    if not json_output:
+                        click.secho(
+                            "  Build FAILED due to expired certificates", fg="red", err=True
+                        )
+                    else:
+                        # For JSON mode, we'll output at the end with success=False
+                        pass
+                    # Don't exit yet in JSON mode, let it collect all errors
+                    if not json_output:
+                        sys.exit(5)
+            if not json_output:
+                if warns:
+                    click.secho(
+                        f"  [{target_name}] [SUMMARY] {len(warns)} certificate(s) expiring within {warn_days} days",
+                        fg="yellow",
+                    )
+                if not errs and not warns:
+                    click.secho(
+                        f"  [{target_name}] ✓ All certificates are valid and healthy", fg="green"
+                    )
     else:
-        click.secho("\n[STAGE 3/3] VERIFY - Skipped", fg="yellow")
+        if not json_output:
+            click.secho("\n[STAGE 3/3] VERIFY - Skipped", fg="yellow")
 
     # =========================================================================
-    # FINALIZE: Manifest and checksums
+    # Build complete
     # =========================================================================
     if not dry_run:
-        click.secho("\nFinalizing build artifacts...", fg="blue")
-
-        # Check if packaging is enabled
-        package_enabled = env_cfg.get("package", True)
+        if not json_output:
+            click.secho("\nFinalizing build artifacts...", fg="blue")
 
         # Build manifest and checksums per target
         for target_name, result in per_target_results.items():
@@ -836,6 +1128,12 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             ]
 
             # Write manifest
+            output_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+            manifest_obj["files"] = [
+                {"path": fname, "sha256": sha256_file(build_root / fname)}
+                for fname in output_files
+                if fname != "manifest.json"
+            ]
             manifest_path = build_root / "manifest.json"
             manifest_path.write_text(
                 json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -846,35 +1144,98 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             except ValueError:
                 display_path = manifest_path
             click.secho(f"  [{target_name}] ✓ Wrote manifest: {display_path}", fg="green")
+            if not json_output:
+                click.secho(
+                    f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}",
+                    fg="green",
+                )
 
-            # Write checksums file with all files including manifest
             all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
             checksum_lines = [f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files]
             checksum_path = build_root / "checksums.sha256"
             checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
-            # Use absolute path if outside ROOT, otherwise relative
-            try:
-                display_path = checksum_path.relative_to(ROOT)
-            except ValueError:
-                display_path = checksum_path
+            if not json_output:
+                click.secho(
+                    f"  [{target_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}",
+                    fg="green",
+                )
+
+    # =========================================================================
+    # OUTPUT RESULTS
+    # =========================================================================
+    # Collect target information for JSON output
+    for target_name, result in per_target_results.items():
+        build_root = result["build_root"]
+        pem_blocks = result["pem_blocks"]
+        output_formats = result["output_formats"]
+
+        # Get bundles for this target
+        target_bundles = []
+        for tname, include_bundles in targets_to_build:
+            if tname == target_name:
+                target_bundles = include_bundles
+                break
+
+        target_info = {
+            "name": target_name,
+            "certificate_count": len(pem_blocks),
+            "output_formats": output_formats,
+            "output_path": str(build_root.relative_to(ROOT)) if not dry_run else str(build_root),
+            "bundles": target_bundles,
+        }
+
+        # Add verification results if available
+        if target_name in verify_results:
+            target_info["verification"] = verify_results[target_name]
+
+        json_targets.append(target_info)
+
+    # Check if any verification errors occurred
+    verification_failed = False
+    if not skip_verify:
+        verify_cfg = env_cfg.get("verify") or {}
+        fail_on_expired = (
+            verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
+        )
+        for target_name in verify_results:
+            if verify_results[target_name]["errors"] and fail_on_expired:
+                verification_failed = True
+                break
+
+    # Output results
+    if json_output:
+        from bundlecraft.helpers.json_output import create_build_response, emit_json
+
+        emit_json(
+            create_build_response(
+                success=not verification_failed and not json_errors,
+                craft=env_cfg.get("name") or env,
+                targets=json_targets,
+                errors=json_errors if json_errors else None,
+                dry_run=dry_run,
+            )
+        )
+
+        if verification_failed:
+            sys.exit(5)
+    else:
+        if dry_run:
             click.secho(
-                f"  [{target_name}] ✓ Wrote checksums: {display_path}",
+                "\n✅ [DRY RUN] Build simulation complete for target(s): "
+                + ", ".join(per_target_results.keys()),
+                fg="yellow",
+                bold=True,
+            )
+        else:
+            click.secho(
+                "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
+                fg="bright_green",
+                bold=True,
+            )
+            click.secho(
+                "All targets committed atomically to final locations.",
                 fg="green",
             )
-
-    if dry_run:
-        click.secho(
-            "\n✅ [DRY RUN] Build simulation complete for target(s): "
-            + ", ".join(per_target_results.keys()),
-            fg="yellow",
-            bold=True,
-        )
-    else:
-        click.secho(
-            "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
-            fg="bright_green",
-            bold=True,
-        )
 
 
 if __name__ == "__main__":

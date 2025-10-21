@@ -6,6 +6,8 @@ import time
 import pytest
 from click.testing import CliRunner
 
+from bundlecraft import builder as builder_mod
+from bundlecraft import fetch as fetch_mod
 from bundlecraft.builder import main as build_main
 
 
@@ -13,7 +15,9 @@ from bundlecraft.builder import main as build_main
 class TestDeterministicBuilds:
     """Integration tests for deterministic builds."""
 
-    def test_two_identical_builds_produce_identical_package(self, temp_dir):
+    def test_two_identical_builds_produce_identical_package(
+        self, temp_dir, sample_cert_pem, monkeypatch
+    ):
         """Test that two identical builds produce byte-identical package.tar.gz."""
         runner = CliRunner()
 
@@ -21,37 +25,34 @@ class TestDeterministicBuilds:
         config_dir = temp_dir / "config"
         (config_dir / "crafts").mkdir(parents=True)
         (config_dir / "bundles").mkdir(parents=True)
-        sources_dir = temp_dir / "sources" / "test-bundle"
-        sources_dir.mkdir(parents=True)
+        sources_internal = temp_dir / "sources" / "internal" / "test-bundle"
+        sources_internal.mkdir(parents=True)
 
-        # Create a simple test certificate
-        test_cert = """-----BEGIN CERTIFICATE-----
-MIICljCCAX4CCQCKz8bZ6YqRjTANBgkqhkiG9w0BAQsFADANMQswCQYDVQQDDAJD
-QTAeFw0yNDEwMjEwMDAwMDBaFw0zNDEwMTkwMDAwMDBaMA0xCzAJBgNVBAMMAkNB
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtIqZNkzZwQeQ8m/5Z5w5
-kXo8PNGLFnqVhQI0j7j3j3jJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJ
-mJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJ
-mJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJ
-mJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJ
-mJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJ
-mJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJkCAwEAATANBgkqhkiG9w0B
-AQsFAAOCAQEAtIqZNkzZwQeQ8m/5Z5w5kXo8PNGLFnqVhQI0j7j3j3jJmJmJmJmJ
-mJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJ
-mJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJ
-mJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJ
-mJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJ
-mJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJmJ
------END CERTIFICATE-----
-"""
-        (sources_dir / "test.pem").write_text(test_cert, encoding="utf-8")
+        # Monkeypatch paths for builder and fetch
+        monkeypatch.setattr(builder_mod, "ROOT", temp_dir)
+        monkeypatch.setattr(builder_mod, "CONFIG_DIR", config_dir)
+        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_dir / "sources")
+        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_dir / "sources" / "staged")
+        monkeypatch.setattr(builder_mod, "DIST_DIR", temp_dir / "dist")
+        monkeypatch.setattr(fetch_mod, "CURRENT_DIR", temp_dir / "bundlecraft")
+        import bundlecraft.fetch
+
+        bundlecraft.fetch.ROOT = temp_dir
+        bundlecraft.fetch.CONFIG_DIR = config_dir
+        bundlecraft.fetch.SOURCES_DIR = temp_dir / "sources"
+        bundlecraft.fetch.STAGED_DIR = temp_dir / "sources" / "staged"
+
+        # Use the fixture certificate
+        (sources_internal / "test.pem").write_text(sample_cert_pem, encoding="utf-8")
 
         # Create minimal bundle config
         bundle_config = """---
-name: test-bundle
+bundle_name: test-bundle
 description: Test bundle
-repo_includes:
+repo:
   - name: test-bundle
-    path: sources/test-bundle
+    include:
+      - sources/internal/test-bundle
 """
         (config_dir / "bundles" / "test-bundle.yaml").write_text(bundle_config)
 
@@ -123,7 +124,7 @@ verify:
 
         assert hash1 == hash2, "Identical builds should produce byte-identical packages"
 
-    def test_checksums_computed_after_package(self, temp_dir, sample_cert_pem):
+    def test_checksums_computed_after_package(self, temp_dir, sample_cert_pem, monkeypatch):
         """Test that checksums include the package.tar.gz file."""
         runner = CliRunner()
 
@@ -131,19 +132,33 @@ verify:
         config_dir = temp_dir / "config"
         (config_dir / "crafts").mkdir(parents=True)
         (config_dir / "bundles").mkdir(parents=True)
-        sources_dir = temp_dir / "sources" / "test-bundle"
-        sources_dir.mkdir(parents=True)
+        sources_internal = temp_dir / "sources" / "internal" / "test-bundle"
+        sources_internal.mkdir(parents=True)
+
+        # Monkeypatch paths for builder and fetch
+        monkeypatch.setattr(builder_mod, "ROOT", temp_dir)
+        monkeypatch.setattr(builder_mod, "CONFIG_DIR", config_dir)
+        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_dir / "sources")
+        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_dir / "sources" / "staged")
+        monkeypatch.setattr(builder_mod, "DIST_DIR", temp_dir / "dist")
+        import bundlecraft.fetch
+
+        bundlecraft.fetch.ROOT = temp_dir
+        bundlecraft.fetch.CONFIG_DIR = config_dir
+        bundlecraft.fetch.SOURCES_DIR = temp_dir / "sources"
+        bundlecraft.fetch.STAGED_DIR = temp_dir / "sources" / "staged"
 
         # Use the fixture certificate
-        (sources_dir / "test.pem").write_text(sample_cert_pem, encoding="utf-8")
+        (sources_internal / "test.pem").write_text(sample_cert_pem, encoding="utf-8")
 
-        # Create minimal bundle config
+        # Bundle config
         bundle_config = """---
-name: test-bundle
+bundle_name: test-bundle
 description: Test bundle
-repo_includes:
+repo:
   - name: test-bundle
-    path: sources/test-bundle
+    include:
+      - sources/internal/test-bundle
 """
         (config_dir / "bundles" / "test-bundle.yaml").write_text(bundle_config)
 
@@ -195,6 +210,6 @@ verify:
         assert "manifest.json" in checksums_content, "checksums should include manifest.json"
 
         # Verify bundle PEM is in checksums
-        assert "bundlecraft-ca-trust.pem" in checksums_content, (
-            "checksums should include PEM bundle"
-        )
+        assert (
+            "bundlecraft-ca-trust.pem" in checksums_content
+        ), "checksums should include PEM bundle"

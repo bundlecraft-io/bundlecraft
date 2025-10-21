@@ -125,7 +125,8 @@ jobs:
           bundlecraft build \
             --craft ${{ matrix.item.env }} \
             --bundle ${{ matrix.item.target }} \
-            --output-root "${{ matrix.item.output_root }}"
+            --output-root "${{ matrix.item.output_root }}" \
+            --verbose --json
       - name: Show output directory structure
         run: |
           echo "=== output directory structure ==="
@@ -273,7 +274,7 @@ jobs:
           fi
           for dir in $dirs; do
             echo "Verifying $dir"
-            bundlecraft verify --target "$dir" --verbose
+            bundlecraft verify --target "$dir" --verbose --json
           done
       - name: Extract and verify tarball
         run: |
@@ -291,7 +292,7 @@ jobs:
           fi
           for dir in $dirs; do
             echo "Verifying $dir"
-            bundlecraft verify --target "$dir" --verbose
+            bundlecraft verify --target "$dir" --verbose --json
           done
       - name: Summarize verified bundles
         if: success()
