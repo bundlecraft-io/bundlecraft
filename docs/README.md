@@ -19,6 +19,7 @@ Each document describes a specific layer of the system — from goals and design
 9. [Troubleshooting](troubleshooting.md)
 10. [Configuration Spec](CONFIG-SPEC.md)
 11. [API Fetcher and Local Mock](fetcher-apis.md)
+12. [Atomic Builds](atomic-builds.md) - **NEW**: Reliable, all-or-nothing build operations
 
 ---
 
