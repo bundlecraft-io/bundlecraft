@@ -259,6 +259,6 @@ pytest tests/test_atomic_build.py -v
 
 ## See Also
 
-- [Issue #50: Atomic build implementation for resiliency](https://github.com/chrisjpich/pki-ca-trust/issues/50)
+- [Issue #50: Atomic build implementation for resiliency](https://github.com/chrisjpich/bundlecraft/issues/50)
 - [CONFIG-SPEC.md](CONFIG-SPEC.md) - Configuration options
 - [troubleshooting.md](troubleshooting.md) - Common issues

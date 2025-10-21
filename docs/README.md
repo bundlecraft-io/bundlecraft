@@ -1,6 +1,6 @@
-# pki-ca-trust Documentation
+# bundlecraft Documentation
 
-This folder contains the technical and conceptual documentation for the **pki-ca-trust** project.
+This folder contains the technical and conceptual documentation for the **bundlecraft** project.
 
 Each document describes a specific layer of the system — from goals and design philosophy to implementation and maintenance.
 

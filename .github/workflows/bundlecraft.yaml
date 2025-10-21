@@ -157,14 +157,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist/
-      - name: Rehydrate to pki-ca-trust/<env>/<bundle> and package
+      - name: Rehydrate to bundlecraft/<env>/<bundle> and package
         run: |
           set -euo pipefail
           echo "=== Contents of dist/ after artifact download ==="
           ls -laR dist/ || true
           echo "=================================================="
-          rm -rf pki-ca-trust
-          mkdir -p pki-ca-trust
+          rm -rf bundlecraft
+          mkdir -p bundlecraft
           shopt -s nullglob dotglob
           artifact_count=0
           for artifact_dir in dist/*; do
@@ -174,7 +174,7 @@ jobs:
             if [[ "$base" =~ ^trust-store-([^-/]+)-(.+)$ ]]; then
               env="${BASH_REMATCH[1]}"
               bundle="${BASH_REMATCH[2]}"
-              dest="pki-ca-trust/${env}/${bundle}"
+              dest="bundlecraft/${env}/${bundle}"
               mkdir -p "$dest"
 
               # Detect nested layout: artifact may contain craft-dir/target-dir structure
@@ -200,21 +200,21 @@ jobs:
             echo "::error::No artifacts were downloaded"
             exit 1
           fi
-          echo "=== pki-ca-trust (rehydrated) ==="
-          find pki-ca-trust -maxdepth 3 -type d || true
+          echo "=== bundlecraft (rehydrated) ==="
+          find bundlecraft -maxdepth 3 -type d || true
           echo "================================="
-          tar -czf bundlecraft-trust.tar.gz pki-ca-trust/
+          tar -czf bundlecraft-trust.tar.gz bundlecraft/
           sha256sum bundlecraft-trust.tar.gz > bundlecraft-trust.sha256
           echo "Created tarball and checksum:"
           sha256sum bundlecraft-trust.tar.gz
           echo "=== Creating per-craft-bundle tarballs (flat contents) ==="
-          mapfile -t TARGETS < <(find pki-ca-trust -mindepth 2 -maxdepth 2 -type d | sort)
+          mapfile -t TARGETS < <(find bundlecraft -mindepth 2 -maxdepth 2 -type d | sort)
           for dir in "${TARGETS[@]}"; do
             craft="$(echo "$dir" | awk -F/ '{print $2}')"
             bundle="$(echo "$dir" | awk -F/ '{print $3}')"
             name="bundlecraft-trust-craft-${craft}-bundle-${bundle}.tar.gz"
             # Create a flat tarball with the contents of the bundle at the archive root
-            tar -czf "$name" -C "pki-ca-trust/${craft}/${bundle}" .
+            tar -czf "$name" -C "bundlecraft/${craft}/${bundle}" .
             sha256sum "$name" > "${name%.tar.gz}.sha256"
             echo "Created per-bundle tarball: $name"
           done
@@ -222,7 +222,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: all-builds
-          path: pki-ca-trust/
+          path: bundlecraft/
       - name: Upload tarball + checksum
         uses: actions/upload-artifact@v4
         with:
@@ -248,7 +248,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: all-builds
-          path: pki-ca-trust/
+          path: bundlecraft/
       - name: Download tarball artifact
         uses: actions/download-artifact@v4
         with:
@@ -265,11 +265,11 @@ jobs:
       - name: Verify combined directory
         run: |
           echo "=== Directory structure before verify ==="
-          find pki-ca-trust -maxdepth 3 -type d || true
+          find bundlecraft -maxdepth 3 -type d || true
           echo "========================================"
-          dirs=$(find pki-ca-trust -mindepth 2 -maxdepth 2 -type d)
+          dirs=$(find bundlecraft -mindepth 2 -maxdepth 2 -type d)
           if [ -z "$dirs" ]; then
-            echo "No bundle directories found under pki-ca-trust/. Check collect stage output."
+            echo "No bundle directories found under bundlecraft/. Check collect stage output."
             exit 1
           fi
           for dir in $dirs; do
@@ -285,7 +285,7 @@ jobs:
           find . -maxdepth 3 -type d || true
           echo "=========================="
           cd ..
-          dirs=$(find verify-tarball/pki-ca-trust -mindepth 2 -maxdepth 2 -type d 2>/dev/null)
+          dirs=$(find verify-tarball/bundlecraft -mindepth 2 -maxdepth 2 -type d 2>/dev/null)
           if [ -z "$dirs" ]; then
             echo "No bundle directories found in extracted tarball."
             exit 1
@@ -298,9 +298,9 @@ jobs:
         if: success()
         run: |
           echo "=== Verification Summary ==="
-          count=$(find pki-ca-trust -type f -name 'checksums.sha256' | wc -l)
+          count=$(find bundlecraft -type f -name 'checksums.sha256' | wc -l)
           echo "Verified $count bundles:"
-          find pki-ca-trust -type f -name 'checksums.sha256' -exec dirname {} \; | sort
+          find bundlecraft -type f -name 'checksums.sha256' -exec dirname {} \; | sort
           echo "==============================="
   publish-release:
     name: Publish GitHub Release
@@ -357,9 +357,9 @@ jobs:
             echo "Tarball not found: $TAR" >&2
             exit 1
           fi
-          # Find unique pki-ca-trust/<env>/<bundle>/ directories inside the tarball
+          # Find unique bundlecraft/<env>/<bundle>/ directories inside the tarball
           mapfile -t DIRS < <(tar -tzf "$TAR" | awk -F/ 'NF>=3 {print $1"/"$2"/"$3"/"}' | sort -u)
-          mapfile -t BUNDLES < <(printf "%s\n" "${DIRS[@]}" | grep -E '^pki-ca-trust/[^/]+/[^/]+/$' | sed -E 's#^pki-ca-trust/([^/]+)/([^/]+)/$#\1/\2#' | sort)
+          mapfile -t BUNDLES < <(printf "%s\n" "${DIRS[@]}" | grep -E '^bundlecraft/[^/]+/[^/]+/$' | sed -E 's#^bundlecraft/([^/]+)/([^/]+)/$#\1/\2#' | sort)
           count=${#BUNDLES[@]}
           echo "bundle_count=$count" >> "$GITHUB_OUTPUT"
           {
@@ -527,29 +527,26 @@ jobs:
             - sbom.json (Software Bill of Materials in CycloneDX format)
 
             ### Verification Instructions
-            
             **Verify GPG signature:**
             ```bash
             # Download and import the public GPG key
-            curl -O https://raw.githubusercontent.com/chrisjpich/pki-ca-trust/main/docs/public-gpg-key.asc
+            curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
             gpg --import public-gpg-key.asc
-            
+
             # Verify the signature
             gpg --verify bundlecraft-trust.tar.gz.asc bundlecraft-trust.tar.gz
             ```
             ✅ If you see 'Good signature', the artifact is authentic and untampered.
             ❌ If verification fails, do not use the artifact.
-            
             **Verify using BundleCraft CLI:**
             ```bash
             # Verify all signatures in a bundle directory
             bundlecraft verify --target <bundle-dir> --verify-signatures
-            
+
             # Or with a specific keyring
             bundlecraft verify --target <bundle-dir> \
               --verify-signatures --gpg-keyring public-gpg-key.asc
             ```
-            
             **SBOM (Software Bill of Materials):**
             Each bundle includes an sbom.json file containing:
             - Certificate metadata (serial, issuer, subject, fingerprints)
@@ -575,11 +572,11 @@ jobs:
             sha256sum -c bundlecraft-trust.sha256
             gpg --verify bundlecraft-trust.tar.gz.asc bundlecraft-trust.tar.gz
 
-            # Extract (creates pki-ca-trust/ directory)
+            # Extract (creates bundlecraft/ directory)
             tar -xzf bundlecraft-trust.tar.gz
 
             # Explore structure
-            ls -R pki-ca-trust/
+            ls -R bundlecraft/
             ```
           files: |-
             release/bundlecraft-trust.tar.gz
@@ -650,11 +647,11 @@ jobs:
             # Verify checksum
             sha256sum -c bundlecraft-trust.sha256
 
-            # Extract (creates pki-ca-trust/ directory)
+            # Extract (creates bundlecraft/ directory)
             tar -xzf bundlecraft-trust.tar.gz
 
             # Explore structure
-            ls -R pki-ca-trust/
+            ls -R bundlecraft/
             ```
           files: |-
             release/bundlecraft-trust.tar.gz

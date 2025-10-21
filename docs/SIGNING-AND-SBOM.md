@@ -279,33 +279,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      
+
       - name: Install dependencies
         run: |
           pip install -e .
-      
+
       - name: Import GPG key
         run: |
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --import
-      
+
       - name: Build and sign bundle
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           bundlecraft build --craft prod --bundle mozilla --sign
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: signed-bundle
           path: dist/Production/mozilla/
-      
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -434,5 +434,5 @@ bundlecraft build --craft prod --bundle mozilla --no-sbom
 ## Support
 
 For questions or issues:
-- Open an [issue](https://github.com/chrisjpich/pki-ca-trust/issues)
-- Join [GitHub Discussions](https://github.com/chrisjpich/pki-ca-trust/discussions)
+- Open an [issue](https://github.com/chrisjpich/bundlecraft/issues)
+- Join [GitHub Discussions](https://github.com/chrisjpich/bundlecraft/discussions)

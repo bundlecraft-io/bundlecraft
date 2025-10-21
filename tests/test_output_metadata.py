@@ -296,7 +296,7 @@ repo:
 
         # Copy sample certificate (CI path) or generate one locally if unavailable
         sample_pem_src = Path(
-            "/home/runner/work/pki-ca-trust/pki-ca-trust/tests/data/certs/sample.pem"
+            "/home/runner/work/bundlecraft/bundlecraft/tests/data/certs/sample.pem"
         )
         sample_dest = temp / "sources" / "internal" / "sample.pem"
         if sample_pem_src.exists():
