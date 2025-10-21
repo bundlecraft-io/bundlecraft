@@ -1286,6 +1286,18 @@ def main(
                 for fname in output_files
             ]
             
+            # Add expanded output metadata if configured
+            output_metadata_cfg = env_cfg.get("output_metadata")
+            if output_metadata_cfg:
+                expanded_metadata = expand_output_metadata(
+                    output_metadata_cfg,
+                    bundle=target_name,
+                    env=env,
+                    timestamp_utc=manifest_obj["timestamp_utc"],
+                )
+                if expanded_metadata:
+                    manifest_obj["output_metadata"] = expanded_metadata
+            
             # Write manifest
             manifest_path = build_root / "manifest.json"
             manifest_path.write_text(

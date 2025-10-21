@@ -266,6 +266,8 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
     "--gpg-keyring",
     type=click.Path(exists=True),
     help="Path to GPG public keyring file to import for signature verification",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     help="Show what would be verified without actually reading files",
@@ -276,9 +278,7 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
     is_flag=True,
     help="Emit machine-readable JSON output (suppresses human-readable output)",
 )
-def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_keyring, json_output):
-    """Verify the integrity and consistency of built trust bundles."""
-def main(target, verify_manifest, verify_all, verbose, dry_run, json_output):
+def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_keyring, dry_run, json_output):
     """Verify the integrity and consistency of built trust bundles.
 
     Use --dry-run to preview what would be verified without making any changes.
