@@ -22,7 +22,16 @@ from typing import Any
 import click
 
 from bundlecraft.fetchers.api import fetch_api
+from bundlecraft.fetchers.apple_roots import fetch_apple_roots
+from bundlecraft.fetchers.artifactory import fetch_artifactory
+from bundlecraft.fetchers.azure_blob import fetch_azure_blob
+from bundlecraft.fetchers.azure_keyvault import fetch_azure_keyvault
+from bundlecraft.fetchers.gcs import fetch_gcs
+from bundlecraft.fetchers.github_releases import fetch_github_release
 from bundlecraft.fetchers.http import fetch_url
+from bundlecraft.fetchers.microsoft_roots import fetch_microsoft_roots
+from bundlecraft.fetchers.mozilla_roots import fetch_mozilla_roots
+from bundlecraft.fetchers.s3 import fetch_s3
 from bundlecraft.fetchers.vault import fetch_vault
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
@@ -196,6 +205,135 @@ def _fetch_from_config(
                     addr=addr,
                     token_ref=token_ref,
                     namespace=namespace,
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "s3":
+                bucket = src.get("bucket")
+                key = src.get("key")
+                if not bucket or not key:
+                    raise click.ClickException("S3 fetch source requires 'bucket' and 'key'")
+                logger.info(f"  Fetching from S3: s3://{bucket}/{key}")
+                out_path = fetch_s3(
+                    dest_dir,
+                    name=name,
+                    bucket=bucket,
+                    key=key,
+                    region=src.get("region"),
+                    endpoint_url=src.get("endpoint_url"),
+                    access_key_ref=src.get("access_key_ref"),
+                    secret_key_ref=src.get("secret_key_ref"),
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "azure_blob":
+                container = src.get("container")
+                blob_name = src.get("blob_name")
+                if not container or not blob_name:
+                    raise click.ClickException(
+                        "Azure Blob fetch source requires 'container' and 'blob_name'"
+                    )
+                logger.info(f"  Fetching from Azure Blob: {container}/{blob_name}")
+                out_path = fetch_azure_blob(
+                    dest_dir,
+                    name=name,
+                    container=container,
+                    blob_name=blob_name,
+                    account_name=src.get("account_name"),
+                    account_url=src.get("account_url"),
+                    connection_string_ref=src.get("connection_string_ref"),
+                    sas_token_ref=src.get("sas_token_ref"),
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "gcs":
+                bucket = src.get("bucket")
+                blob_name = src.get("blob_name")
+                if not bucket or not blob_name:
+                    raise click.ClickException("GCS fetch source requires 'bucket' and 'blob_name'")
+                logger.info(f"  Fetching from GCS: gs://{bucket}/{blob_name}")
+                out_path = fetch_gcs(
+                    dest_dir,
+                    name=name,
+                    bucket=bucket,
+                    blob_name=blob_name,
+                    project=src.get("project"),
+                    credentials_ref=src.get("credentials_ref"),
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "artifactory":
+                url = src.get("url")
+                if not url:
+                    raise click.ClickException("Artifactory fetch source requires 'url'")
+                logger.info(f"  Fetching from Artifactory: {url}")
+                out_path = fetch_artifactory(
+                    dest_dir,
+                    name=name,
+                    url=url,
+                    repository=src.get("repository"),
+                    path=src.get("path"),
+                    username_ref=src.get("username_ref"),
+                    password_ref=src.get("password_ref"),
+                    token_ref=src.get("token_ref"),
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "github_release":
+                owner = src.get("owner")
+                repo = src.get("repo")
+                asset_name = src.get("asset_name")
+                if not owner or not repo or not asset_name:
+                    raise click.ClickException(
+                        "GitHub Release fetch source requires 'owner', 'repo', and 'asset_name'"
+                    )
+                logger.info(f"  Fetching from GitHub Release: {owner}/{repo}/{asset_name}")
+                out_path = fetch_github_release(
+                    dest_dir,
+                    name=name,
+                    owner=owner,
+                    repo=repo,
+                    asset_name=asset_name,
+                    tag=src.get("tag"),
+                    token_ref=src.get("token_ref"),
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "azure_keyvault":
+                vault_url = src.get("vault_url")
+                certificate_name = src.get("certificate_name")
+                if not vault_url or not certificate_name:
+                    raise click.ClickException(
+                        "Azure Key Vault fetch source requires 'vault_url' and 'certificate_name'"
+                    )
+                logger.info(f"  Fetching from Azure Key Vault: {vault_url}/{certificate_name}")
+                out_path = fetch_azure_keyvault(
+                    dest_dir,
+                    name=name,
+                    vault_url=vault_url,
+                    certificate_name=certificate_name,
+                    version=src.get("version"),
+                    tenant_id_ref=src.get("tenant_id_ref"),
+                    client_id_ref=src.get("client_id_ref"),
+                    client_secret_ref=src.get("client_secret_ref"),
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "mozilla_roots":
+                logger.info("  Fetching Mozilla trusted root certificates")
+                out_path = fetch_mozilla_roots(
+                    dest_dir,
+                    name=name,
+                    url=src.get("url"),
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "microsoft_roots":
+                logger.info("  Fetching Microsoft trusted root certificates")
+                out_path = fetch_microsoft_roots(
+                    dest_dir,
+                    name=name,
+                    url=src.get("url"),
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "apple_roots":
+                logger.info("  Fetching Apple trusted root certificates")
+                out_path = fetch_apple_roots(
+                    dest_dir,
+                    name=name,
+                    url=src.get("url"),
                     verify=verify if isinstance(verify, dict) else None,
                 )
             else:
