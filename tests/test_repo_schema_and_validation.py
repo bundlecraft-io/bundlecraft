@@ -22,6 +22,7 @@ def test_repo_schema_staging(cli_runner, temp_workspace, sample_bundle_config, m
     (craft_dir / "test.yaml").write_text(
         """
 name: TestCraft
+description: Test craft for repo schema validation
 targets:
   only:
     includes: [repo-bundle]
@@ -91,6 +92,7 @@ def test_duplicate_name_validation(cli_runner, temp_workspace, monkeypatch):
     (craft_dir / "test.yaml").write_text(
         """
 name: TestCraft
+description: Test craft for duplicate name validation
 targets:
   only:
     includes: [dup]

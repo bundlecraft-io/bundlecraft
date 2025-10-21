@@ -46,12 +46,15 @@ fetch:
       # To calculate: download the file, run 'sha256sum <filename>', and copy the hash here.
       sha256: <expected_sha256>  # Recommended for static/public sources
 
-  # Example: API endpoint with authentication
+  # Example: API endpoint with authentication and custom retry settings
   - name: partner_roots
     type: api
     endpoint: https://api.partner.com/v1/pki/roots
     provider: Partner PKI Service
     token_ref: PARTNER_API_TOKEN  # Read from environment variable
+    # Optional: Override fetch retry/timeout settings for slow APIs
+    timeout: 90  # Increase timeout for slower API (default: 30s)
+    retries: 5   # More aggressive retries for flaky endpoint (default: 3)
     verify:
       ca_file: sources/partner-ca.pem  # Custom CA for TLS verification
       tls_fingerprint_sha256: <leaf_cert_pin>  # Pin leaf certificate
@@ -61,7 +64,7 @@ fetch:
   # Example: HashiCorp Vault
   - name: vault_roots
     type: vault
-    mount_point: secret
+    mount: secret
     path: pki/trusted_roots
     pem_field: pem
     addr: https://vault.example.com:8200

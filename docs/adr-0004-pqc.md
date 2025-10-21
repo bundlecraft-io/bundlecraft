@@ -2,7 +2,7 @@
 
 Status: Proposed
 Date: 2025-10-18
-Owner: BundleCraft maintainers
+Owner: Chris J. Pich
 Related: ADR-0001 (Containers), ADR-0003 (Distribution), README, SECURITY.md
 
 ---

@@ -207,6 +207,12 @@ fetch:
     verify:
       sha256: <expected_sha256>
       tls_fingerprint_sha256: <cert_pin>
+      sha256: <expected_sha256>  # Content pinning (recommended)
+    # Optional: Override fetch retry/timeout settings
+    timeout: 60         # Request timeout in seconds (default: 30)
+    retries: 5          # Number of retry attempts (default: 3)
+    backoff_factor: 2.0 # Exponential backoff multiplier (default: 2.0)
+    retry_on_status: [429, 502, 503, 504]  # HTTP status codes to retry
 
   - name: api_cert
     type: api
@@ -220,7 +226,35 @@ fetch:
 Extended fetchers require additional dependencies:
 ```bash
 pip install 'bundlecraft[cloud,fetchers]'
+      tls_fingerprint_sha256: <cert_pin>
+    # Example: Slower API needs longer timeout
+    timeout: 120
+    retries: 5
+
+  - name: vault_roots
+    type: vault
+    mount: secret
+    path: pki/trusted_roots
+    pem_field: pem
+    addr: http://127.0.0.1:8200
+    token_ref: VAULT_TOKEN
 ```
+
+**Fetch Retry and Timeout Configuration:**
+
+All fetch operations support configurable timeout and retry behavior to handle transient network failures gracefully:
+
+- **`timeout`** (integer, 1-600): Request timeout in seconds. Default: 30
+- **`retries`** (integer, 0-10): Number of retry attempts on transient failures. Default: 3
+- **`backoff_factor`** (float, 1.0-10.0): Exponential backoff multiplier between retries. Default: 2.0
+  - Retry delays: backoff_factor^attempt with random jitter (e.g., 2.0^0=1s, 2.0^1=2s, 2.0^2=4s)
+- **`retry_on_status`** (list of integers): HTTP status codes that trigger retry. Default: [429, 502, 503, 504]
+  - 429: Too Many Requests (rate limiting)
+  - 502: Bad Gateway (temporary proxy error)
+  - 503: Service Unavailable (temporary service error)
+  - 504: Gateway Timeout (temporary timeout)
+
+These settings can be configured globally in `config/defaults.yaml` under the `fetch:` section, or overridden per-source in bundle configs. Network errors (timeouts, connection failures) are always retried automatically.
 
 ### Metadata
 
@@ -320,6 +354,91 @@ format_overrides:
     # alias_format: '{subject.CN}-{fingerprint}'
 ```
 
+### Output Metadata for GitOps
+
+BundleCraft supports attaching structured metadata (annotations and labels) to build outputs for GitOps orchestration systems like ArgoCD, Flux, and Kubernetes.
+
+```yaml
+output_metadata:
+  annotations:
+    # Static annotations
+    argocd.argoproj.io/sync-wave: "1"
+    kustomize.toolkit.fluxcd.io/prune: "true"
+    
+    # Dynamic annotations with template variables
+    build-timestamp: "{{timestamp}}"
+    bundle-version: "{{bundle}}-{{env}}-{{date}}"
+    git-commit: "{{git_commit}}"
+    
+  labels:
+    # Static labels
+    app.kubernetes.io/component: "trust-bundle"
+    app.kubernetes.io/managed-by: "bundlecraft"
+    
+    # Dynamic labels with template variables
+    environment: "{{env}}"
+    bundle-id: "{{bundle}}"
+```
+
+**Template Variables:**
+
+- `{{bundle}}` - Target name (e.g., "internal-prod")
+- `{{env}}` - Craft/environment name (e.g., "production")
+- `{{timestamp}}` - ISO 8601 timestamp in UTC (e.g., "2025-10-21T12:00:00Z")
+- `{{date}}` - Date in YYYY-MM-DD format (e.g., "2025-10-21")
+- `{{git_commit}}` - Git commit hash (short form, 7 chars, or "unknown")
+
+**Output:**
+
+1. **manifest.json** - Expanded metadata is always included in the `output_metadata` field
+2. **metadata.yaml** - Optional YAML sidecar for Kubernetes ConfigMap/Secret generation
+
+**Example manifest.json snippet:**
+
+```json
+{
+  "craft": "Production",
+  "target": "internal-prod",
+  "timestamp_utc": "2025-10-21T12:00:00Z",
+  "output_metadata": {
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "1",
+      "build-timestamp": "2025-10-21T12:00:00Z",
+      "bundle-version": "internal-prod-production-2025-10-21",
+      "git-commit": "d0dfaa2"
+    },
+    "labels": {
+      "app.kubernetes.io/component": "trust-bundle",
+      "environment": "production",
+      "bundle-id": "internal-prod"
+    }
+  }
+}
+```
+
+**Example metadata.yaml:**
+
+```yaml
+annotations:
+  argocd.argoproj.io/sync-wave: '1'
+  build-timestamp: '2025-10-21T12:00:00Z'
+  bundle-version: internal-prod-production-2025-10-21
+  git-commit: d0dfaa2
+labels:
+  app.kubernetes.io/component: trust-bundle
+  bundle-id: internal-prod
+  environment: production
+```
+
+**Use Cases:**
+
+- **ArgoCD Sync Waves**: Control deployment order with `argocd.argoproj.io/sync-wave`
+- **Flux Prune Policy**: Manage resource cleanup with `kustomize.toolkit.fluxcd.io/prune`
+- **Kubernetes Labels**: Organize and select resources with standard labels
+- **Versioning**: Track bundle versions with dynamic template variables
+- **Traceability**: Link builds to git commits for audit trails
+```
+
 ### Distribution Metadata (for CI/CD pipeline use only)
 
 ```yaml
@@ -345,6 +464,20 @@ distribution_metadata:
     - production
     - signed
     - automated-build
+
+# Output metadata for GitOps orchestration (ArgoCD, Flux, Kubernetes)
+output_metadata:
+  annotations:
+    # Template variables: {{bundle}}, {{env}}, {{timestamp}}, {{date}}, {{git_commit}}
+    build-timestamp: "{{timestamp}}"
+    bundle-version: "{{bundle}}-{{env}}-{{date}}"
+    git-commit: "{{git_commit}}"
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    environment: "{{env}}"
+    bundle-id: "{{bundle}}"
+    app.kubernetes.io/component: "trust-bundle"
+    app.kubernetes.io/managed-by: "bundlecraft"
 ```
 
 ### Complete Craft Config Example
@@ -382,6 +515,17 @@ format_overrides:
     storepass_env: TRUST_JKS_PASSWORD
   pkcs12:
     password_env: TRUST_P12_PASSWORD
+
+output_metadata:
+  annotations:
+    build-timestamp: "{{timestamp}}"
+    bundle-version: "{{bundle}}-{{env}}-{{date}}"
+    git-commit: "{{git_commit}}"
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    environment: "{{env}}"
+    bundle-id: "{{bundle}}"
+    app.kubernetes.io/component: "trust-bundle"
 
 distribution_metadata:
   # NOTE: BundleCraft CLI does NOT publish or upload bundles directly.
@@ -433,6 +577,12 @@ package: false
 
 pem:
   include_subject_comments: true
+
+fetch:
+  timeout: 30  # Request timeout in seconds (1-600)
+  retries: 3   # Number of retry attempts on transient failures (0-10)
+  backoff_factor: 2.0  # Exponential backoff multiplier (1.0-10.0)
+  retry_on_status: [429, 502, 503, 504]  # HTTP status codes that trigger retry
 
 filters:
   unique_by_fingerprint: true
@@ -551,6 +701,237 @@ Supported values for `distribution_metadata.targets[].type`:
 
 ---
 
+## Schema Validation
+
+BundleCraft uses Pydantic v2 for comprehensive configuration validation. All configs are validated at load time with clear error messages.
+
+For step-by-step guidance on interpreting and fixing validation errors (plus pytest and pre-commit tips), see:
+- docs/troubleshooting.md → YAML schema/validation failures
+- docs/troubleshooting.md → Pytest failures: quick navigation
+- docs/troubleshooting.md → pre-commit failures: common hooks and fixes
+
+### Required Fields
+
+**Bundle Configs:**
+- `bundle_name` (string, non-empty) - Unique identifier for the bundle
+- `description` (string, non-empty) - Human-readable purpose/context
+- At least one of: `repo[]` or `fetch[]` - Must define at least one certificate source
+
+**Craft Configs:**
+- `name` (string, non-empty) - Display name for the craft
+- `description` (string, non-empty) - Human-readable purpose/context
+- `targets` (dict or list, non-empty) - At least one build target required
+
+**Defaults Config:**
+- No strictly required fields (all have sensible defaults)
+
+### Value Constraints
+
+**Output Formats:**
+- Valid values: `pem`, `p7b`, `jks`, `p12`, `pkcs12`, `der`
+- Invalid formats trigger a clear error with the list of valid options
+
+**Key Size Requirements (Security):**
+- RSA keys: minimum 1024 bits (configurable via `filters.minimum_key_size_rsa`)
+- ECC keys: minimum 192 bits (configurable via `filters.minimum_key_size_ecc`)
+
+**Expiry Warnings:**
+- `warn_days_before_expiry`: must be between 0 and 365 days
+
+**URL Security:**
+- Only `https://` and `file://` URLs are allowed (enforced for `fetch[].url` and `fetch[].endpoint`)
+- Exception: `http://localhost` and `http://127.0.0.1` are permitted for local development
+- Insecure HTTP URLs trigger: `"Only HTTPS URLs are allowed for security"`
+
+**Reserved Names:**
+- The following names are reserved and cannot be used for bundle names, repo names, or fetch names:
+  - `include`, `exclude`, `fetch`, `repo`
+- Using a reserved name triggers: `"'<name>' is a reserved name and cannot be used"`
+
+**Name Uniqueness:**
+- All `repo[].name` values must be unique within a bundle
+- All `fetch[].name` values must be unique within a bundle
+- No `repo[].name` can conflict with any `fetch[].name` in the same bundle
+
+**Type-Specific Requirements:**
+- `fetch[].type: url` → requires `url` field
+- `fetch[].type: vault` → requires both `mount` and `path` fields
+- `fetch[].type: api` → requires `endpoint` field
+
+**Target Requirements:**
+- Each target in `targets` must have at least one of: `includes`, `include_bundles`, or `compose`
+- Empty targets trigger: `"At least one of 'includes', 'include_bundles', or 'compose' must be provided"`
+
+**Inline PEM Entries:**
+- Dictionary entries in `repo[].include[]` must have either `inline` or `path` key
+- Invalid: `{"invalid_key": "value"}` → triggers error
+
+### Common Validation Errors
+
+**Error: Missing required field**
+```
+1 validation error for BundleConfig
+bundle_name
+  Field required [type=missing, input_value={...}, input_type=dict]
+```
+**Fix:** Add the required field:
+```yaml
+bundle_name: my-bundle
+description: My bundle description
+```
+
+---
+
+**Error: Empty string**
+```
+1 validation error for BundleConfig
+description
+  String should have at least 1 character [type=string_too_short, input_value='', input_type=str]
+```
+**Fix:** Provide a non-empty value:
+```yaml
+description: Internal CA roots for production
+```
+
+---
+
+**Error: Invalid output format**
+```
+1 validation error for CraftConfig
+output_formats
+  Value error, Invalid output format 'jsk'. Valid formats: der, jks, p12, p7b, pem, pkcs12
+```
+**Fix:** Use a valid format name:
+```yaml
+output_formats: [pem, jks, p7b, p12]  # Fixed: jsk → jks
+```
+
+---
+
+**Error: Insecure HTTP URL**
+```
+1 validation error for BundleConfig
+fetch.0.url
+  Value error, Only HTTPS URLs are allowed for security. Use https:// or file:// schemes.
+```
+**Fix:** Use HTTPS or file:// URLs:
+```yaml
+fetch:
+  - name: mozilla_roots
+    type: url
+    url: https://curl.se/ca/cacert.pem  # Changed from http:// to https://
+```
+
+---
+
+**Error: Reserved name**
+```
+1 validation error for BundleConfig
+bundle_name
+  Value error, 'fetch' is a reserved bundle name
+```
+**Fix:** Use a different name:
+```yaml
+bundle_name: mozilla-fetch  # Changed from 'fetch'
+```
+
+---
+
+**Error: Duplicate names**
+```
+1 validation error for BundleConfig
+  Value error, Duplicate repo names found: internal
+```
+**Fix:** Ensure all repo and fetch names are unique:
+```yaml
+repo:
+  - name: internal-roots
+    include: [sources/internal/roots/]
+  - name: internal-intermediates  # Changed from 'internal'
+    include: [sources/internal/intermediate/]
+```
+
+---
+
+**Error: No sources defined**
+```
+1 validation error for BundleConfig
+  Value error, Bundle must have at least one 'repo' or 'fetch' entry
+```
+**Fix:** Add at least one source:
+```yaml
+repo:
+  - name: local
+    include: [sources/internal/]
+```
+
+---
+
+**Error: Missing type-specific field**
+```
+1 validation error for BundleConfig
+fetch.0
+  Value error, 'url' is required for fetch type 'url'
+```
+**Fix:** Add the required field for the fetch type:
+```yaml
+fetch:
+  - name: mozilla
+    type: url
+    url: https://curl.se/ca/cacert.pem  # Added missing url field
+```
+
+---
+
+**Error: Key size too small**
+```
+1 validation error for DefaultsConfig
+filters.minimum_key_size_rsa
+  Value error, RSA key size must be at least 1024 bits for security
+```
+**Fix:** Use minimum required key sizes:
+```yaml
+filters:
+  minimum_key_size_rsa: 2048  # Changed from 512
+  minimum_key_size_ecc: 256   # Changed from 128
+```
+
+---
+
+**Error: Numeric policy_version**
+```
+# This is automatically handled - no error!
+# The validator converts numeric versions to strings:
+metadata:
+  policy_version: 1.0  # Automatically converted to "1.0"
+```
+
+### Validation Architecture
+
+- **Location:** `bundlecraft/helpers/config_schema.py`
+- **Framework:** Pydantic v2 with `ConfigDict` and field validators
+- **Validation Points:**
+  - Bundle configs: validated in `builder.py` and `fetch.py`
+  - Craft configs: validated in `builder.py`
+  - Defaults config: validated in `builder.py`
+- **Error Handling:** All validation errors are caught and re-raised as `ValueError` with full Pydantic error details
+- **Extra Fields:** Allowed via `ConfigDict(extra="allow")` for forward compatibility
+
+### Testing
+
+Comprehensive validation tests are located in `tests/test_config_validation.py` with 30+ test cases covering:
+- Missing required fields
+- Empty values
+- Invalid formats
+- Reserved names
+- Duplicate names
+- Name conflicts
+- Security constraints (HTTPS, key sizes)
+- Type-specific requirements
+- Valid configurations (positive tests)
+
+---
+
 ## Security Best Practices
 
 1. **Fetch verification**: Always pin `sha256` for public/static sources (Mozilla)
@@ -558,3 +939,5 @@ Supported values for `distribution_metadata.targets[].type`:
 3. **Secrets**: Never hardcode passwords; always use `*_env` keys to reference environment variables
 4. **Distribution**: Use `enabled: false` to disable distribution targets in lower environments
 5. **Tags**: Use environment tags to control CI/CD pipeline routing (e.g., only sign/publish `production` tagged envs)
+6. **HTTPS enforcement**: The schema automatically rejects insecure HTTP URLs (except localhost)
+7. **Key sizes**: Configure minimum key size requirements to enforce cryptographic standards

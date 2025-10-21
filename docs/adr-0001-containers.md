@@ -1,8 +1,8 @@
 # ADR-0001: Distribute BundleCraft as an OCI-compliant container image (plus template repo); do **not** publish a PyPI package
 
-**Status:** Accepted (amended by ADR-0003)
+**Status:** Deferred (amended by ADR-0003, ADR-0006)
 **Date:** October 16, 2025
-**Owner:** BundleCraft maintainers
+**Owner:** Chris J. Pich
 **Related:** SECURITY.md, RELEASE.md, CI/CD workflows, README
 
 ---

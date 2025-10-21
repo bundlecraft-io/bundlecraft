@@ -32,9 +32,13 @@ class TestFetch:
         bundle_dir.mkdir(parents=True, exist_ok=True)
         # Ensure sample exists at sources/sample.pem (conftest copies certs there)
         bundle_yaml = """
-        include:
-          - sources/sample.pem
-        exclude: []
+bundle_name: test-bundle
+description: Test bundle with no fetch section
+repo:
+  - name: local
+    include:
+      - sources/sample.pem
+    exclude: []
         """
         cfg_path = bundle_dir / "test-bundle.yaml"
         cfg_path.write_text(bundle_yaml, encoding="utf-8")
@@ -52,8 +56,9 @@ class TestFetch:
             ],
         )
         assert result.exit_code == 0
-        assert (staging / "test-bundle" / "include").exists()
-        assert list((staging / "test-bundle" / "include").glob("*.pem"))
+        # With repo structure, files are now under staging/test-bundle/{repo_name}/
+        assert (staging / "test-bundle" / "local").exists()
+        assert list((staging / "test-bundle" / "local").glob("*.pem"))
 
     def test_fetch_file_url(self, cli_runner, temp_workspace, test_data_dir):
         sample_pem = test_data_dir / "certs" / "sample.pem"
@@ -61,13 +66,14 @@ class TestFetch:
         bundle_dir.mkdir(parents=True, exist_ok=True)
         sha = _sha256_of(sample_pem)
         bundle_yaml = f"""
-        fetch:
-          - name: sample
-            type: url
-            url: file://{sample_pem}
-            verify:
-              sha256: {sha}
-        include: []
+bundle_name: test-bundle
+description: Test bundle for file URL fetch
+fetch:
+  - name: sample
+    type: url
+    url: file://{sample_pem}
+    verify:
+      sha256: {sha}
         """
         (bundle_dir / "test-bundle.yaml").write_text(bundle_yaml, encoding="utf-8")
         staging = temp_workspace / "staging"
@@ -93,13 +99,14 @@ class TestFetch:
         bundle_dir.mkdir(parents=True, exist_ok=True)
         wrong_sha = "0" * 64
         bundle_yaml = f"""
-        fetch:
-          - name: sample
-            type: url
-            url: file://{sample_pem}
-            verify:
-              sha256: {wrong_sha}
-        include: []
+bundle_name: test-bundle
+description: Test bundle for SHA mismatch test
+fetch:
+  - name: sample
+    type: url
+    url: file://{sample_pem}
+    verify:
+      sha256: {wrong_sha}
         """
         (bundle_dir / "test-bundle.yaml").write_text(bundle_yaml, encoding="utf-8")
         result = cli_runner.invoke(
@@ -118,11 +125,12 @@ class TestFetch:
         bundle_dir = temp_workspace / "config" / "bundles"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
-        fetch:
-          - name: bad
-            type: url
-            url: http://example.com/cacert.pem
-        include: []
+bundle_name: test-bundle
+description: Test bundle for insecure HTTP rejection
+fetch:
+  - name: bad
+    type: url
+    url: http://example.com/cacert.pem
         """
         (bundle_dir / "test-bundle.yaml").write_text(bundle_yaml, encoding="utf-8")
         result = cli_runner.invoke(
@@ -135,7 +143,7 @@ class TestFetch:
             ],
         )
         assert result.exit_code != 0
-        assert "Insecure HTTP is not allowed" in result.output
+        assert "Only HTTPS URLs are allowed for security" in result.output
 
     def test_fetch_cleans_staging_by_default(self, cli_runner, temp_workspace, test_data_dir):
         sample_pem = test_data_dir / "certs" / "sample.pem"
@@ -144,13 +152,14 @@ class TestFetch:
         sha = _sha256_of(sample_pem)
         (bundle_dir / "test-bundle.yaml").write_text(
             f"""
-            fetch:
-              - name: sample
-                type: url
-                url: file://{sample_pem}
-                verify:
-                  sha256: {sha}
-            include: []
+bundle_name: test-bundle
+description: Test bundle for staging cleanup
+fetch:
+  - name: sample
+    type: url
+    url: file://{sample_pem}
+    verify:
+      sha256: {sha}
             """,
             encoding="utf-8",
         )
@@ -181,11 +190,12 @@ class TestFetch:
         bundle_dir = temp_workspace / "config" / "bundles"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
-        fetch:
-          - name: api_bad
-            type: api
-            endpoint: http://localhost:9999/thing
-        include: []
+bundle_name: test-bundle
+description: Test bundle for API HTTPS requirement
+fetch:
+  - name: api_bad
+    type: api
+    endpoint: http://example.com/api/certs
         """
         (bundle_dir / "test-bundle.yaml").write_text(bundle_yaml, encoding="utf-8")
         result = cli_runner.invoke(
@@ -198,20 +208,20 @@ class TestFetch:
             ],
         )
         assert result.exit_code != 0
-        assert "API fetch requires HTTPS" in result.output
+        assert "Only HTTPS URLs are allowed for security" in result.output
 
     def test_fetch_vault_missing_token(self, cli_runner, monkeypatch, temp_workspace):
         monkeypatch.delenv("VAULT_TOKEN", raising=False)
         bundle_dir = temp_workspace / "config" / "bundles"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
-        fetch:
-          - name: from_vault
-            type: vault
-            mount_point: secret
-            path: pki/trusted
-            # no token_ref provided; VAULT_TOKEN should be used
-        include: []
+bundle_name: test-bundle
+description: Test bundle for Vault token missing
+fetch:
+  - name: from_vault
+    type: vault
+    mount: secret
+    path: pki/trusted
         """
         (bundle_dir / "test-bundle.yaml").write_text(bundle_yaml, encoding="utf-8")
         result = cli_runner.invoke(
@@ -265,12 +275,13 @@ class TestFetch:
         bundle_dir = temp_workspace / "config" / "bundles"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
-        fetch:
-          - name: from_vault
-            type: vault
-            mount_point: secret
-            path: pki/trusted
-        include: []
+bundle_name: test-bundle
+description: Test bundle for Vault mock client
+fetch:
+  - name: from_vault
+    type: vault
+    mount: secret
+    path: pki/trusted
         """
         (bundle_dir / "test-bundle.yaml").write_text(bundle_yaml, encoding="utf-8")
         result = cli_runner.invoke(

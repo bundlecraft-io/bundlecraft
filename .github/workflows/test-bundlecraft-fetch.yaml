@@ -30,18 +30,18 @@ jobs:
         shell: bash
         run: |
           cat > ci-test-vault.yaml <<'YAML'
-          id: ci-vault-test
-          include: []
+          bundle_name: ci-vault-test
+          description: CI test bundle for Vault K/V fetcher validation
           fetch:
             - name: from_vault
               type: vault
-              mount_point: secret
+              mount: secret
               path: pki/trusted_roots
               pem_field: pem
               addr: http://127.0.0.1:8200
               token_ref: VAULT_TOKEN
           YAML
-          echo "Wrote ci-test-vault.yaml:" && cat ci-test-vault.yaml
+          echo "Generated ci-test-vault.yaml:" && cat ci-test-vault.yaml
       - name: Ensure vault-local.py is executable
         run: chmod +x scripts/vault-local.py
       - name: Run local Vault and fetch via BundleCraft
@@ -49,12 +49,12 @@ jobs:
           VAULT_ADDR: http://127.0.0.1:8200
           VAULT_TOKEN: root
         run: |
-          ./scripts/vault-local.py up --verbose --runtime podman --ci-cmd "bundlecraft fetch --verbose --config-file ci-test-vault.yaml" || { echo "Vault CI command failed"; exit 1; }
+          ./scripts/vault-local.py up --verbose --runtime podman --ci-cmd "bundlecraft fetch --verbose --bundle-config-file ci-test-vault.yaml --json" || { echo "Vault CI command failed"; exit 1; }
       - name: Verify Vault fetch outputs
         run: |
           echo "Checking staged outputs:"
-          test -f sources/fetched/ci/ci-vault-test/from_vault.pem || { echo "❌ Missing from_vault.pem"; exit 1; }
-          test -f sources/fetched/ci/ci-vault-test/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
+          test -f sources/staged/ci-vault-test/from_vault/from_vault.pem || { echo "❌ Missing from_vault.pem"; exit 1; }
+          test -f sources/staged/ci-vault-test/from_vault/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
           echo "✅ Vault fetch successful"
       - name: Upload Vault job artifacts
         if: always()
@@ -62,7 +62,7 @@ jobs:
         with:
           name: vault-fetch-artifacts
           path: |
-            sources/fetched/ci/ci-vault-test/**
+            sources/staged/ci-vault-test/**
             local_vault/**
             local_vault_artifacts/**
             ci-test-vault.yaml
@@ -98,8 +98,8 @@ jobs:
           cp "$DATA_DIR/server.crt" ci-http-test/ca.crt
           CA_FILE="$(pwd)/ci-http-test/ca.crt"
           cat > ci-test-http.yaml <<YAML
-          id: ci-http-test
-          include: []
+          bundle_name: ci-http-test
+          description: CI test bundle for HTTPS fetcher with TLS pinning
           fetch:
             - name: from_https
               type: url
@@ -110,12 +110,12 @@ jobs:
           echo "Generated ci-test-http.yaml with CA trust"
       - name: Run HTTP fetch with pinning
         run: |
-          bundlecraft fetch --verbose --config-file ci-test-http.yaml
+          bundlecraft fetch --verbose --bundle-config-file ci-test-http.yaml --json
       - name: Verify HTTP fetch outputs
         run: |
           echo "Checking staged outputs:"
-          test -f sources/fetched/ci/ci-http-test/from_https.pem || { echo "❌ Missing from_https.pem"; exit 1; }
-          test -f sources/fetched/ci/ci-http-test/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
+          test -f sources/staged/ci-http-test/from_https/from_https.pem || { echo "❌ Missing from_https.pem"; exit 1; }
+          test -f sources/staged/ci-http-test/from_https/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
           echo "✅ HTTP fetch with pinning successful"
       - name: HTTP job summary
         run: |
@@ -128,7 +128,7 @@ jobs:
         with:
           name: http-fetch-artifacts
           path: |
-            sources/fetched/ci/ci-http-test/**
+            sources/staged/ci-http-test/**
             ci-http-test/**
             ci-test-http.yaml
       - name: Cleanup
@@ -175,8 +175,8 @@ jobs:
           cp "$DATA_DIR/server.crt" ci-api-test/api.crt
           CA_FILE="$(pwd)/ci-api-test/api.crt"
           cat > ci-test-api.yaml <<YAML
-          id: ci-api-test
-          include: []
+          bundle_name: ci-api-test
+          description: CI test bundle for API fetcher (Keyfactor mock)
           fetch:
             - name: from_keyfactor_mock
               type: api
@@ -193,16 +193,12 @@ jobs:
         run: |
           if [ -z "${KEYFACTOR_TOKEN:-}" ]; then KEYFACTOR_TOKEN=mock-token-12345; fi
           export KEYFACTOR_TOKEN
-          if [ -z "${KEYFACTOR_TOKEN:-}" ]; then
-            echo "❌ Missing KEYFACTOR_TOKEN (set repository secret)" >&2
-            exit 2
-          fi
-          bundlecraft fetch --verbose --config-file ci-test-api.yaml
+          bundlecraft fetch --verbose --bundle-config-file ci-test-api.yaml --json
       - name: Verify API fetch outputs
         run: |-
           echo "Checking staged outputs:"
-          test -f sources/fetched/ci/ci-api-test/from_keyfactor_mock.pem || { echo "❌ Missing from_keyfactor_mock.pem"; exit 1; }
-          test -f sources/fetched/ci/ci-api-test/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
+          test -f sources/staged/ci-api-test/from_keyfactor_mock/from_keyfactor_mock.pem || { echo "❌ Missing from_keyfactor_mock.pem"; exit 1; }
+          test -f sources/staged/ci-api-test/from_keyfactor_mock/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
           echo "✅ API fetch (Keyfactor mock) successful"
       - name: API job summary
         run: |
@@ -215,7 +211,7 @@ jobs:
         with:
           name: api-fetch-artifacts
           path: |
-            sources/fetched/ci/ci-api-test/**
+            sources/staged/ci-api-test/**
             ci-api-test/**
             ci-test-api.yaml
       - name: Cleanup

@@ -68,6 +68,12 @@ def convert_to_formats(
                 continue
             if out_path.exists() and not fmt_overrides.get("force", False):
                 raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
+            # Proactively remove when forcing to avoid partial/append behaviors
+            if out_path.exists() and fmt_overrides.get("force", False):
+                try:
+                    out_path.unlink()
+                except Exception:
+                    pass
             out_path.write_text(
                 pem_path.read_text(encoding="utf-8", errors="ignore"), encoding="utf-8"
             )
@@ -119,9 +125,19 @@ def convert_to_formats(
 
 def create_zip(pem_path: Path, build_root: Path, output_basename: str, force: bool = False):
     """
-    Create a tarball (zip) containing each certificate as an individual PEM file.
+    Create a deterministic tarball (zip) containing each certificate as an individual PEM file.
     Filenames: {subject.CN}-{thumbprint}.pem
+
+    Creates a deterministic archive with:
+    - mtime=0 (epoch time)
+    - uid=0, gid=0
+    - uname='', gname=''
+    - Sorted entries for consistent ordering
+    - gzip mtime=0 for deterministic compression
     """
+    import gzip
+    import io
+
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
 
@@ -134,22 +150,50 @@ def create_zip(pem_path: Path, build_root: Path, output_basename: str, force: bo
     tar_path = build_root / f"{output_basename}.tar.gz"
     if tar_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {tar_path}. Use --force to overwrite.")
-    with tarfile.open(tar_path, "w:gz") as tar:
-        for blk in blocks:
-            cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
-            cn = _get_cn(cert)
-            # Use SHA256 thumbprint for uniqueness
-            from cryptography.hazmat.primitives import hashes
 
-            thumb = cert.fingerprint(hashes.SHA256()).hex()[:16]
-            safe_cn = _sanitize_alias(cn)
-            fname = f"{safe_cn}-{thumb}.pem"
+    # Collect all certificate data first, sorted by filename for determinism
+    cert_files = []
+    for blk in blocks:
+        cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
+        cn = _get_cn(cert)
+        # Use SHA256 thumbprint for uniqueness
+        from cryptography.hazmat.primitives import hashes
+
+        thumb = cert.fingerprint(hashes.SHA256()).hex()[:16]
+        safe_cn = _sanitize_alias(cn)
+        fname = f"{safe_cn}-{thumb}.pem"
+        cert_files.append((fname, blk))
+
+    # Sort by filename for deterministic ordering
+    cert_files.sort(key=lambda x: x[0])
+
+    # Create tar in memory first
+    tar_buffer = io.BytesIO()
+    with tarfile.open(fileobj=tar_buffer, mode="w", format=tarfile.PAX_FORMAT) as tar:
+        for fname, blk in cert_files:
             # Write PEM to temp file for tar
             with tempfile.NamedTemporaryFile("w+", delete=False) as tmp:
                 tmp.write(blk)
                 tmp.flush()
-                tar.add(tmp.name, arcname=fname)
+
+                # Create TarInfo with normalized metadata for determinism
+                tarinfo = tar.gettarinfo(tmp.name, arcname=fname)
+                tarinfo.mtime = 0  # Epoch time for determinism
+                tarinfo.uid = 0
+                tarinfo.gid = 0
+                tarinfo.uname = ""
+                tarinfo.gname = ""
+
+                # Add file with normalized metadata
+                with open(tmp.name, "rb") as f:
+                    tar.addfile(tarinfo, f)
             os.unlink(tmp.name)
+
+    # Write compressed tar with mtime=0 for gzip determinism
+    tar_buffer.seek(0)
+    with gzip.GzipFile(filename="", fileobj=open(tar_path, "wb"), mode="wb", mtime=0) as gz:
+        gz.write(tar_buffer.read())
+
     print(f"[INFO] Created ZIP tarball: {tar_path}")
 
 
@@ -246,6 +290,11 @@ def create_p7b(pem_path: Path, build_root: Path, output_basename: str, force: bo
     out_path = build_root / f"{output_basename}.p7b"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
+    if out_path.exists() and force:
+        try:
+            out_path.unlink()
+        except Exception:
+            pass
 
     text = pem_path.read_text(encoding="utf-8", errors="ignore")
     blocks = _split_pem_blocks(text)
@@ -300,6 +349,11 @@ def create_jks(
     out_path = build_root / f"{output_basename}.jks"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
+    if out_path.exists() and force:
+        try:
+            out_path.unlink()
+        except Exception:
+            pass
 
     text = pem_path.read_text(encoding="utf-8", errors="ignore")
     blocks = _split_pem_blocks(text)
@@ -340,10 +394,12 @@ def create_jks(
                     "-storepass",
                     storepass,
                 ]
-                subprocess.run(cmd, check=True)
-                print(f"[INFO] Imported cert {idx}: {alias}")
+                # Capture keytool output to suppress its generic message
+                subprocess.run(cmd, check=True, capture_output=True, text=True)
+                # Print our own formatted message with the cert alias
+                print(f"  [JKS] ✓ Imported: {alias}")
             except Exception as e:
-                print(f"[ERROR] Failed to import cert {idx}: {e}")
+                print(f"  [JKS] ✗ Failed to import cert {idx}: {e}")
 
     print(f"[INFO] Created JKS: {out_path}")
 
@@ -370,6 +426,11 @@ def create_pkcs12(
     out_path = build_root / f"{output_basename}.p12"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
+    if out_path.exists() and force:
+        try:
+            out_path.unlink()
+        except Exception:
+            pass
 
     text = pem_path.read_text(encoding="utf-8", errors="ignore")
     blocks = _split_pem_blocks(text)

@@ -10,6 +10,7 @@ dependencies = [
   "cryptography>=42.0",
   "pyOpenSSL>=23.0",
   "PyYAML>=6.0",
+  "pydantic>=2.0",
 ]
 
 [project.optional-dependencies]

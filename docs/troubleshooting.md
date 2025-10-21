@@ -52,6 +52,96 @@ This guide covers common issues, root causes, and quick fixes when using the Fet
 
 ---
 
+## YAML schema/validation failures
+
+When a config file doesn't meet the schema, BundleCraft shows a Pydantic error with the exact location and reason. Here's how to read and fix them quickly.
+
+### What the error looks like
+
+```
+[ERROR] Fetch failed: Config validation failed for /path/to/config/bundles/test-bundle.yaml:
+1 validation error for BundleConfig
+fetch.0.url
+  Value error, Only HTTPS URLs are allowed for security. Use https:// or file:// schemes.
+```
+
+### How to navigate and resolve
+
+1) Identify the file
+- The path after "for" is the config with the problem.
+
+2) Identify the section and field
+- The line like `fetch.0.url` means: in the `fetch` list, the first element (index 0), field `url`.
+- Other examples:
+  - `repo.1.include.0` → repo[1] include list, first item
+  - `targets` → the whole targets structure is invalid or empty
+  - `metadata.policy_version` → wrong type/value under metadata
+
+3) Apply the fix (common cases)
+- Insecure HTTP URL
+  - Symptom: `Only HTTPS URLs are allowed for security`
+  - Fix: Use `https://` (or `file://` for local), exception for `http://localhost`.
+
+- Missing required field for fetch type
+  - Symptom: `'url' is required for fetch type 'url'` (or `'endpoint' ...`, `'mount' and 'path' ...`)
+  - Fix: Provide the required fields for the specified `type`.
+
+- Duplicate or reserved names
+  - Symptom: `Duplicate repo names found: X` or `'<name>' is a reserved name`
+  - Fix: Make names unique and avoid reserved: `include`, `exclude`, `fetch`, `repo`.
+
+- Empty/invalid targets in craft
+  - Symptom: `Craft must have at least one target defined` or
+    `At least one of 'includes', 'include_bundles', or 'compose' must be provided`
+  - Fix: Add at least one include list to each target.
+
+- Inline include mappings
+  - Symptom: `Include dict must have either 'inline' or 'path' key`
+  - Fix: Use a string path, `{ path: ... }`, or `{ inline: <PEM>, name?: <file> }`.
+
+- Numeric metadata fields
+  - Symptom: `metadata.policy_version: Input should be a valid string`
+  - Fix: Allowed now; numeric values are auto-converted to strings by the schema.
+
+### Quick commands while iterating
+
+Validate a single file quickly:
+
+```bash
+# Bundle
+python3 - <<'PY'
+from pathlib import Path
+from bundlecraft.helpers.utils import load_yaml
+from bundlecraft.helpers.config_schema import validate_bundle_config
+load_yaml(Path('config/bundles/example-bundle.yaml'), validate=validate_bundle_config)
+print('OK')
+PY
+
+# Craft
+python3 - <<'PY'
+from pathlib import Path
+from bundlecraft.helpers.utils import load_yaml
+from bundlecraft.helpers.config_schema import validate_craft_config
+load_yaml(Path('config/crafts/example-craft.yaml'), validate=validate_craft_config)
+print('OK')
+PY
+```
+
+Run a focused test and see the exact error text:
+
+```bash
+python3 -m pytest tests/test_config_validation.py::TestBundleConfigValidation::test_insecure_http_url -q
+```
+
+### Migration tips
+
+- Prefer the `repo:` structure for includes; the legacy top-level `include`/`exclude` still works but is discouraged.
+- Vault configs use `mount`, not `mount_point`.
+- API endpoints must be HTTPS (`endpoint:`), like URL fetchers.
+- Keep `bundle_name`/`description` (bundle) and `name`/`description` (craft) non-empty.
+
+---
+
 ## Verify issues
 
 - Expired certificates
@@ -87,3 +177,74 @@ This guide covers common issues, root causes, and quick fixes when using the Fet
 - Run with --help on each subcommand
 - Check docs in docs/ and bundlecraft/README.md
 - Open an issue with logs, config snippets (redact secrets), and your environment details
+
+---
+
+## Pytest failures: quick navigation
+
+When a test fails, start by re-running just that test with more context.
+
+- Show one test's full traceback and logs:
+
+```bash
+python3 -m pytest tests/test_fetch.py::TestFetch::test_fetch_no_section -vv -s
+```
+
+- Hide tracebacks for a cleaner summary (good for scanning):
+
+```bash
+python3 -m pytest -q --tb=line
+```
+
+- Re-run only previously failed tests:
+
+```bash
+python3 -m pytest --lf -q
+```
+
+- Stop on first failure to iterate faster:
+
+```bash
+python3 -m pytest -x -q
+```
+
+- Print local variables in tracebacks:
+
+```bash
+python3 -m pytest -vv --showlocals
+```
+
+Tip: For YAML/schema errors, see the section above: "YAML schema/validation failures".
+
+---
+
+## pre-commit failures: common hooks and fixes
+
+This repo typically uses hooks like formatting, linting, and basic markdown checks. If a commit is blocked:
+
+- See what failed and why:
+
+```bash
+pre-commit run --all-files
+```
+
+- Auto-fix (most hooks will rewrite files):
+
+```bash
+pre-commit run --all-files --hook-stage manual
+```
+
+Common issues:
+
+- Import sort / formatting (Python)
+  - Symptom: "Import block is un-sorted or un-formatted"
+  - Fix: Let the hook auto-fix, or run your formatter (e.g., ruff/black/isort) locally.
+
+- Markdown lint
+  - Symptom: Duplicate headings, missing language identifiers, bare URLs, or blanks around lists.
+  - Fix: Adjust headings, add language after ``` fences (e.g., ```bash), wrap bare URLs in <...>, ensure blank lines around lists/headers.
+
+- Trailing whitespace / EOF newline
+  - Fix: Let hooks auto-fix or configure your editor to trim trailing spaces and add final newline.
+
+Bypass (not recommended): use `--no-verify` on `git commit` if you're in a pinch. Prefer fixing to keep CI green.
