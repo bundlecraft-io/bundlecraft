@@ -524,14 +524,38 @@ jobs:
             - Additional formats when configured (.p7b, .p12, .jks)
             - checksums.sha256
             - manifest.json
+            - sbom.json (Software Bill of Materials in CycloneDX format)
 
             ### Verification Instructions
+            
+            **Verify GPG signature:**
             ```bash
-            curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
+            # Download and import the public GPG key
+            curl -O https://raw.githubusercontent.com/chrisjpich/pki-ca-trust/main/docs/public-gpg-key.asc
             gpg --import public-gpg-key.asc
+            
+            # Verify the signature
             gpg --verify bundlecraft-trust.tar.gz.asc bundlecraft-trust.tar.gz
             ```
-            If you do not see 'Good signature', the artifact may be tampered with.
+            ✅ If you see 'Good signature', the artifact is authentic and untampered.
+            ❌ If verification fails, do not use the artifact.
+            
+            **Verify using BundleCraft CLI:**
+            ```bash
+            # Verify all signatures in a bundle directory
+            bundlecraft verify --target <bundle-dir> --verify-signatures
+            
+            # Or with a specific keyring
+            bundlecraft verify --target <bundle-dir> \
+              --verify-signatures --gpg-keyring public-gpg-key.asc
+            ```
+            
+            **SBOM (Software Bill of Materials):**
+            Each bundle includes an sbom.json file containing:
+            - Certificate metadata (serial, issuer, subject, fingerprints)
+            - Fetch provenance (source URLs, verification hashes)
+            - Tooling metadata (Python version, cryptography version)
+            - Build metadata (craft, target, timestamp)
 
             ### Consumers: quick start
             Per-craft/bundle archive (recommended for targeted usage):
@@ -600,6 +624,14 @@ jobs:
             - Additional formats when configured (.p7b, .p12, .jks)
             - checksums.sha256
             - manifest.json
+            - sbom.json (Software Bill of Materials in CycloneDX format)
+
+            ### SBOM (Software Bill of Materials)
+            Each bundle includes an sbom.json file in CycloneDX format containing:
+            - Certificate metadata (serial, issuer, subject, fingerprints)
+            - Fetch provenance (source URLs, verification hashes)
+            - Tooling metadata (Python version, cryptography version)
+            - Build metadata (craft, target, timestamp)
 
             ### Consumers: quick start
             Per-craft-target bundle (recommended for targeted usage):
