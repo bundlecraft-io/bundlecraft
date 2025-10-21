@@ -54,7 +54,7 @@ fetch:
     token_ref: PARTNER_API_TOKEN  # Read from environment variable
     # Optional: Override fetch retry/timeout settings for slow APIs
     timeout: 90  # Increase timeout for slower API (default: 30s)
-    retries: 5   # More aggressive retries for flaky endpoint (default: 3)
+    retries: 5  # More aggressive retries for flaky endpoint (default: 3)
     verify:
       ca_file: sources/partner-ca.pem  # Custom CA for TLS verification
       tls_fingerprint_sha256: <leaf_cert_pin>  # Pin leaf certificate
@@ -76,7 +76,7 @@ fetch:
 # Metadata
 # ---------------------------------------------------------------------
 metadata:
-  owner: pki-team@example.com
+  owner: pki-team@bundlecraft.io
   purpose: Example demonstrating all bundle configuration options
   change_control: CAB-2025-001  # Optional audit tracking
   upstream: https://internal.example.com/pki/docs

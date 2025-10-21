@@ -50,7 +50,7 @@ format_overrides:
 # Optional metadata
 # ---------------------------------------------------------------------
 metadata:
-  maintainer: pki-team@example.com  # Default contact for repository maintainers
+  maintainer: pki-team@bundlecraft.io  # Default contact for repository maintainers
   policy_version: 1.0  # Schema version tracking for config evolution
 # ---------------------------------------------------------------------
 # Craft composition guidance (craft files)

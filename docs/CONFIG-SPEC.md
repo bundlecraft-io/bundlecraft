@@ -187,7 +187,7 @@ These settings can be configured globally in `config/defaults.yaml` under the `f
 
 ```yaml
 metadata:
-  owner: security-team@example.com
+  owner: security-team@bundlecraft.io
   purpose: Internal PKI trust anchors
   change_control: CAB-2025-001
   tags: [internal, production]
@@ -207,7 +207,7 @@ include:
 exclude: []
 
 metadata:
-  owner: pki-team@example.com
+  owner: pki-team@bundlecraft.io
   purpose: Internal service mesh authentication
   tags: [internal, ca-bundle]
 ```
@@ -291,17 +291,17 @@ output_metadata:
     # Static annotations
     argocd.argoproj.io/sync-wave: "1"
     kustomize.toolkit.fluxcd.io/prune: "true"
-    
+
     # Dynamic annotations with template variables
     build-timestamp: "{{timestamp}}"
     bundle-version: "{{bundle}}-{{env}}-{{date}}"
     git-commit: "{{git_commit}}"
-    
+
   labels:
     # Static labels
     app.kubernetes.io/component: "trust-bundle"
     app.kubernetes.io/managed-by: "bundlecraft"
-    
+
     # Dynamic labels with template variables
     environment: "{{env}}"
     bundle-id: "{{bundle}}"
@@ -364,6 +364,7 @@ labels:
 - **Kubernetes Labels**: Organize and select resources with standard labels
 - **Versioning**: Track bundle versions with dynamic template variables
 - **Traceability**: Link builds to git commits for audit trails
+
 ```
 
 ### Distribution Metadata (for CI/CD pipeline use only)
@@ -530,7 +531,7 @@ format_overrides:
     filename: default-ca-bundle.p12
 
 metadata:
-  maintainer: pki-team@example.com
+  maintainer: pki-team@bundlecraft.io
   policy_version: 1.0
 ```
 
@@ -603,23 +604,6 @@ Supported values for `distribution_metadata.targets[].type`:
 
 ---
 
-## Migration Guide
-
-### Moving from old configs
-
-**Bundle configs:**
-
-- ✅ Keep: `include`, `exclude`, `fetch`, `metadata`
-- ❌ Remove: `output_formats`, `verify`, `pem`, `filters`, `format_overrides`, `package`
-
-**Craft configs:**
-
-- ✅ Keep: `targets`, `output_formats`, `verify`, `filters`, `format_overrides`
-- ✅ Add: `distribution` section with targets and tags
-- ❌ Remove: `include`, `exclude`, `fetch` (belongs in bundles)
-
----
-
 ## Reserved Fields
 
 - `bundle_cfg.package`: reserved (may be used for bundle-level compression hints)
@@ -633,6 +617,7 @@ Supported values for `distribution_metadata.targets[].type`:
 BundleCraft uses Pydantic v2 for comprehensive configuration validation. All configs are validated at load time with clear error messages.
 
 For step-by-step guidance on interpreting and fixing validation errors (plus pytest and pre-commit tips), see:
+
 - docs/troubleshooting.md → YAML schema/validation failures
 - docs/troubleshooting.md → Pytest failures: quick navigation
 - docs/troubleshooting.md → pre-commit failures: common hooks and fixes
@@ -640,68 +625,83 @@ For step-by-step guidance on interpreting and fixing validation errors (plus pyt
 ### Required Fields
 
 **Bundle Configs:**
+
 - `bundle_name` (string, non-empty) - Unique identifier for the bundle
 - `description` (string, non-empty) - Human-readable purpose/context
 - At least one of: `repo[]` or `fetch[]` - Must define at least one certificate source
 
 **Craft Configs:**
+
 - `name` (string, non-empty) - Display name for the craft
 - `description` (string, non-empty) - Human-readable purpose/context
 - `targets` (dict or list, non-empty) - At least one build target required
 
 **Defaults Config:**
+
 - No strictly required fields (all have sensible defaults)
 
 ### Value Constraints
 
 **Output Formats:**
+
 - Valid values: `pem`, `p7b`, `jks`, `p12`, `pkcs12`, `der`
 - Invalid formats trigger a clear error with the list of valid options
 
 **Key Size Requirements (Security):**
+
 - RSA keys: minimum 1024 bits (configurable via `filters.minimum_key_size_rsa`)
 - ECC keys: minimum 192 bits (configurable via `filters.minimum_key_size_ecc`)
 
 **Expiry Warnings:**
+
 - `warn_days_before_expiry`: must be between 0 and 365 days
 
 **URL Security:**
+
 - Only `https://` and `file://` URLs are allowed (enforced for `fetch[].url` and `fetch[].endpoint`)
 - Exception: `http://localhost` and `http://127.0.0.1` are permitted for local development
 - Insecure HTTP URLs trigger: `"Only HTTPS URLs are allowed for security"`
 
 **Reserved Names:**
+
 - The following names are reserved and cannot be used for bundle names, repo names, or fetch names:
   - `include`, `exclude`, `fetch`, `repo`
 - Using a reserved name triggers: `"'<name>' is a reserved name and cannot be used"`
 
 **Name Uniqueness:**
+
 - All `repo[].name` values must be unique within a bundle
 - All `fetch[].name` values must be unique within a bundle
 - No `repo[].name` can conflict with any `fetch[].name` in the same bundle
 
 **Type-Specific Requirements:**
+
 - `fetch[].type: url` → requires `url` field
 - `fetch[].type: vault` → requires both `mount` and `path` fields
 - `fetch[].type: api` → requires `endpoint` field
 
 **Target Requirements:**
+
 - Each target in `targets` must have at least one of: `includes`, `include_bundles`, or `compose`
 - Empty targets trigger: `"At least one of 'includes', 'include_bundles', or 'compose' must be provided"`
 
 **Inline PEM Entries:**
+
 - Dictionary entries in `repo[].include[]` must have either `inline` or `path` key
 - Invalid: `{"invalid_key": "value"}` → triggers error
 
 ### Common Validation Errors
 
 **Error: Missing required field**
+
 ```
 1 validation error for BundleConfig
 bundle_name
   Field required [type=missing, input_value={...}, input_type=dict]
 ```
+
 **Fix:** Add the required field:
+
 ```yaml
 bundle_name: my-bundle
 description: My bundle description
@@ -710,12 +710,15 @@ description: My bundle description
 ---
 
 **Error: Empty string**
+
 ```
 1 validation error for BundleConfig
 description
   String should have at least 1 character [type=string_too_short, input_value='', input_type=str]
 ```
+
 **Fix:** Provide a non-empty value:
+
 ```yaml
 description: Internal CA roots for production
 ```
@@ -723,12 +726,15 @@ description: Internal CA roots for production
 ---
 
 **Error: Invalid output format**
+
 ```
 1 validation error for CraftConfig
 output_formats
   Value error, Invalid output format 'jsk'. Valid formats: der, jks, p12, p7b, pem, pkcs12
 ```
+
 **Fix:** Use a valid format name:
+
 ```yaml
 output_formats: [pem, jks, p7b, p12]  # Fixed: jsk → jks
 ```
@@ -736,12 +742,15 @@ output_formats: [pem, jks, p7b, p12]  # Fixed: jsk → jks
 ---
 
 **Error: Insecure HTTP URL**
+
 ```
 1 validation error for BundleConfig
 fetch.0.url
   Value error, Only HTTPS URLs are allowed for security. Use https:// or file:// schemes.
 ```
+
 **Fix:** Use HTTPS or file:// URLs:
+
 ```yaml
 fetch:
   - name: mozilla_roots
@@ -752,12 +761,15 @@ fetch:
 ---
 
 **Error: Reserved name**
+
 ```
 1 validation error for BundleConfig
 bundle_name
   Value error, 'fetch' is a reserved bundle name
 ```
+
 **Fix:** Use a different name:
+
 ```yaml
 bundle_name: mozilla-fetch  # Changed from 'fetch'
 ```
@@ -765,11 +777,14 @@ bundle_name: mozilla-fetch  # Changed from 'fetch'
 ---
 
 **Error: Duplicate names**
+
 ```
 1 validation error for BundleConfig
   Value error, Duplicate repo names found: internal
 ```
+
 **Fix:** Ensure all repo and fetch names are unique:
+
 ```yaml
 repo:
   - name: internal-roots
@@ -781,11 +796,14 @@ repo:
 ---
 
 **Error: No sources defined**
+
 ```
 1 validation error for BundleConfig
   Value error, Bundle must have at least one 'repo' or 'fetch' entry
 ```
+
 **Fix:** Add at least one source:
+
 ```yaml
 repo:
   - name: local
@@ -795,12 +813,15 @@ repo:
 ---
 
 **Error: Missing type-specific field**
+
 ```
 1 validation error for BundleConfig
 fetch.0
   Value error, 'url' is required for fetch type 'url'
 ```
+
 **Fix:** Add the required field for the fetch type:
+
 ```yaml
 fetch:
   - name: mozilla
@@ -811,12 +832,15 @@ fetch:
 ---
 
 **Error: Key size too small**
+
 ```
 1 validation error for DefaultsConfig
 filters.minimum_key_size_rsa
   Value error, RSA key size must be at least 1024 bits for security
 ```
+
 **Fix:** Use minimum required key sizes:
+
 ```yaml
 filters:
   minimum_key_size_rsa: 2048  # Changed from 512
@@ -826,6 +850,7 @@ filters:
 ---
 
 **Error: Numeric policy_version**
+
 ```
 # This is automatically handled - no error!
 # The validator converts numeric versions to strings:
@@ -847,6 +872,7 @@ metadata:
 ### Testing
 
 Comprehensive validation tests are located in `tests/test_config_validation.py` with 30+ test cases covering:
+
 - Missing required fields
 - Empty values
 - Invalid formats
