@@ -168,7 +168,7 @@ def get_fetch_config(
     # Apply source-specific overrides
     if source_config:
         for key in ["timeout", "retries", "backoff_factor", "retry_on_status"]:
-            if key in source_config:
+            if key in source_config and source_config[key] is not None:
                 config[key] = source_config[key]
 
     return config
