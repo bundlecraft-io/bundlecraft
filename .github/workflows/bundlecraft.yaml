@@ -218,7 +218,18 @@ jobs:
               bundle="${BASH_REMATCH[2]}"
               dest="pki-ca-trust/${env}/${bundle}"
               mkdir -p "$dest"
-              cp -R "${artifact_dir}/"* "$dest"/ || true
+              # Determine actual source directory inside the artifact
+              shopt -s nullglob
+              C_SRC=("${artifact_dir}"/*/"${bundle}")
+              shopt -u nullglob
+              if [ ${#C_SRC[@]} -gt 0 ] && [ -d "${C_SRC[0]}" ]; then
+                src_dir="${C_SRC[0]}"
+                echo "  Detected nested layout; copying from: $src_dir"
+                cp -R "${src_dir}/"* "$dest"/ || true
+              else
+                echo "  Using artifact root as source"
+                cp -R "${artifact_dir}/"* "$dest"/ || true
+              fi
               echo "  ✓ Rehydrated: $base -> $dest"
               ((artifact_count++))
             else
