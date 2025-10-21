@@ -508,6 +508,26 @@ def _fetch_each_to_named_dirs(
         name = src.get("name") or f"fetched-{idx}"
         if name_filter and name != name_filter:
             continue
+
+        if dry_run:
+            ftype = (src.get("type") or "url").lower()
+            logger.info(f"[dry-run] Would fetch: {name} (type: {ftype})")
+            if ftype == "url":
+                url = src.get("url")
+                logger.info(f"[dry-run]   from URL: {url}")
+            elif ftype == "api":
+                endpoint = src.get("endpoint") or src.get("url")
+                provider = src.get("provider") or "generic"
+                logger.info(f"[dry-run]   from API: {endpoint} (provider: {provider})")
+            elif ftype == "vault":
+                mount_point = (
+                    src.get("mount_point") or src.get("mount") or src.get("engine") or "secret"
+                )
+                path = src.get("path")
+                logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
+            logger.info(f"[dry-run]   to directory: {staging_root / name}")
+            continue
+
         subdir = staging_root / name
         ensure_dir(subdir)
         try:
@@ -586,15 +606,15 @@ def main(
     Use --dry-run to preview what would be fetched without making any changes.
     """
     json_errors = []
-    fetched_count = 0
     local_count = 0
-    total_files = 0
-    
+
     if not json_output:
         click.secho("\n🔐 BundleCraft Fetcher\n----------------------", fg="cyan")
 
         if dry_run:
-            click.secho("[DRY RUN MODE] No files will be fetched or copied\n", fg="yellow", bold=True)
+            click.secho(
+                "[DRY RUN MODE] No files will be fetched or copied\n", fg="yellow", bold=True
+            )
 
     # Set logging level based on verbose flag
     if not json_output:
@@ -638,51 +658,49 @@ def main(
             staged_paths += local_paths
             local_count = len(local_paths)
 
-        if dry_run:
-            # In dry-run, just show what would be fetched
-            if not json_output:
-                for entry in fetch_cfg:
-                    name = entry.get("name") or "unnamed"
-                    ftype = entry.get("type") or "http"
-                    if not fetch_name or name == fetch_name:
-                        logger.info(f"[dry-run] Would fetch: {name} (type: {ftype})")
-            fetched_count = len([e for e in fetch_cfg if not fetch_name or e.get("name") == fetch_name])
-        else:
-            fetched_paths = _fetch_each_to_named_dirs(
-                fetch_cfg, staging_root, root, verbose, fetch_name, dry_run
-            )
-            staged_paths += fetched_paths
-            fetched_count = len(fetch_cfg)
+        # Fetch remote sources
+        staged_paths += _fetch_each_to_named_dirs(
+            fetch_cfg, staging_root, root, verbose, fetch_name, dry_run
+        )
 
-            # Summarize directory structure and counts
-            if not dry_run and staging_root.exists():
+        # Summarize directory structure and counts
+        if not dry_run and staging_root.exists():
+            if not json_output:
+                click.secho("\n[SUMMARY] Staged artifacts:", fg="blue")
+            total = 0
+            for sub in sorted(staging_root.iterdir()):
+                if not sub.is_dir():
+                    continue
+                files = [p for p in sorted(sub.rglob("*")) if p.is_file()]
+                count = len(files)
+                total += count
                 if not json_output:
-                    click.secho("\n[SUMMARY] Staged artifacts:", fg="blue")
-                for sub in sorted(staging_root.iterdir()):
-                    if not sub.is_dir():
-                        continue
-                    files = [p for p in sorted(sub.rglob("*")) if p.is_file()]
-                    count = len(files)
-                    total_files += count
-                    if not json_output:
-                        click.secho(f"  - {sub.name}/ : {count} file(s)", fg="blue")
-                if not json_output:
-                    click.secho(f"  Total: {total_files} file(s)\n", fg="blue")
-            elif dry_run and not json_output:
-                click.secho("\n[SUMMARY] [dry-run] Would stage artifacts to:", fg="yellow")
-                click.secho(f"  {staging_root}\n", fg="yellow")
+                    click.secho(f"  - {sub.name}/ : {count} file(s)", fg="blue")
+            if not json_output:
+                click.secho(f"  Total: {total} file(s)\n", fg="blue")
+        elif dry_run and not json_output:
+            click.secho("\n[SUMMARY] [dry-run] Would stage artifacts to:", fg="yellow")
+            click.secho(f"  {staging_root}", fg="yellow")
+            if not no_clean:
+                click.secho(
+                    "  [dry-run] Would clean staging directory before fetching", fg="yellow"
+                )
+            click.secho("", fg="yellow")  # Empty line for formatting
 
         if json_output:
             from bundlecraft.helpers.json_output import create_fetch_response, emit_json
-            emit_json(create_fetch_response(
-                success=True,
-                bundle_name=bundle_name,
-                staging_path=str(staging_root),
-                fetched_sources=fetched_count,
-                local_sources=local_count,
-                total_files=total_files,
-                dry_run=dry_run
-            ))
+
+            emit_json(
+                create_fetch_response(
+                    success=True,
+                    bundle_name=bundle_name,
+                    staging_path=str(staging_root),
+                    fetched_sources=len(fetch_cfg),
+                    local_sources=local_count if not fetch_only else 0,
+                    total_files=len(staged_paths),
+                    dry_run=dry_run,
+                )
+            )
         else:
             if dry_run:
                 click.secho("[SUCCESS] [dry-run] Fetch simulation completed.", fg="yellow")
@@ -694,12 +712,12 @@ def main(
         if json_output:
             json_errors.append(error_msg)
             from bundlecraft.helpers.json_output import create_fetch_response, emit_json
-            emit_json(create_fetch_response(
-                success=False,
-                bundle_name="",
-                staging_path="",
-                errors=json_errors
-            ))
+
+            emit_json(
+                create_fetch_response(
+                    success=False, bundle_name="", staging_path="", errors=json_errors
+                )
+            )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
         sys.exit(2)
@@ -708,12 +726,12 @@ def main(
         if json_output:
             json_errors.append(error_msg)
             from bundlecraft.helpers.json_output import create_fetch_response, emit_json
-            emit_json(create_fetch_response(
-                success=False,
-                bundle_name="",
-                staging_path="",
-                errors=json_errors
-            ))
+
+            emit_json(
+                create_fetch_response(
+                    success=False, bundle_name="", staging_path="", errors=json_errors
+                )
+            )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
         sys.exit(2)

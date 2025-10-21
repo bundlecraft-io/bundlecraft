@@ -130,7 +130,7 @@ def main(
     """
     json_errors = []
     cert_count = 0
-    
+
     if not json_output:
         click.secho("\n🔐 BundleCraft Converter\n---------------------------", fg="cyan")
 
@@ -145,13 +145,16 @@ def main(
         if json_output:
             json_errors.append(error_msg)
             from bundlecraft.helpers.json_output import create_convert_response, emit_json
-            emit_json(create_convert_response(
-                success=False,
-                input_path="",
-                output_dir="",
-                output_format=output_format,
-                errors=json_errors
-            ))
+
+            emit_json(
+                create_convert_response(
+                    success=False,
+                    input_path="",
+                    output_dir="",
+                    output_format=output_format,
+                    errors=json_errors,
+                )
+            )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
         sys.exit(2)
@@ -165,18 +168,21 @@ def main(
         if json_output:
             json_errors.append(error_msg)
             from bundlecraft.helpers.json_output import create_convert_response, emit_json
-            emit_json(create_convert_response(
-                success=False,
-                input_path=str(in_path),
-                output_dir=str(out_dir),
-                output_format=output_format,
-                errors=json_errors
-            ))
+
+            emit_json(
+                create_convert_response(
+                    success=False,
+                    input_path=str(in_path),
+                    output_dir=str(out_dir),
+                    output_format=output_format,
+                    errors=json_errors,
+                )
+            )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
         sys.exit(2)
 
-    if not out_dir.exists():
+    if not dry_run and not out_dir.exists():
         if not json_output:
             click.secho(f"[INFO] Creating output directory: {out_dir}", fg="yellow")
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -200,17 +206,22 @@ def main(
         "pkcs12",
         "jks",
     }:
-        error_msg = "Password required for protected input. Use env var or --password (or --prompt)."
+        error_msg = (
+            "Password required for protected input. Use env var or --password (or --prompt)."
+        )
         if json_output:
             json_errors.append(error_msg)
             from bundlecraft.helpers.json_output import create_convert_response, emit_json
-            emit_json(create_convert_response(
-                success=False,
-                input_path=str(in_path),
-                output_dir=str(out_dir),
-                output_format=output_format,
-                errors=json_errors
-            ))
+
+            emit_json(
+                create_convert_response(
+                    success=False,
+                    input_path=str(in_path),
+                    output_dir=str(out_dir),
+                    output_format=output_format,
+                    errors=json_errors,
+                )
+            )
         else:
             click.secho(
                 f"[ERROR] {error_msg}",
@@ -230,21 +241,24 @@ def main(
                 click.secho("\n[SUCCESS] [dry-run] Conversion simulation complete", fg="yellow")
             else:
                 from bundlecraft.helpers.json_output import create_convert_response, emit_json
-                emit_json(create_convert_response(
-                    success=True,
-                    input_path=str(in_path),
-                    output_dir=str(out_dir),
-                    output_format=output_format,
-                    certificate_count=0,
-                    dry_run=True
-                ))
+
+                emit_json(
+                    create_convert_response(
+                        success=True,
+                        input_path=str(in_path),
+                        output_dir=str(out_dir),
+                        output_format=output_format,
+                        certificate_count=0,
+                        dry_run=True,
+                    )
+                )
             sys.exit(0)
 
         # Suppress stdout when using JSON output
         if json_output:
             import contextlib
             import io
-            
+
             with contextlib.redirect_stdout(io.StringIO()):
                 convert_from_any(
                     in_path,
@@ -267,24 +281,28 @@ def main(
                 force=force,
                 output_basename=output_basename,
             )
-        
+
         # Count certificates in output
         # Try to read the output file to count certs
         output_file = out_dir / f"{output_basename or 'bundlecraft-ca-trust'}.{fmt}"
         if output_file.exists() and fmt == "pem":
             import re
+
             text = output_file.read_text(encoding="utf-8", errors="ignore")
             cert_count = len(re.findall(r"-----BEGIN CERTIFICATE-----", text))
-        
+
         if json_output:
             from bundlecraft.helpers.json_output import create_convert_response, emit_json
-            emit_json(create_convert_response(
-                success=True,
-                input_path=str(in_path),
-                output_dir=str(out_dir),
-                output_format=output_format,
-                certificate_count=cert_count
-            ))
+
+            emit_json(
+                create_convert_response(
+                    success=True,
+                    input_path=str(in_path),
+                    output_dir=str(out_dir),
+                    output_format=output_format,
+                    certificate_count=cert_count,
+                )
+            )
         else:
             click.secho(f"[SUCCESS] Conversion complete → {out_dir}", fg="green")
         sys.exit(0)
@@ -293,13 +311,16 @@ def main(
         if json_output:
             json_errors.append(error_msg)
             from bundlecraft.helpers.json_output import create_convert_response, emit_json
-            emit_json(create_convert_response(
-                success=False,
-                input_path=str(in_path),
-                output_dir=str(out_dir),
-                output_format=output_format,
-                errors=json_errors
-            ))
+
+            emit_json(
+                create_convert_response(
+                    success=False,
+                    input_path=str(in_path),
+                    output_dir=str(out_dir),
+                    output_format=output_format,
+                    errors=json_errors,
+                )
+            )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
         sys.exit(2)

@@ -1013,6 +1013,16 @@ def main(
         )
         for target_name, result in per_target_results.items():
             pem_blocks = result["pem_blocks"]
+            if dry_run:
+                click.secho(
+                    f"  [{target_name}] [dry-run] Would verify {len(pem_blocks)} certificate(s)",
+                    fg="yellow",
+                )
+                click.secho(
+                    f"  [{target_name}] [dry-run] Would check for expiry (fail_on_expired={fail_on_expired}, warn_days={warn_days})",
+                    fg="yellow",
+                )
+                continue
             errs, warns = _verify_certificates(pem_blocks, fail_on_expired, warn_days)
             verify_results[target_name] = {
                 "passed": len(errs) == 0,
@@ -1067,6 +1077,21 @@ def main(
             build_root = result["build_root"]
             pem_blocks = result["pem_blocks"]
             output_formats = result["output_formats"]
+
+            # Create deterministic tar package if enabled (before computing checksums)
+            if package_enabled:
+                tar_path = _create_deterministic_tar(build_root, "package")
+                # Use absolute path if outside ROOT, otherwise relative
+                try:
+                    display_path = tar_path.relative_to(ROOT)
+                except ValueError:
+                    display_path = tar_path
+                click.secho(
+                    f"  [{target_name}] ✓ Created deterministic package: {display_path}",
+                    fg="green",
+                )
+
+            # Prepare manifest object
             timestamp_utc = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             manifest_obj = {
                 "craft": env_cfg.get("name") or env,
@@ -1091,6 +1116,21 @@ def main(
                     ),
                 }
 
+            # Collect all output files except manifest.json and checksums.sha256
+            output_files = sorted(
+                [
+                    f.name
+                    for f in build_root.glob("*")
+                    if f.is_file() and f.name not in ("manifest.json", "checksums.sha256")
+                ]
+            )
+
+            # Compute checksums once for all files (including tar if created)
+            manifest_obj["files"] = [
+                {"path": fname, "sha256": sha256_file(build_root / fname)} for fname in output_files
+            ]
+
+            # Write manifest
             # Add expanded output metadata if configured
             expanded_metadata = None
             output_metadata_cfg = env_cfg.get("output_metadata")
@@ -1114,9 +1154,14 @@ def main(
             manifest_path.write_text(
                 json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
+            # Use absolute path if outside ROOT, otherwise relative
+            try:
+                display_path = manifest_path.relative_to(ROOT)
+            except ValueError:
+                display_path = manifest_path
             if not json_output:
                 click.secho(
-                    f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}",
+                    f"  [{target_name}] ✓ Wrote manifest: {display_path}",
                     fg="green",
                 )
 
