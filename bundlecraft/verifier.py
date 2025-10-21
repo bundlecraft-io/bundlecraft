@@ -340,21 +340,33 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
     else:
         ok = verify_directory(path, verbose)
     
+    # Check for missing checksums file first (for JSON error reporting)
+    checksum_path = path / CHECKSUM_FILE
+    if not checksum_path.exists():
+        error_msg = f"Missing {CHECKSUM_FILE} in {path}"
+        if not json_output:
+            logger.error(error_msg)
+        json_errors.append(error_msg)
+        ok = False
+    
     # Verify signatures if requested
     if verify_signatures:
-        logger.info("\n🔏 Verifying GPG signatures...")
+        if not json_output:
+            logger.info("\n🔏 Verifying GPG signatures...")
         from bundlecraft.helpers.signing import verify_signature
         
         sig_files = list(path.glob("*.asc"))
         if not sig_files:
-            logger.warning("⚠️  No signature files (.asc) found in directory")
+            if not json_output:
+                logger.warning("⚠️  No signature files (.asc) found in directory")
         else:
             sig_ok = True
             for sig_path in sorted(sig_files):
                 # Find corresponding file (remove .asc extension)
                 file_path = sig_path.with_suffix("")
                 if not file_path.exists():
-                    logger.warning(f"⚠️  Signed file not found: {file_path.name}")
+                    if not json_output:
+                        logger.warning(f"⚠️  Signed file not found: {file_path.name}")
                     continue
                 
                 try:
@@ -362,108 +374,105 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
                         file_path, sig_path, keyring=Path(gpg_keyring) if gpg_keyring else None
                     )
                     if valid:
-                        logger.info(f"✅ {file_path.name}: {message}")
+                        if not json_output:
+                            logger.info(f"✅ {file_path.name}: {message}")
                     else:
-                        logger.error(f"❌ {file_path.name}: {message}")
+                        if not json_output:
+                            logger.error(f"❌ {file_path.name}: {message}")
                         sig_ok = False
                 except Exception as e:
-                    logger.error(f"❌ {file_path.name}: Verification error: {e}")
+                    if not json_output:
+                        logger.error(f"❌ {file_path.name}: Verification error: {e}")
                     sig_ok = False
             
             if not sig_ok:
                 ok = False
-        # Modified verify_directory to return stats
-        checksum_path = path / CHECKSUM_FILE
-        if not checksum_path.exists():
-            error_msg = f"Missing {CHECKSUM_FILE} in {path}"
-            if not json_output:
-                logger.error(error_msg)
-            json_errors.append(error_msg)
-            ok = False
-        else:
-            checksums = load_checksums(checksum_path)
-            if not json_output:
-                logger.info(f"🔍 Starting verification for directory: {path}")
-                logger.info(f"📄 Using checksum manifest: {checksum_path.resolve()}")
+    
+    # If checksums exist, verify directory contents
+    if checksum_path.exists():
+        checksums = load_checksums(checksum_path)
+        if not json_output:
+            logger.info(f"🔍 Starting verification for directory: {path}")
+            logger.info(f"📄 Using checksum manifest: {checksum_path.resolve()}")
 
-            cert_counts = {}
+        cert_counts = {}
 
-            for file in sorted(path.iterdir()):
-                if file.is_dir():
-                    continue
-                if file.name in IGNORE_FILES:
-                    reason = (
-                        "manifest is signed separately"
-                        if file.name == MANIFEST_FILE
-                        else "non-deterministic artifact"
-                    )
-                    if not json_output:
-                        logger.info(f"⏭️  Skipping {file.name} ({reason})")
-                    skipped_count += 1
-                    continue
-                if file.name == CHECKSUM_FILE:
-                    continue
+        for file in sorted(path.iterdir()):
+            if file.is_dir():
+                continue
+            if file.name in IGNORE_FILES:
+                reason = (
+                    "manifest is signed separately"
+                    if file.name == MANIFEST_FILE
+                    else "non-deterministic artifact"
+                )
+                if not json_output:
+                    logger.info(f"⏭️  Skipping {file.name} ({reason})")
+                skipped_count += 1
+                continue
+            if file.name == CHECKSUM_FILE:
+                continue
 
-                expected = checksums.get(file.name)
-                if not expected:
-                    warn_msg = f"No checksum entry for {file.name}"
-                    if not json_output:
-                        logger.warning(f"⚠️  {warn_msg}")
-                    json_warnings.append(warn_msg)
-                    continue
+            expected = checksums.get(file.name)
+            if not expected:
+                warn_msg = f"No checksum entry for {file.name}"
+                if not json_output:
+                    logger.warning(f"⚠️  {warn_msg}")
+                json_warnings.append(warn_msg)
+                continue
 
-                actual = sha256sum(file)
-                if actual != expected:
-                    error_msg = f"{file.name}: hash mismatch (expected: {expected}, got: {actual})"
-                    if not json_output:
-                        logger.error(f"❌ {file.name}: hash mismatch!")
-                        if verbose:
-                            logger.error(f"    Expected: {expected}")
-                            logger.error(f"    Actual:   {actual}")
-                            logger.error(f"    Info: {file_info(file)}")
-                    json_errors.append(error_msg)
-                    ok = False
-                else:
-                    verified_count += 1
-                    if not json_output:
-                        logger.info(f"✅ {file.name} verified successfully.")
-                        if verbose:
-                            logger.info(f"    SHA256: {actual}")
-                            logger.info(f"    Info: {file_info(file)}")
+            actual = sha256sum(file)
+            if actual != expected:
+                error_msg = f"{file.name}: hash mismatch (expected: {expected}, got: {actual})"
+                if not json_output:
+                    logger.error(f"❌ {file.name}: hash mismatch!")
+                    if verbose:
+                        logger.error(f"    Expected: {expected}")
+                        logger.error(f"    Actual:   {actual}")
+                        logger.error(f"    Info: {file_info(file)}")
+                json_errors.append(error_msg)
+                ok = False
+            else:
+                verified_count += 1
+                if not json_output:
+                    logger.info(f"✅ {file.name} verified successfully.")
+                    if verbose:
+                        logger.info(f"    SHA256: {actual}")
+                        logger.info(f"    Info: {file_info(file)}")
 
-                count = count_certs_in_store(file)
-                if count is not None:
-                    cert_counts[file.name] = count
-                    if not json_output and verbose:
-                        logger.info(f"    Certificate count: {count}")
-                elif not json_output:
-                    logger.info("    (hash OK, certificate content not readable)")
+            count = count_certs_in_store(file)
+            if count is not None:
+                cert_counts[file.name] = count
+                if not json_output and verbose:
+                    logger.info(f"    Certificate count: {count}")
+            elif not json_output:
+                logger.info("    (hash OK, certificate content not readable)")
 
-            total_certs = sum(cert_counts.values()) if cert_counts else 0
-            unique_counts = set(cert_counts.values())
+        total_certs = sum(cert_counts.values()) if cert_counts else 0
+        unique_counts = set(cert_counts.values())
+        if cert_counts:
+            if len(unique_counts) > 1:
+                warn_msg = f"Certificate count mismatch detected: {cert_counts}"
+                if not json_output:
+                    logger.warning(f"⚠️  {warn_msg}")
+                json_warnings.append(warn_msg)
+            elif all(v == 0 for v in unique_counts):
+                warn_msg = "All bundle files appear empty (0 certs)"
+                if not json_output:
+                    logger.warning(f"⚠️  {warn_msg}")
+                json_warnings.append(warn_msg)
+
+        if not json_output:
+            logger.info("🔚 Verification run complete.")
+            logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            logger.info(f"📦 Verified files: {verified_count}")
+            logger.info(f"⏭️  Skipped files:  {skipped_count}")
+            logger.info(f"🧾 Certificates counted: {total_certs}")
             if cert_counts:
+                logger.info(f"🔍 Files with cert counts: {len(cert_counts)}")
                 if len(unique_counts) > 1:
-                    warn_msg = f"Certificate count mismatch detected: {cert_counts}"
-                    if not json_output:
-                        logger.warning(f"⚠️  {warn_msg}")
-                    json_warnings.append(warn_msg)
-                elif all(v == 0 for v in unique_counts):
-                    warn_msg = "All bundle files appear empty (0 certs)"
-                    if not json_output:
-                        logger.warning(f"⚠️  {warn_msg}")
-                    json_warnings.append(warn_msg)
-
-            if not json_output:
-                logger.info("🔚 Verification run complete.")
-                logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                logger.info(f"📦 Verified files: {verified_count}")
-                logger.info(f"⏭️  Skipped files:  {skipped_count}")
-                logger.info(f"🧾 Certificates counted: {total_certs}")
-                if cert_counts:
-                    logger.info(f"🔍 Files with cert counts: {len(cert_counts)}")
-                    if len(unique_counts) > 1:
-                        logger.info("⚠️  Certificate count mismatch detected.")
-                logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    logger.info("⚠️  Certificate count mismatch detected.")
+            logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
     if json_output:
         from bundlecraft.helpers.json_output import create_verify_response, emit_json
