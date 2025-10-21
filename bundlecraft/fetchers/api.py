@@ -46,12 +46,16 @@ def fetch_api(
     """
     # Get fetch configuration with overrides
     fetch_config = get_fetch_config(
-        source_config={
-            "timeout": timeout,
-            "retries": retries,
-            "backoff_factor": backoff_factor,
-            "retry_on_status": retry_on_status,
-        } if any(x is not None for x in [timeout, retries, backoff_factor, retry_on_status]) else None,
+        source_config=(
+            {
+                "timeout": timeout,
+                "retries": retries,
+                "backoff_factor": backoff_factor,
+                "retry_on_status": retry_on_status,
+            }
+            if any(x is not None for x in [timeout, retries, backoff_factor, retry_on_status])
+            else None
+        ),
         defaults=defaults,
     )
 
@@ -115,7 +119,9 @@ def fetch_api(
     )
     def _do_fetch():
         try:
-            with urllib.request.urlopen(req, timeout=fetch_config["timeout"], context=context) as resp:
+            with urllib.request.urlopen(
+                req, timeout=fetch_config["timeout"], context=context
+            ) as resp:
                 return resp.read()
         except urllib.error.HTTPError as e:
             # Improve diagnostics for common API mistakes

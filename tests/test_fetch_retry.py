@@ -2,8 +2,6 @@
 
 import time
 import urllib.error
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -303,8 +301,9 @@ class TestConfigSchema:
 
     def test_fetch_retry_config_validation_timeout(self):
         """Test timeout validation in FetchRetryConfig."""
-        from bundlecraft.helpers.config_schema import FetchRetryConfig
         from pydantic import ValidationError
+
+        from bundlecraft.helpers.config_schema import FetchRetryConfig
 
         with pytest.raises(ValidationError):
             FetchRetryConfig(timeout=0)  # Too low
@@ -314,8 +313,9 @@ class TestConfigSchema:
 
     def test_fetch_retry_config_validation_retries(self):
         """Test retries validation in FetchRetryConfig."""
-        from bundlecraft.helpers.config_schema import FetchRetryConfig
         from pydantic import ValidationError
+
+        from bundlecraft.helpers.config_schema import FetchRetryConfig
 
         with pytest.raises(ValidationError):
             FetchRetryConfig(retries=-1)  # Negative
@@ -325,8 +325,9 @@ class TestConfigSchema:
 
     def test_fetch_retry_config_validation_backoff_factor(self):
         """Test backoff_factor validation in FetchRetryConfig."""
-        from bundlecraft.helpers.config_schema import FetchRetryConfig
         from pydantic import ValidationError
+
+        from bundlecraft.helpers.config_schema import FetchRetryConfig
 
         with pytest.raises(ValidationError):
             FetchRetryConfig(backoff_factor=0.5)  # Too low
@@ -336,8 +337,9 @@ class TestConfigSchema:
 
     def test_fetch_retry_config_validation_status_codes(self):
         """Test retry_on_status validation in FetchRetryConfig."""
-        from bundlecraft.helpers.config_schema import FetchRetryConfig
         from pydantic import ValidationError
+
+        from bundlecraft.helpers.config_schema import FetchRetryConfig
 
         # Valid status codes
         config = FetchRetryConfig(retry_on_status=[200, 404, 500])

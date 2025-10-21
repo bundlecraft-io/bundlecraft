@@ -66,12 +66,16 @@ def fetch_url(
     """
     # Get fetch configuration with overrides
     fetch_config = get_fetch_config(
-        source_config={
-            "timeout": timeout,
-            "retries": retries,
-            "backoff_factor": backoff_factor,
-            "retry_on_status": retry_on_status,
-        } if any(x is not None for x in [timeout, retries, backoff_factor, retry_on_status]) else None,
+        source_config=(
+            {
+                "timeout": timeout,
+                "retries": retries,
+                "backoff_factor": backoff_factor,
+                "retry_on_status": retry_on_status,
+            }
+            if any(x is not None for x in [timeout, retries, backoff_factor, retry_on_status])
+            else None
+        ),
         defaults=defaults,
     )
 

@@ -125,7 +125,11 @@ def _write_provenance(dir_path: Path, records: list[dict[str, Any]]) -> None:
 
 
 def _fetch_from_config(
-    fetch_cfg: list[dict[str, Any]], dest_dir: Path, root: Path, verbose: bool = False, defaults: dict | None = None
+    fetch_cfg: list[dict[str, Any]],
+    dest_dir: Path,
+    root: Path,
+    verbose: bool = False,
+    defaults: dict | None = None,
 ) -> list[Path]:
     outputs: list[Path] = []
     provenance: list[dict[str, Any]] = []

@@ -141,6 +141,11 @@ fetch:
     url: https://curl.se/ca/cacert.pem
     verify:
       sha256: <expected_sha256>  # Content pinning (recommended)
+    # Optional: Override fetch retry/timeout settings
+    timeout: 60         # Request timeout in seconds (default: 30)
+    retries: 5          # Number of retry attempts (default: 3)
+    backoff_factor: 2.0 # Exponential backoff multiplier (default: 2.0)
+    retry_on_status: [429, 502, 503, 504]  # HTTP status codes to retry
 
   - name: partner_roots
     type: api
@@ -149,6 +154,9 @@ fetch:
     verify:
       ca_file: sources/partner-ca.pem
       tls_fingerprint_sha256: <cert_pin>
+    # Example: Slower API needs longer timeout
+    timeout: 120
+    retries: 5
 
   - name: vault_roots
     type: vault
@@ -158,6 +166,22 @@ fetch:
     addr: http://127.0.0.1:8200
     token_ref: VAULT_TOKEN
 ```
+
+**Fetch Retry and Timeout Configuration:**
+
+All fetch operations support configurable timeout and retry behavior to handle transient network failures gracefully:
+
+- **`timeout`** (integer, 1-600): Request timeout in seconds. Default: 30
+- **`retries`** (integer, 0-10): Number of retry attempts on transient failures. Default: 3
+- **`backoff_factor`** (float, 1.0-10.0): Exponential backoff multiplier between retries. Default: 2.0
+  - Retry delays: backoff_factor^attempt with random jitter (e.g., 2.0^0=1s, 2.0^1=2s, 2.0^2=4s)
+- **`retry_on_status`** (list of integers): HTTP status codes that trigger retry. Default: [429, 502, 503, 504]
+  - 429: Too Many Requests (rate limiting)
+  - 502: Bad Gateway (temporary proxy error)
+  - 503: Service Unavailable (temporary service error)
+  - 504: Gateway Timeout (temporary timeout)
+
+These settings can be configured globally in `config/defaults.yaml` under the `fetch:` section, or overridden per-source in bundle configs. Network errors (timeouts, connection failures) are always retried automatically.
 
 ### Metadata
 
@@ -370,6 +394,12 @@ package: false
 
 pem:
   include_subject_comments: true
+
+fetch:
+  timeout: 30  # Request timeout in seconds (1-600)
+  retries: 3   # Number of retry attempts on transient failures (0-10)
+  backoff_factor: 2.0  # Exponential backoff multiplier (1.0-10.0)
+  retry_on_status: [429, 502, 503, 504]  # HTTP status codes that trigger retry
 
 filters:
   unique_by_fingerprint: true
