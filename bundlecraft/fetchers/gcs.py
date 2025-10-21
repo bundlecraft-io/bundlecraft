@@ -42,7 +42,7 @@ def fetch_gcs(
     # Get credentials from environment
     creds_env = credentials_ref or "GOOGLE_APPLICATION_CREDENTIALS"
     creds_path = os.environ.get(creds_env)
-    
+
     try:
         # Create storage client
         if creds_path:
@@ -52,31 +52,31 @@ def fetch_gcs(
         else:
             # Use default credentials
             client = storage.Client()
-        
+
         # Get bucket and blob
         bucket_obj = client.bucket(bucket)
         blob = bucket_obj.blob(blob_name)
-        
+
         # Download blob content
         data = blob.download_as_bytes()
-        
+
         # Write to destination
         dest_dir.mkdir(parents=True, exist_ok=True)
         out_path = dest_dir / (name if name.endswith(".pem") else f"{name}.pem")
-        
+
         # Ensure data is decoded if bytes
         if isinstance(data, bytes):
             content = data.decode("utf-8")
         else:
             content = data
-        
+
         # Ensure trailing newline
         if not content.endswith("\n"):
             content = content + "\n"
-        
+
         out_path.write_text(content, encoding="utf-8")
         return out_path
-        
+
     except Exception as e:
         raise click.ClickException(
             f"Failed to fetch from GCS bucket '{bucket}' blob '{blob_name}': {e}"

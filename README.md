@@ -64,7 +64,13 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 ## ✨ Features
 
-- **Trusted Fetch layer**: Securely fetch certificates from HTTPS, APIs, and Vault with CA/fingerprint/sha256 pinning; staging-only (no cache) and full provenance.
+- **Trusted Fetch layer**: Securely fetch certificates from multiple sources with CA/fingerprint/sha256 pinning; staging-only (no cache) and full provenance:
+  - **Cloud Storage**: AWS S3, Azure Blob Storage, Google Cloud Storage (GCS)
+  - **Artifact Repositories**: JFrog Artifactory, GitHub Releases
+  - **Key Management**: Azure Key Vault, HashiCorp Vault
+  - **Public Root Programs**: Mozilla, Microsoft, Apple (via CCADB)
+  - **Generic Sources**: HTTPS URLs, REST APIs
+  - See [docs/FETCHERS.md](docs/FETCHERS.md) for complete documentation
 - **Reproducible builds** using layered YAML configs
 - **Multi-format export:** PEM, P7B, JKS, P12, ZIP
 - **Cross-format verification:** expiry, empties, count consistency

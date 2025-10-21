@@ -134,29 +134,92 @@ include:
 
 ### Fetch Definitions
 
+BundleCraft supports multiple fetcher types for various sources. See [FETCHERS.md](./FETCHERS.md) for comprehensive documentation.
+
+**Common fetcher types:**
+
 ```yaml
 fetch:
+  # Public root programs (recommended with SHA256 pinning)
   - name: mozilla_roots
-    type: url
-    url: https://curl.se/ca/cacert.pem
+    type: mozilla_roots
     verify:
-      sha256: <expected_sha256>  # Content pinning (recommended)
+      sha256: <expected_sha256>
 
-  - name: partner_roots
+  - name: microsoft_roots
+    type: microsoft_roots
+    verify:
+      sha256: <expected_sha256>
+
+  # Cloud storage
+  - name: s3_cert
+    type: s3
+    bucket: my-pki-bucket
+    key: certs/rootCA.pem
+    region: us-east-1
+    verify:
+      sha256: <expected_sha256>
+
+  - name: azure_blob_cert
+    type: azure_blob
+    container: pki-certs
+    blob_name: certs/rootCA.pem
+    connection_string_ref: AZURE_STORAGE_CONNECTION_STRING
+
+  - name: gcs_cert
+    type: gcs
+    bucket: my-pki-bucket
+    blob_name: certs/rootCA.pem
+
+  # Artifact repositories
+  - name: artifactory_cert
+    type: artifactory
+    url: https://artifactory.company.com/artifactory
+    repository: libs-release-local
+    path: certs/rootCA.pem
+    token_ref: ARTIFACTORY_TOKEN
+
+  - name: github_release_cert
+    type: github_release
+    owner: myorg
+    repo: pki-certs
+    asset_name: rootCA.pem
+    tag: v1.0.0
+
+  # Key management
+  - name: azure_keyvault_cert
+    type: azure_keyvault
+    vault_url: https://myvault.vault.azure.net/
+    certificate_name: my-root-ca
+
+  - name: vault_cert
+    type: vault
+    mount_point: secret
+    path: pki/trusted_roots
+    pem_field: pem
+    addr: https://vault.company.com:8200
+    token_ref: VAULT_TOKEN
+
+  # Generic sources
+  - name: url_cert
+    type: url
+    url: https://example.com/cert.pem
+    verify:
+      sha256: <expected_sha256>
+      tls_fingerprint_sha256: <cert_pin>
+
+  - name: api_cert
     type: api
     endpoint: https://api.partner.com/pki/roots
     token_ref: PARTNER_API_TOKEN
     verify:
       ca_file: sources/partner-ca.pem
-      tls_fingerprint_sha256: <cert_pin>
+```
 
-  - name: vault_roots
-    type: vault
-    mount_point: secret
-    path: pki/trusted_roots
-    pem_field: pem
-    addr: http://127.0.0.1:8200
-    token_ref: VAULT_TOKEN
+**Installation:**
+Extended fetchers require additional dependencies:
+```bash
+pip install 'bundlecraft[cloud,fetchers]'
 ```
 
 ### Metadata

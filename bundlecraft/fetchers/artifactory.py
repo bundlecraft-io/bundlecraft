@@ -64,7 +64,7 @@ def fetch_artifactory(
     # Authentication: prefer token, fallback to username/password
     token_env = token_ref or "ARTIFACTORY_TOKEN"
     token = os.environ.get(token_env)
-    
+
     if token:
         hdrs["X-JFrog-Art-Api"] = token
     else:
@@ -72,10 +72,10 @@ def fetch_artifactory(
         password_env = password_ref or "ARTIFACTORY_PASSWORD"
         username = os.environ.get(username_env)
         password = os.environ.get(password_env)
-        
+
         if username and password:
             import base64
-            
+
             creds = f"{username}:{password}"
             encoded = base64.b64encode(creds.encode()).decode()
             hdrs["Authorization"] = f"Basic {encoded}"

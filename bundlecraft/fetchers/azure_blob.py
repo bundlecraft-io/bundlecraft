@@ -46,11 +46,11 @@ def fetch_azure_blob(
     # Try connection string first
     conn_str_env = connection_string_ref or "AZURE_STORAGE_CONNECTION_STRING"
     conn_str = os.environ.get(conn_str_env)
-    
+
     # Try SAS token
     sas_token_env = sas_token_ref or "AZURE_STORAGE_SAS_TOKEN"
     sas_token = os.environ.get(sas_token_env)
-    
+
     try:
         # Create BlobServiceClient
         if conn_str:
@@ -63,7 +63,7 @@ def fetch_azure_blob(
             else:
                 # Try default credential (Managed Identity, etc.)
                 from azure.identity import DefaultAzureCredential
-                
+
                 credential = DefaultAzureCredential()
                 blob_service_client = BlobServiceClient(
                     account_url=account_url, credential=credential
@@ -74,35 +74,35 @@ def fetch_azure_blob(
                 blob_service_client = BlobServiceClient(account_url=url, credential=sas_token)
             else:
                 from azure.identity import DefaultAzureCredential
-                
+
                 credential = DefaultAzureCredential()
                 blob_service_client = BlobServiceClient(account_url=url, credential=credential)
         else:
             raise click.ClickException(
                 "Azure Blob fetch requires either connection_string_ref, account_url, or account_name"
             )
-        
+
         # Get blob client and download
         blob_client = blob_service_client.get_blob_client(container=container, blob=blob_name)
         data = blob_client.download_blob().readall()
-        
+
         # Write to destination
         dest_dir.mkdir(parents=True, exist_ok=True)
         out_path = dest_dir / (name if name.endswith(".pem") else f"{name}.pem")
-        
+
         # Ensure data is decoded if bytes
         if isinstance(data, bytes):
             content = data.decode("utf-8")
         else:
             content = data
-        
+
         # Ensure trailing newline
         if not content.endswith("\n"):
             content = content + "\n"
-        
+
         out_path.write_text(content, encoding="utf-8")
         return out_path
-        
+
     except Exception as e:
         raise click.ClickException(
             f"Failed to fetch from Azure Blob container '{container}' blob '{blob_name}': {e}"

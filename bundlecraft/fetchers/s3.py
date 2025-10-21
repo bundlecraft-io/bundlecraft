@@ -45,10 +45,10 @@ def fetch_s3(
     # Get credentials from environment
     access_key_env = access_key_ref or "AWS_ACCESS_KEY_ID"
     secret_key_env = secret_key_ref or "AWS_SECRET_ACCESS_KEY"
-    
+
     access_key = os.environ.get(access_key_env)
     secret_key = os.environ.get(secret_key_env)
-    
+
     # Create S3 client with optional credentials
     client_kwargs = {}
     if region:
@@ -58,37 +58,37 @@ def fetch_s3(
     if access_key and secret_key:
         client_kwargs["aws_access_key_id"] = access_key
         client_kwargs["aws_secret_access_key"] = secret_key
-    
+
     # Handle TLS verification options
     if verify and isinstance(verify, dict):
         ca_file = verify.get("ca_file")
         if ca_file:
             client_kwargs["verify"] = str(ca_file)
-    
+
     try:
         s3_client = boto3.client("s3", **client_kwargs)
-        
+
         # Fetch object from S3
         response = s3_client.get_object(Bucket=bucket, Key=key)
         data = response["Body"].read()
-        
+
         # Write to destination
         dest_dir.mkdir(parents=True, exist_ok=True)
         out_path = dest_dir / (name if name.endswith(".pem") else f"{name}.pem")
-        
+
         # Ensure data is decoded if bytes
         if isinstance(data, bytes):
             content = data.decode("utf-8")
         else:
             content = data
-        
+
         # Ensure trailing newline
         if not content.endswith("\n"):
             content = content + "\n"
-        
+
         out_path.write_text(content, encoding="utf-8")
         return out_path
-        
+
     except Exception as e:
         raise click.ClickException(
             f"Failed to fetch from S3 bucket '{bucket}' key '{key}': {e}"

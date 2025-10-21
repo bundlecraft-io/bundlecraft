@@ -47,58 +47,58 @@ def fetch_azure_keyvault(
     tenant_id_env = tenant_id_ref or "AZURE_TENANT_ID"
     client_id_env = client_id_ref or "AZURE_CLIENT_ID"
     client_secret_env = client_secret_ref or "AZURE_CLIENT_SECRET"
-    
+
     tenant_id = os.environ.get(tenant_id_env)
     client_id = os.environ.get(client_id_env)
     client_secret = os.environ.get(client_secret_env)
-    
+
     try:
         # Create credential
         if tenant_id and client_id and client_secret:
             from azure.identity import ClientSecretCredential
-            
+
             credential = ClientSecretCredential(
                 tenant_id=tenant_id, client_id=client_id, client_secret=client_secret
             )
         else:
             # Use default credential (Managed Identity, Azure CLI, etc.)
             from azure.identity import DefaultAzureCredential
-            
+
             credential = DefaultAzureCredential()
-        
+
         # Create certificate client
         client = CertificateClient(vault_url=vault_url, credential=credential)
-        
+
         # Get certificate
         if version:
             certificate = client.get_certificate_version(certificate_name, version)
         else:
             certificate = client.get_certificate(certificate_name)
-        
+
         # Extract PEM from certificate
         # Azure Key Vault returns certificates in different formats
         # We need to convert to PEM format
         cer_bytes = certificate.cer
-        
+
         # Convert DER to PEM
         from cryptography import x509
         from cryptography.hazmat.primitives import serialization
-        
+
         cert = x509.load_der_x509_certificate(cer_bytes)
         pem_bytes = cert.public_bytes(serialization.Encoding.PEM)
         content = pem_bytes.decode("utf-8")
-        
+
         # Write to destination
         dest_dir.mkdir(parents=True, exist_ok=True)
         out_path = dest_dir / (name if name.endswith(".pem") else f"{name}.pem")
-        
+
         # Ensure trailing newline
         if not content.endswith("\n"):
             content = content + "\n"
-        
+
         out_path.write_text(content, encoding="utf-8")
         return out_path
-        
+
     except Exception as e:
         raise click.ClickException(
             f"Failed to fetch certificate '{certificate_name}' from Key Vault '{vault_url}': {e}"

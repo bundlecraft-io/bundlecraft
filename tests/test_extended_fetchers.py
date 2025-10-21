@@ -103,7 +103,7 @@ class TestAzureBlobFetcher:
             b"-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----\n"
         )
         mock_blob_service_client.get_blob_client.return_value = mock_blob_client
-        
+
         MockBlobServiceClient = MagicMock(return_value=mock_blob_service_client)
         MockBlobServiceClient.from_connection_string = MagicMock(
             return_value=mock_blob_service_client
@@ -151,7 +151,7 @@ class TestGCSFetcher:
         mock_bucket.blob.return_value = mock_blob
         mock_client = MagicMock()
         mock_client.bucket.return_value = mock_bucket
-        
+
         MockStorage = MagicMock()
         MockStorage.Client.return_value = mock_client
 
@@ -247,7 +247,7 @@ class TestAzureKeyVaultFetcher:
         from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.x509.oid import NameOID
         from datetime import datetime, timedelta, timezone
-        
+
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Test CA")])
         cert = (
@@ -261,10 +261,10 @@ class TestAzureKeyVaultFetcher:
             .sign(key, hashes.SHA256())
         )
         mock_certificate.cer = cert.public_bytes(serialization.Encoding.DER)
-        
+
         mock_client = MagicMock()
         mock_client.get_certificate.return_value = mock_certificate
-        
+
         MockCertificateClient = MagicMock(return_value=mock_client)
 
         from bundlecraft.fetchers import azure_keyvault as azure_keyvault_mod
@@ -273,15 +273,16 @@ class TestAzureKeyVaultFetcher:
         mock_azure_identity = MagicMock()
         mock_credential = MagicMock()
         mock_azure_identity.DefaultAzureCredential = MagicMock(return_value=mock_credential)
-        
+
         import sys
+
         sys.modules["azure.identity"] = mock_azure_identity
-        
+
         try:
             monkeypatch.setattr(
                 azure_keyvault_mod, "_import_azure_keyvault", lambda: MockCertificateClient
             )
-            
+
             bundle_dir = temp_workspace / "config" / "bundles"
             bundle_dir.mkdir(parents=True, exist_ok=True)
             bundle_yaml = """
@@ -411,7 +412,7 @@ class TestSHA256PinningAndTLSOptions:
         # Mock boto3
         test_content = b"-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----\n"
         expected_sha = hashlib.sha256(test_content).hexdigest()
-        
+
         mock_boto3 = MagicMock()
         mock_s3_client = MagicMock()
         mock_response = {"Body": MagicMock(read=MagicMock(return_value=test_content))}
@@ -453,7 +454,7 @@ class TestSHA256PinningAndTLSOptions:
         """Test S3 fetcher fails on SHA256 mismatch."""
         test_content = b"-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----\n"
         wrong_sha = "0" * 64
-        
+
         mock_boto3 = MagicMock()
         mock_s3_client = MagicMock()
         mock_response = {"Body": MagicMock(read=MagicMock(return_value=test_content))}
@@ -530,14 +531,15 @@ class TestProvenanceRecording:
             ],
         )
         assert result.exit_code == 0
-        
+
         # Check provenance file exists
         staged = temp_workspace / "sources" / "staged"
         provenance_file = staged / "test-bundle" / "from_s3" / "provenance.fetch.json"
         assert provenance_file.exists()
-        
+
         # Verify provenance content
         import json
+
         prov_data = json.loads(provenance_file.read_text())
         assert "generated_at" in prov_data
         assert "items" in prov_data
