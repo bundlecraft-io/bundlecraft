@@ -22,6 +22,7 @@ from pathlib import Path
 import click
 
 from bundlecraft.helpers.convert_utils import convert_from_any
+from bundlecraft.helpers.exit_codes import ExitCode
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -157,7 +158,7 @@ def main(
             )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
-        sys.exit(2)
+        sys.exit(ExitCode.INPUT_ERROR)
     out_dir = Path(output_dir).resolve()
 
     fmt = output_format.lower()
@@ -180,7 +181,7 @@ def main(
             )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
-        sys.exit(2)
+        sys.exit(ExitCode.INPUT_ERROR)
 
     if not dry_run and not out_dir.exists():
         if not json_output:
@@ -228,7 +229,7 @@ def main(
                 fg="red",
                 err=True,
             )
-        sys.exit(2)
+        sys.exit(ExitCode.OUTPUT_ERROR)
 
     try:
         if dry_run:
@@ -252,7 +253,7 @@ def main(
                         dry_run=True,
                     )
                 )
-            sys.exit(0)
+            sys.exit(ExitCode.SUCCESS)
 
         # Suppress stdout when using JSON output
         if json_output:
@@ -305,7 +306,7 @@ def main(
             )
         else:
             click.secho(f"[SUCCESS] Conversion complete → {out_dir}", fg="green")
-        sys.exit(0)
+        sys.exit(ExitCode.SUCCESS)
     except Exception as e:
         error_msg = f"Conversion failed: {e}"
         if json_output:
@@ -323,7 +324,7 @@ def main(
             )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
-        sys.exit(2)
+        sys.exit(ExitCode.CONVERSION_ERROR)
 
 
 # Back-compat function used by older tests

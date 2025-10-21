@@ -29,6 +29,7 @@ import click
 import yaml
 
 from bundlecraft.helpers.atomic_build import AtomicBuildContext
+from bundlecraft.helpers.exit_codes import ExitCode
 from bundlecraft.helpers.config_schema import (
     validate_bundle_config,
     validate_craft_config,
@@ -516,7 +517,7 @@ def main(
             )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
-        sys.exit(2)
+        sys.exit(ExitCode.CONFIG_ERROR)
 
     craft_cfg = load_yaml(cfg_path, required=True, validate=validate_craft_config)
     env_cfg = merge_configs(defaults, craft_cfg)
@@ -571,7 +572,7 @@ def main(
                 emit_json(
                     create_build_response(success=False, craft=env, targets=[], errors=json_errors)
                 )
-            sys.exit(2)
+            sys.exit(ExitCode.CONFIG_ERROR)
 
     # Precompute craft-safe path and output settings used during caching
     craft_name_for_path = env_cfg.get("name") or env
@@ -654,7 +655,7 @@ def main(
                         fg="red",
                         err=True,
                     )
-                    sys.exit(2)
+                    sys.exit(ExitCode.BUILD_ERROR)
                 pem_blocks = _read_pem_chunks(pem_files)
 
                 # Apply filters from merged config
@@ -667,7 +668,7 @@ def main(
                     click.secho(
                         f"  [cache] [ERROR] {bname} - no valid PEM parsed", fg="red", err=True
                     )
-                    sys.exit(3)
+                    sys.exit(ExitCode.INVALID_CERT)
                 cache_pem = cache_dir / "bundlecraft-ca-trust.pem"
                 _write_canonical_pem(
                     cache_pem, pem_blocks, include_subject_comments, force=True, dry_run=dry_run
@@ -719,7 +720,7 @@ def main(
                     import traceback
 
                     traceback.print_exc()
-                sys.exit(2)
+                sys.exit(ExitCode.BUILD_ERROR)
     else:
         if not json_output:
             click.secho(
@@ -918,7 +919,7 @@ def main(
                     fg="red",
                     err=True,
                 )
-                sys.exit(3)
+                sys.exit(ExitCode.INVALID_CERT)
 
             pem_out = build_root / "bundlecraft-ca-trust.pem"
             _write_canonical_pem(
@@ -1111,7 +1112,7 @@ def main(
                         pass
                     # Don't exit yet in JSON mode, let it collect all errors
                     if not json_output:
-                        sys.exit(5)
+                        sys.exit(ExitCode.EXPIRED_CERT)
             if not json_output:
                 if warns:
                     click.secho(
@@ -1437,7 +1438,7 @@ def main(
                                 fg="red",
                                 err=True,
                             )
-                        sys.exit(6)
+                        sys.exit(ExitCode.BUILD_ERROR)
 
                 if not json_output:
                     click.secho(
@@ -1515,7 +1516,7 @@ def main(
         )
 
         if verification_failed:
-            sys.exit(5)
+            sys.exit(ExitCode.VALIDATION_ERROR)
     else:
         if dry_run:
             click.secho(

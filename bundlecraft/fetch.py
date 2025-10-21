@@ -25,6 +25,7 @@ from bundlecraft.fetchers.api import fetch_api
 from bundlecraft.fetchers.http import fetch_url
 from bundlecraft.fetchers.vault import fetch_vault
 from bundlecraft.helpers.config_schema import validate_bundle_config
+from bundlecraft.helpers.exit_codes import ExitCode
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -720,7 +721,7 @@ def main(
             )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
-        sys.exit(2)
+        sys.exit(ExitCode.CONFIG_ERROR)
     except Exception as e:
         error_msg = f"Fetch failed: {e}"
         if json_output:
@@ -734,7 +735,7 @@ def main(
             )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
-        sys.exit(2)
+        sys.exit(ExitCode.FETCH_ERROR)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,8 @@ from pathlib import Path
 import click
 from cryptography.hazmat.primitives.serialization import pkcs7, pkcs12
 
+from bundlecraft.helpers.exit_codes import ExitCode
+
 # --- logging setup ---
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -334,10 +336,10 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
                         logger.info(f"✅ Signature verified: {message}")
                     else:
                         logger.error(f"❌ Signature verification failed: {message}")
-                        exit(1)
+                        exit(ExitCode.VALIDATION_ERROR)
                 except Exception as e:
                     logger.error(f"❌ Signature verification error: {e}")
-                    exit(1)
+                    exit(ExitCode.VALIDATION_ERROR)
             else:
                 logger.warning(f"⚠️  No signature found for {path.name}")
         
@@ -563,7 +565,7 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
             logger.error("❌ One or more verifications failed.")
 
     if not ok:
-        exit(1)
+        exit(ExitCode.VALIDATION_ERROR)
 
 
 if __name__ == "__main__":

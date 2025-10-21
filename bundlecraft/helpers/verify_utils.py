@@ -25,6 +25,8 @@ from pathlib import Path
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
+from bundlecraft.helpers.exit_codes import ExitCode
+
 # ---------------------------------------------------------------------
 # Core verifier
 # ---------------------------------------------------------------------
@@ -33,7 +35,7 @@ from cryptography.hazmat.backends import default_backend
 def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) -> int:
     if not target.exists():
         print(f"[ERROR] Target not found: {target}", file=sys.stderr)
-        return 5
+        return ExitCode.INPUT_ERROR
 
     pem_files = []
     if target.is_dir():
@@ -42,11 +44,11 @@ def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) ->
         pem_files = [target]
     else:
         print(f"[ERROR] Unsupported file type: {target}", file=sys.stderr)
-        return 5
+        return ExitCode.INPUT_ERROR
 
     if not pem_files:
         print(f"[WARN] No PEM files found in {target}")
-        return 0
+        return ExitCode.SUCCESS
 
     now = dt.datetime.now(dt.timezone.utc)
     soon_cutoff = now + dt.timedelta(days=warn_days)
@@ -80,22 +82,22 @@ def verifier(target: Path, warn_days: int = 30, fail_on_expired: bool = True) ->
 
     if errors or (expired and fail_on_expired):
         print("[RESULT] ❌ Verification failed.")
-        return 5
+        return ExitCode.EXPIRED_CERT if expired else ExitCode.INVALID_CERT
     if expiring > 0:
         print("[RESULT] ⚠️  Certificates expiring soon.")
-        return 1
+        return ExitCode.GENERAL_ERROR
 
     if target.is_dir():
         if not _check_output_files(target):
             print("[RESULT] ❌ Detected empty or invalid output files.")
-            return 5
+            return ExitCode.VALIDATION_ERROR
         _compare_output_counts(target)
 
     if expiring > 0:
-        return 1
+        return ExitCode.GENERAL_ERROR
 
     print("[RESULT] ✅ All certificates valid.")
-    return 0
+    return ExitCode.SUCCESS
 
 
 # ---------------------------------------------------------------------
