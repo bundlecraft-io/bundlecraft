@@ -257,7 +257,17 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
 )
 @click.option("--verify-all", is_flag=True, help="Verify both bundle files and manifest together")
 @click.option("--verbose", is_flag=True, help="Show detailed file metadata and hashes")
-def main(target, verify_manifest, verify_all, verbose):
+@click.option(
+    "--verify-signatures",
+    is_flag=True,
+    help="Verify GPG signatures for all signed artifacts (.asc files)",
+)
+@click.option(
+    "--gpg-keyring",
+    type=click.Path(exists=True),
+    help="Path to GPG public keyring file to import for signature verification",
+)
+def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_keyring):
     """Verify the integrity and consistency of built trust bundles."""
     click.secho("\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
     path = Path(target)
@@ -267,6 +277,28 @@ def main(target, verify_manifest, verify_all, verbose):
         logger.info(f"SHA256: {digest}")
         if verbose:
             logger.info(f"Info: {file_info(path)}")
+        
+        # Check for signature if verify_signatures is enabled
+        if verify_signatures:
+            sig_path = path.with_suffix(path.suffix + ".asc")
+            if sig_path.exists():
+                from bundlecraft.helpers.signing import verify_signature
+                
+                try:
+                    valid, message = verify_signature(
+                        path, sig_path, keyring=Path(gpg_keyring) if gpg_keyring else None
+                    )
+                    if valid:
+                        logger.info(f"✅ Signature verified: {message}")
+                    else:
+                        logger.error(f"❌ Signature verification failed: {message}")
+                        exit(1)
+                except Exception as e:
+                    logger.error(f"❌ Signature verification error: {e}")
+                    exit(1)
+            else:
+                logger.warning(f"⚠️  No signature found for {path.name}")
+        
         return
 
     ok = True
@@ -277,6 +309,39 @@ def main(target, verify_manifest, verify_all, verbose):
         show_manifest_info(path, verbose)
     else:
         ok = verify_directory(path, verbose)
+    
+    # Verify signatures if requested
+    if verify_signatures:
+        logger.info("\n🔏 Verifying GPG signatures...")
+        from bundlecraft.helpers.signing import verify_signature
+        
+        sig_files = list(path.glob("*.asc"))
+        if not sig_files:
+            logger.warning("⚠️  No signature files (.asc) found in directory")
+        else:
+            sig_ok = True
+            for sig_path in sorted(sig_files):
+                # Find corresponding file (remove .asc extension)
+                file_path = sig_path.with_suffix("")
+                if not file_path.exists():
+                    logger.warning(f"⚠️  Signed file not found: {file_path.name}")
+                    continue
+                
+                try:
+                    valid, message = verify_signature(
+                        file_path, sig_path, keyring=Path(gpg_keyring) if gpg_keyring else None
+                    )
+                    if valid:
+                        logger.info(f"✅ {file_path.name}: {message}")
+                    else:
+                        logger.error(f"❌ {file_path.name}: {message}")
+                        sig_ok = False
+                except Exception as e:
+                    logger.error(f"❌ {file_path.name}: Verification error: {e}")
+                    sig_ok = False
+            
+            if not sig_ok:
+                ok = False
 
     if ok:
         logger.info("✅ All verifications passed.")
