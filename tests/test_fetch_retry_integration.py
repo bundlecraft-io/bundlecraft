@@ -1,12 +1,9 @@
 """Integration test demonstrating retry functionality with mock server."""
 
-import tempfile
-import time
-from pathlib import Path
+import urllib.error
 from unittest.mock import Mock, patch
 
 import pytest
-import urllib.error
 
 from bundlecraft.fetchers.http import fetch_url
 
