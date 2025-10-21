@@ -30,7 +30,7 @@ Manually refreshing these into `sources/` risks drift and stale trust anchors.
 
 ## 2️⃣ Problem Statement
 
-We need a secure, deterministic, and policy-controlled way to **fetch certificates automatically from trusted remote sources** during a build — without compromising reproducibility, auditability, or security posture.
+We need a secure, deterministic, and policy-controlled way to **fetch certificates automatically from trusted remote sources** during a build - without compromising reproducibility, auditability, or security posture.
 
 ---
 
@@ -206,4 +206,4 @@ fetch:
 
 **BundleCraft vNext = Fetch → Build → Verify → Convert**
 
-By introducing a **trusted fetching layer**, BundleCraft evolves from a static trust-store builder into a **dynamic trust-source orchestrator** — maintaining the same immutability and audit guarantees while embracing real-time, policy-compliant sourcing of certificates.
+By introducing a **trusted fetching layer**, BundleCraft evolves from a static trust-store builder into a **dynamic trust-source orchestrator** - maintaining the same immutability and audit guarantees while embracing real-time, policy-compliant sourcing of certificates.

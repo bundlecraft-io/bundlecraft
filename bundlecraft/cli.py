@@ -24,7 +24,7 @@ from bundlecraft.verifier import main as verify_main
 
 @click.group(
     help=(
-        "🔐 BundleCraft — build, verify, and convert CA trust bundles.\n\n"
+        "🔐 BundleCraft - build, verify, and convert CA trust bundles.\n\n"
         "Run `bundlecraft <command> --help` for command-specific options."
     ),
     context_settings={"help_option_names": ["-h", "--help"]},

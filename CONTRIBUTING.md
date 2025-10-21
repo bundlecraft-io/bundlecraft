@@ -1,6 +1,6 @@
 # 🧩 Contributing to BundleCraft
 
-Thanks for contributing to **BundleCraft** — a unified CLI for building, verifying, and converting CA trust bundles.
+Thanks for contributing to **BundleCraft** - a unified CLI for building, verifying, and converting CA trust bundles.
 
 This guide defines a reproducible local setup, coding standards, testing, and (optional) packaging steps so contributors and CI get the same results.
 

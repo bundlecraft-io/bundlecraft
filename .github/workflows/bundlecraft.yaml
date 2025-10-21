@@ -411,11 +411,11 @@ jobs:
             bytes=$(stat -c %s release/bundlecraft-trust.tar.gz)
             size=$(human "$bytes")
             sha=$(cut -d ' ' -f1 release/bundlecraft-trust.sha256 || true)
-            combined_md+="- [bundlecraft-trust.tar.gz](${BASE_URL}/bundlecraft-trust.tar.gz) — ${size} — sha256: ${sha}\n"
+            combined_md+="- [bundlecraft-trust.tar.gz](${BASE_URL}/bundlecraft-trust.tar.gz) - ${size} - sha256: ${sha}\n"
             if [ -f release/bundlecraft-trust.tar.gz.asc ]; then
               sig_bytes=$(stat -c %s release/bundlecraft-trust.tar.gz.asc)
               sig_size=$(human "$sig_bytes")
-              combined_md+="  - Signature: [bundlecraft-trust.tar.gz.asc](${BASE_URL}/bundlecraft-trust.tar.gz.asc) — ${sig_size}\n"
+              combined_md+="  - Signature: [bundlecraft-trust.tar.gz.asc](${BASE_URL}/bundlecraft-trust.tar.gz.asc) - ${sig_size}\n"
             fi
           else
             combined_md="(none)\n"
@@ -433,7 +433,7 @@ jobs:
               sha_file="${f%.tar.gz}.sha256"
               sha=""
               if [ -f "$sha_file" ]; then sha=$(cut -d ' ' -f1 "$sha_file"); fi
-              perenv_md+="- [${name}](${BASE_URL}/${name}) — ${size} — sha256: ${sha}\n"
+              perenv_md+="- [${name}](${BASE_URL}/${name}) - ${size} - sha256: ${sha}\n"
             done
           fi
           {

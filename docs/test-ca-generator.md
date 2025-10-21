@@ -8,7 +8,7 @@ The `scripts/generate_test_cas.py` tool generates self-signed root CAs and subor
 
 ## Purpose
 
-BundleCraft is a **certificate trust management** system—it processes and distributes public trust anchors, never private keys. However, development and testing require test certificate chains.
+BundleCraft is a **certificate trust management** system-it processes and distributes public trust anchors, never private keys. However, development and testing require test certificate chains.
 
 This tool bridges that gap by:
 - Generating test certificates on-demand
@@ -287,7 +287,7 @@ python scripts/generate_test_cas.py --name ci-root --no-warning
 - **Complex logic**: Hierarchies and config parsing
 - **Cross-platform**: Works on Linux, macOS, Windows without modification
 
-Shell would require multiple `openssl` command invocations and temp file management—much riskier for key material.
+Shell would require multiple `openssl` command invocations and temp file management-much riskier for key material.
 
 ### Why Dispose Keys Immediately?
 
@@ -319,9 +319,9 @@ These are intentionally omitted to keep the tool simple and focused on CA genera
 
 ## Related Documentation
 
-- [Scripts Reference](../scripts/README.md#-generate_test_caspy) — CLI usage and examples
-- [ADR-0002: Fetch Layer](adr-0002-fetch.md) — Context on trust-only principles
-- [Troubleshooting](troubleshooting.md) — General BundleCraft debugging
+- [Scripts Reference](../scripts/README.md#-generate_test_caspy) - CLI usage and examples
+- [ADR-0002: Fetch Layer](adr-0002-fetch.md) - Context on trust-only principles
+- [Troubleshooting](troubleshooting.md) - General BundleCraft debugging
 
 ## License
 

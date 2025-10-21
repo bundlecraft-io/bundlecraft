@@ -2,9 +2,9 @@
 
 This document defines the configuration schema for BundleCraft, clearly separating concerns between:
 
-- **Bundle configs** (`config/bundles/*.yaml`) — Certificate sourcing and gathering
-- **Craft configs** (`config/crafts/*.yaml`) — Build, output, and deployment configuration
-- **Defaults** (`config/defaults.yaml`) — Global fallback settings
+- **Bundle configs** (`config/bundles/*.yaml`) - Certificate sourcing and gathering
+- **Craft configs** (`config/crafts/*.yaml`) - Build, output, and deployment configuration
+- **Defaults** (`config/defaults.yaml`) - Global fallback settings
 
 ---
 
@@ -899,6 +899,6 @@ Comprehensive validation tests are located in `tests/test_config_validation.py` 
 
 ## Related Documentation
 
-- **[Exit Codes](./exit-codes.md)** — CLI exit codes for CI/CD integration and error handling
-- **[JSON Output Format](./JSON-OUTPUT.md)** — Structured output for programmatic consumption
-- **[Troubleshooting Guide](./troubleshooting.md)** — Common issues and solutions
+- **[Exit Codes](./exit-codes.md)** - CLI exit codes for CI/CD integration and error handling
+- **[JSON Output Format](./JSON-OUTPUT.md)** - Structured output for programmatic consumption
+- **[Troubleshooting Guide](./troubleshooting.md)** - Common issues and solutions

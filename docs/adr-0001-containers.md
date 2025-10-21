@@ -51,28 +51,28 @@ We need a distribution model that:
 
 ## 4) Options Considered
 
-### Option A — GitHub Template Repo only (status quo+)
+### Option A - GitHub Template Repo only (status quo+)
 
 Users clone a repo with scripts, run Python directly, and wire it in CI.
 
 * **Pros:** Simple, transparent; no runtime requirements beyond Python.
 * **Cons:** Dependency drift; local Python setup pain; reduced reproducibility; harder to enforce SBOM/provenance; CI runners vary.
 
-### Option B — PyPI CLI package
+### Option B - PyPI CLI package
 
 Publish BundleCraft as a Python package with a console entrypoint.
 
 * **Pros:** Familiar install (`pip install`), easy updates.
 * **Cons (critical):** Supply-chain risk (registry trust); stale/rogue package risk; misaligned with environment-specific trust policies; dependency pinning harder; reproducing builds across orgs is less deterministic.
 
-### Option C — OCI-compliant container image
+### Option C - OCI-compliant container image
 
 Ship a slim, non-root, read-only image that exposes a CLI; users mount inputs/outputs.
 
 * **Pros:** Reproducible, portable, runner-agnostic (Podman/containerd); no host Python; easy to **sign**, attach **SBOM**, and generate **provenance**; easy to pin by **digest**; perfect for CI.
 * **Cons:** Requires a container runtime; image build/release pipeline to maintain; attention to image size and CVE churn.
 
-### Option D — Hybrid: OCI image **+** Template Repo (Recommended)
+### Option D - Hybrid: OCI image **+** Template Repo (Recommended)
 
 Publish the engine as an OCI image; provide a template repo that uses the image in CI and documents local invocation. No PyPI.
 

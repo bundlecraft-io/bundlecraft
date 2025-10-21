@@ -291,7 +291,7 @@ podman run --rm -p 8200:8200 \
   docker.io/library/vault:latest
 ```
 
-*(Podman supports rootless containers — safer and Docker-compatible syntax.)*
+*(Podman supports rootless containers - safer and Docker-compatible syntax.)*
 
 
 ### 🧪 Usage
@@ -391,8 +391,8 @@ Reference:
 This document explains how to spin up a **local HashiCorp Vault instance** for testing BundleCraft’s Vault fetch integration.
 
 It supports two methods:
-1. **Direct binary mode (recommended)** — runs the Vault binary directly on your system in dev mode.
-2. **Container mode (optional)** — runs Vault in a rootless Podman container.
+1. **Direct binary mode (recommended)** - runs the Vault binary directly on your system in dev mode.
+2. **Container mode (optional)** - runs Vault in a rootless Podman container.
 
 ---
 
@@ -485,8 +485,8 @@ Notes:
 This section explains how to spin up a **local HashiCorp Vault instance** for testing BundleCraft’s Vault fetch integration.
 
 It supports two methods:
-1. **Direct binary mode (recommended)** — runs the Vault binary directly on your system in dev mode.
-2. **Container mode (optional)** — runs Vault in a rootless Podman container.
+1. **Direct binary mode (recommended)** - runs the Vault binary directly on your system in dev mode.
+2. **Container mode (optional)** - runs Vault in a rootless Podman container.
 
 ---
 
@@ -543,7 +543,7 @@ podman run --rm -p 8200:8200 \
   docker.io/library/vault:latest
 ```
 
-*(Podman supports rootless containers — safer and Docker-compatible syntax.)*
+*(Podman supports rootless containers - safer and Docker-compatible syntax.)*
 
 ---
 
@@ -598,7 +598,7 @@ Runs your test command, then removes the local Vault environment automatically.
 
 ### 🧩 Notes
 
-- This environment is **ephemeral** — all data is lost on shutdown.
+- This environment is **ephemeral** - all data is lost on shutdown.
 - It’s safe to run alongside an existing Vault or Podman environment.
 - Default configuration listens on `http://127.0.0.1:8200`.
 - The script exports `VAULT_ADDR` and `VAULT_TOKEN` internally; use `--ci-cmd` to run commands with those env vars, or export them in your shell as shown above.

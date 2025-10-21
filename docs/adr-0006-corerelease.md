@@ -1,6 +1,6 @@
 # ADR-0006: Introduce the Core Multi-Channel BundleCraft Release & Distribution Layer
 
-**Status:** Proposed — **Supersedes ADR-0001 and ADR-0003**
+**Status:** Proposed - **Supersedes ADR-0001 and ADR-0003**
 **Date:** October 21, 2025
 **Owner:** Chris J. Pich
 **Related:** SECURITY.md, RELEASE.md, README, CI/CD workflows
@@ -209,4 +209,4 @@ All channels share unified signing, SBOM, and provenance controls, maintaining B
 
 ---
 
-**End of ADR-000X — supersedes ADR-0001 and ADR-0003**
+**End of ADR-000X - supersedes ADR-0001 and ADR-0003**

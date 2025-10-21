@@ -11,7 +11,7 @@ Related: ADR-0001 (Containers), ADR-0003 (Distribution), README, SECURITY.md
 
 NIST is standardizing post-quantum signature algorithms (e.g., Dilithium, Falcon, SPHINCS+). For years, PKI will span classical-only, hybrid, and PQC-preferred deployments. Client support will vary, and not all trust store formats will handle PQC equally.
 
-BundleCraft builds, verifies, and converts CA trust bundles from configuration-defined sources into reproducible, auditable artifacts. This ADR answers: what must BundleCraft do to help PKI administration before, during, and after PQC — within its scope as a trust bundle toolkit?
+BundleCraft builds, verifies, and converts CA trust bundles from configuration-defined sources into reproducible, auditable artifacts. This ADR answers: what must BundleCraft do to help PKI administration before, during, and after PQC - within its scope as a trust bundle toolkit?
 
 ---
 

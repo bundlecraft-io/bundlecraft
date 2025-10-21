@@ -1,4 +1,4 @@
-# ADR-0003: Distribute BundleCraft via multiple channels — OCI-first, with optional pipx/PyPI, zipapp, and a first-class GitHub Action
+# ADR-0003: Distribute BundleCraft via multiple channels - OCI-first, with optional pipx/PyPI, zipapp, and a first-class GitHub Action
 
 Status: Deferred (amended by ADR-0003, ADR-0006)
 Date: October 18, 2025
@@ -28,12 +28,12 @@ We need a distribution strategy for the BundleCraft engine (the Python CLI and c
 
 ## 3) Options considered (revisited)
 
-- OCI image (GHCR) — immutable, signed, attested; inputs mounted at runtime
-- PyPI package — convenient installs; possible via pipx for isolation
-- Single-file artifacts — zipapp/PEX for air-gapped or no-container environments
-- Package managers — Homebrew/Nix wrappers (optional, community-friendly)
-- First-class GitHub Action — simple CI integration that wraps the engine
-- Template repo — onboarding and reference patterns
+- OCI image (GHCR) - immutable, signed, attested; inputs mounted at runtime
+- PyPI package - convenient installs; possible via pipx for isolation
+- Single-file artifacts - zipapp/PEX for air-gapped or no-container environments
+- Package managers - Homebrew/Nix wrappers (optional, community-friendly)
+- First-class GitHub Action - simple CI integration that wraps the engine
+- Template repo - onboarding and reference patterns
 
 ---
 
@@ -62,7 +62,7 @@ We adopt a multi-channel approach, ranked by recommendation:
 
     - Publish a minimal, engine-only package designed for pipx (isolated venv)
     - Strong controls: Sigstore signing of wheels/sdist; pinned, minimal dependencies; reproducible build with hash-locked requirements; publish SBOM in releases
-    - Clear docs: “engine only — does not install system trust; provide your own config/certs”
+    - Clear docs: “engine only - does not install system trust; provide your own config/certs”
     - Recommended usage: pipx install bundlecraft==X.Y.Z (pin exact version)
 
 3) Secondary: Single-file artifact (zipapp or PEX) in GitHub Releases
@@ -83,7 +83,7 @@ Template repository remains part of onboarding: directory layout, example crafts
 
 If we offer a PyPI package, we will:
 
-- Treat it as an “engine-only” distribution — no embedded certificates, no example trust, no side-effectful system modifications
+- Treat it as an “engine-only” distribution - no embedded certificates, no example trust, no side-effectful system modifications
 - Prefer pipx for isolation and version pinning; discourage plain pip installs into shared environments
 - Sign distributions (Sigstore), attach SBOMs, and publish SLSA provenance in GitHub Releases
 - Lock dependencies and enforce hashes; avoid optional extras by default

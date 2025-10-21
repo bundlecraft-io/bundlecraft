@@ -2,7 +2,7 @@
 
 This folder contains the technical and conceptual documentation for the **bundlecraft** project.
 
-Each document describes a specific layer of the system — from goals and design philosophy to implementation and maintenance.
+Each document describes a specific layer of the system - from goals and design philosophy to implementation and maintenance.
 
 ---
 

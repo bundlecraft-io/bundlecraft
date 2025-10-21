@@ -1,4 +1,4 @@
-# 🔐 BundleCraft — Modern PKI Trust Store Builder
+# 🔐 BundleCraft - Modern PKI Trust Store Builder
 
 ## Overview
 
@@ -13,7 +13,7 @@
 **BundleCraft** is a modern, configuration-as-code system for **fetching, building, verifying, and distributing multi-format certificate trust bundles** across environments.
 It securely sources certificate material from trusted remote origins or local files, then produces reproducible, auditable outputs for OS, Java, and application platforms.
 
-> **In short:** BundleCraft lets you define *how trust is built* — not just *what to trust*.
+> **In short:** BundleCraft lets you define *how trust is built* - not just *what to trust*.
 
 ---
 
@@ -54,9 +54,9 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 **Key Outputs Each Build:**
 
 - Canonical **PEM** bundle (with annotated subjects, deduplication)
-- **PKCS#7 (.p7b)** — DER-encoded bundle
-- **Java KeyStore (.jks)** — per-cert aliasing, password-protected
-- **PKCS#12 (.p12/.pfx)** — multi-cert export, password-protected
+- **PKCS#7 (.p7b)** - DER-encoded bundle
+- **Java KeyStore (.jks)** - per-cert aliasing, password-protected
+- **PKCS#12 (.p12/.pfx)** - multi-cert export, password-protected
 - **ZIP** (tarball of PEMs, one per cert)
 - Deterministic **manifest.json** and **checksums.sha256** (traceability)
 - **SBOM (Software Bill of Materials)** in CycloneDX format (automatic)
@@ -102,7 +102,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 ---
 
-## 🏗️ How It Works — Pipeline
+## 🏗️ How It Works - Pipeline
 
 BundleCraft uses a **layered configuration model** and a four-stage pipeline:
 
@@ -232,7 +232,7 @@ These can be overridden by environment or bundle configs.
 
 ---
 
-## 🚀 Quickstart — Fetching, Building, and Verifying Trust Bundles
+## 🚀 Quickstart - Fetching, Building, and Verifying Trust Bundles
 
 ### 1. Install Prerequisites
 
@@ -396,8 +396,8 @@ The release pipeline now publishes a trust matrix that shows which crafts (rows)
 
 Artifacts attached to releases:
 
-- `TRUST_MATRIX.md` — Markdown table (human-readable)
-- `trust-matrix.json` — Structured JSON (machine-readable)
+- `TRUST_MATRIX.md` - Markdown table (human-readable)
+- `trust-matrix.json` - Structured JSON (machine-readable)
 
 Generate locally:
 
@@ -461,7 +461,7 @@ When triggering manually, you can optionally filter environments:
 
 - **CLI reference:** [`bundlecraft/README.md`](bundlecraft/README.md)
 - **Configuration spec:** [`docs/CONFIG-SPEC.md`](docs/CONFIG-SPEC.md)
-- **Exit codes:** [`docs/exit-codes.md`](docs/exit-codes.md) — CI/CD integration guide
+- **Exit codes:** [`docs/exit-codes.md`](docs/exit-codes.md) - CI/CD integration guide
 - **Contributing guide:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - **Security policy:** [`SECURITY.md`](SECURITY.md)
 - **Test documentation:** [`tests/README.md`](tests/README.md)
@@ -498,7 +498,7 @@ When triggering manually, you can optionally filter environments:
   The build script removes existing keystore before import. Ensure the latest version is used.
 
 - **P12 only contains one cert?**
-  Fixed in exporter — uses `-in first` + `-certfile rest` for completeness.
+  Fixed in exporter - uses `-in first` + `-certfile rest` for completeness.
 
 - **Verifier says JKS=0?**
   Ensure `keytool` is installed and on PATH. The script parses `Alias name:` and certificate blocks.

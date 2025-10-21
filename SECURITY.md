@@ -8,17 +8,17 @@ It provides deterministic, auditable mechanisms to stage certificate inputs from
 BundleCraft **does not** distribute, embed, or endorse any certificate authority (CA) certificates.
 All trust inputs are user-configured and staged via the Fetch layer or provided locally, with trust controls (CA pinning, TLS fingerprint pinning, optional `sha256` content pins) fully under operator control.
 
-The security model of BundleCraft focuses on the *integrity, reproducibility, and transparency* of trust store builds — not the issuance, endorsement, or global distribution of CA material.
+The security model of BundleCraft focuses on the *integrity, reproducibility, and transparency* of trust store builds - not the issuance, endorsement, or global distribution of CA material.
 
 ---
 
 ## Guiding Principles
 
-1. **Code, not trust** — BundleCraft builds trust stores but never defines what is trusted.
-2. **Local authority** — Users retain full control and accountability for certificate sources.
-3. **Reproducibility** — Builds are deterministic and traceable to their input files and configurations, including fetch provenance (`provenance.fetch.json`).
-4. **Separation of concerns** — Trust material and application code are isolated to prevent unintended trust propagation.
-5. **Transparency** — All generated artifacts include manifests, checksums, and optional signatures for verification.
+1. **Code, not trust** - BundleCraft builds trust stores but never defines what is trusted.
+2. **Local authority** - Users retain full control and accountability for certificate sources.
+3. **Reproducibility** - Builds are deterministic and traceable to their input files and configurations, including fetch provenance (`provenance.fetch.json`).
+4. **Separation of concerns** - Trust material and application code are isolated to prevent unintended trust propagation.
+5. **Transparency** - All generated artifacts include manifests, checksums, and optional signatures for verification.
 
 ---
 

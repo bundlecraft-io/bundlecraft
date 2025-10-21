@@ -446,7 +446,7 @@ bundlecraft/
 
 ## 🧠 Best Practices for Referencing in Docs and Scripts
 
-- **Preferred (installed usage):** `bundlecraft <subcommand>` — this is the canonical CLI form.
+- **Preferred (installed usage):** `bundlecraft <subcommand>` - this is the canonical CLI form.
 - **Module form (uninstalled / dev use):** `python -m bundlecraft.cli <subcommand>`
 - **Never reference file paths** like `bundlecraft/builder.py` in docs; this implies direct script execution, which breaks imports.
 

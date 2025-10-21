@@ -8,7 +8,7 @@
 
 ## Context
 
-BundleCraft builds and ships trust stores for multi-env PKI. We currently output a handful of formats (PEM bundle, PKCS#7, PKCS#12, JKS). Users want broader compatibility across platforms, JVMs, browsers, and OS tooling—without sacrificing repeatability, portability, and security.
+BundleCraft builds and ships trust stores for multi-env PKI. We currently output a handful of formats (PEM bundle, PKCS#7, PKCS#12, JKS). Users want broader compatibility across platforms, JVMs, browsers, and OS tooling-without sacrificing repeatability, portability, and security.
 
 Initial scope: prioritize file-based trust stores (single-file artifacts). Directory-based trust stores (e.g., hash directories) and platform stores (e.g., NSS, Keychain) are valuable but will follow later phases.
 
@@ -67,7 +67,7 @@ This staged approach keeps core pipelines deterministic and portable while openi
 
 ## Implementation Plan
 
-### Phase 1 (Now) — Python-native and JKS support
+### Phase 1 (Now) - Python-native and JKS support
 
 - **PEM (bundle and single):**
 
@@ -91,7 +91,7 @@ This staged approach keeps core pipelines deterministic and portable while openi
 
   - Accept DER-encoded certificates as inputs; convert to internal representation for processing.
 
-### Phase 2 — Extended Java keystores and optional formats
+### Phase 2 - Extended Java keystores and optional formats
 
 - **Extend `bundlecraft.helpers.convert_utils`** for additional Java keystores:
 
@@ -114,7 +114,7 @@ This staged approach keeps core pipelines deterministic and portable while openi
 
   - Expand PKCS7/CMS support if/when `cryptography` coverage is sufficient and interop is validated.
 
-### Phase 3 — Directory & platform stores, PQC
+### Phase 3 - Directory & platform stores, PQC
 
 - **Hash directories:** implement maker/verifier (but ships as an **archive** option to keep “single artifact” UX: e.g., `ca-trust-hashdir.tar.gz`).
 - **NSS cert9.db:** driver using `certutil` in a containerized test harness.
