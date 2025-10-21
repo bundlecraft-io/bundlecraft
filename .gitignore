@@ -5,7 +5,8 @@
 # Staged fetch directory (ephemeral)
 sources/fetched/
 sources/staged/
-build*
+build/
+build_cache/
 
 # Personal/local test folders
 personal*/
