@@ -291,7 +291,7 @@ def run_fetch(
 
 
 def _stage_local_includes(
-    cfg: dict[str, Any], staging_root: Path, root: Path, verbose: bool
+    cfg: dict[str, Any], staging_root: Path, root: Path, verbose: bool, dry_run: bool = False
 ) -> list[Path]:
     """Stage local sources into named subdirectories.
 
@@ -320,7 +320,8 @@ def _stage_local_includes(
                     logger.debug(f"  Repo '{name}' has no include items; skipping")
                 continue
             subdir = staging_root / name
-            ensure_dir(subdir)
+            if not dry_run:
+                ensure_dir(subdir)
             for idx, item in enumerate(include_items, start=1):
                 # Back-compat: allow include items to be plain strings (paths)
                 if isinstance(item, str):
@@ -333,9 +334,12 @@ def _stage_local_includes(
                                     logger.debug(f"  Skipped (excluded): {rel_str}")
                                 continue
                             out = subdir / f.name
-                            out.write_bytes(f.read_bytes())
-                            staged.append(out)
-                            logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
+                            if dry_run:
+                                logger.info(f"  [{name}] [dry-run] Would copy: {rel_str} -> {out}")
+                            else:
+                                out.write_bytes(f.read_bytes())
+                                staged.append(out)
+                                logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
                     elif p.is_file():
                         rel_str = str(p.relative_to(root)).replace("\\", "/")
                         if rel_str in exclude_items:
@@ -343,9 +347,12 @@ def _stage_local_includes(
                                 logger.debug(f"  Skipped (excluded): {rel_str}")
                             continue
                         out = subdir / p.name
-                        out.write_bytes(p.read_bytes())
-                        staged.append(out)
-                        logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
+                        if dry_run:
+                            logger.info(f"  [{name}] [dry-run] Would copy: {rel_str} -> {out}")
+                        else:
+                            out.write_bytes(p.read_bytes())
+                            staged.append(out)
+                            logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
                     else:
                         logger.warning(f"  [{name}] Include path not found: {item}")
                     continue
@@ -363,9 +370,14 @@ def _stage_local_includes(
                                         logger.debug(f"  Skipped (excluded): {rel_str}")
                                     continue
                                 out = subdir / f.name
-                                out.write_bytes(f.read_bytes())
-                                staged.append(out)
-                                logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
+                                if dry_run:
+                                    logger.info(
+                                        f"  [{name}] [dry-run] Would copy: {rel_str} -> {out}"
+                                    )
+                                else:
+                                    out.write_bytes(f.read_bytes())
+                                    staged.append(out)
+                                    logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
                         elif p.is_file():
                             rel_str = str(p.relative_to(root)).replace("\\", "/")
                             if rel_str in exclude_items:
@@ -373,9 +385,12 @@ def _stage_local_includes(
                                     logger.debug(f"  Skipped (excluded): {rel_str}")
                                 continue
                             out = subdir / p.name
-                            out.write_bytes(p.read_bytes())
-                            staged.append(out)
-                            logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
+                            if dry_run:
+                                logger.info(f"  [{name}] [dry-run] Would copy: {rel_str} -> {out}")
+                            else:
+                                out.write_bytes(p.read_bytes())
+                                staged.append(out)
+                                logger.info(f"  [{name}] Copied: {rel_str} -> {out}")
                         else:
                             logger.warning(f"  [{name}] Include path not found: {item.get('path')}")
                         continue
@@ -391,9 +406,12 @@ def _stage_local_includes(
                         # Ensure newline termination
                         if not pem_text.endswith("\n"):
                             pem_text += "\n"
-                        out.write_text(pem_text, encoding="utf-8")
-                        staged.append(out)
-                        logger.info(f"  [{name}] Wrote inline PEM -> {out}")
+                        if dry_run:
+                            logger.info(f"  [{name}] [dry-run] Would write inline PEM -> {out}")
+                        else:
+                            out.write_text(pem_text, encoding="utf-8")
+                            staged.append(out)
+                            logger.info(f"  [{name}] Wrote inline PEM -> {out}")
                         continue
 
                     logger.warning(
@@ -408,7 +426,8 @@ def _stage_local_includes(
     if include_items_legacy:
         exclude_items_legacy = set(cfg.get("exclude") or [])
         include_dir = staging_root / "include"
-        ensure_dir(include_dir)
+        if not dry_run:
+            ensure_dir(include_dir)
         logger.info("[Local] Copying legacy includes ...")
         for item in include_items_legacy:
             p = (root / item).resolve()
@@ -420,9 +439,12 @@ def _stage_local_includes(
                             logger.debug(f"  Skipped (excluded): {rel_str}")
                         continue
                     out = include_dir / f.name
-                    out.write_bytes(f.read_bytes())
-                    staged.append(out)
-                    logger.info(f"  Copied: {rel_str} -> {out}")
+                    if dry_run:
+                        logger.info(f"  [dry-run] Would copy: {rel_str} -> {out}")
+                    else:
+                        out.write_bytes(f.read_bytes())
+                        staged.append(out)
+                        logger.info(f"  Copied: {rel_str} -> {out}")
             elif p.is_file():
                 rel_str = str(p.relative_to(root)).replace("\\", "/")
                 if rel_str in exclude_items_legacy:
@@ -430,9 +452,12 @@ def _stage_local_includes(
                         logger.debug(f"  Skipped (excluded): {rel_str}")
                     continue
                 out = include_dir / p.name
-                out.write_bytes(p.read_bytes())
-                staged.append(out)
-                logger.info(f"  Copied: {rel_str} -> {out}")
+                if dry_run:
+                    logger.info(f"  [dry-run] Would copy: {rel_str} -> {out}")
+                else:
+                    out.write_bytes(p.read_bytes())
+                    staged.append(out)
+                    logger.info(f"  Copied: {rel_str} -> {out}")
             else:
                 logger.warning(f"  Include path not found: {item}")
     return staged
@@ -444,6 +469,7 @@ def _fetch_each_to_named_dirs(
     root: Path,
     verbose: bool,
     name_filter: str | None,
+    dry_run: bool = False,
 ) -> list[Path]:
     staged: list[Path] = []
     if not fetch_cfg:
@@ -496,6 +522,11 @@ def _fetch_each_to_named_dirs(
     help="Output directory for staged certificates (default: ./sources/staged)",
 )
 @click.option("--verbose", is_flag=True, help="Show extra debug output for fetch operations")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be done without actually fetching or copying any files",
+)
 def main(
     bundle_config_file: Path,
     fetch_name: str | None,
@@ -504,6 +535,7 @@ def main(
     fetch_only: bool,
     output_dir: Path,
     verbose: bool,
+    dry_run: bool,
 ):
     """Fetch and stage certificate inputs declared in a bundle config.
 
@@ -514,8 +546,13 @@ def main(
       2) Create per-source subdirectories: 'include/' for local paths and one subdirectory per fetch 'name'
       3) Copy local includes (unless --fetch-only) and perform remote fetches into their respective subdirectories
       4) Summarize the resulting directory structure and file counts
+
+    Use --dry-run to preview what would be fetched without making any changes.
     """
     click.secho("\n🔐 BundleCraft Fetcher\n----------------------", fg="cyan")
+
+    if dry_run:
+        click.secho("[DRY RUN MODE] No files will be fetched or copied\n", fg="yellow", bold=True)
 
     # Set logging level based on verbose flag
     logger.setLevel(logging.DEBUG if verbose else logging.INFO)
@@ -539,31 +576,46 @@ def main(
             staging_root = (root / output_dir / bundle_name).resolve()
         else:
             staging_root = (output_dir / bundle_name).resolve()
-        ensure_dir(staging_root)
-        if not no_clean:
+        if not dry_run:
+            ensure_dir(staging_root)
+        if not no_clean and not dry_run:
             logger.info(f"Cleaning staging directory: {staging_root}")
             _clean_dir(staging_root)
             ensure_dir(staging_root)
+        elif dry_run:
+            logger.info(f"[dry-run] Would use staging directory: {staging_root}")
 
         staged_paths: list[Path] = []
         if not fetch_only:
-            staged_paths += _stage_local_includes(cfg, staging_root, root, verbose)
+            staged_paths += _stage_local_includes(cfg, staging_root, root, verbose, dry_run)
 
-        staged_paths += _fetch_each_to_named_dirs(
-            fetch_cfg, staging_root, root, verbose, fetch_name
-        )
+        if dry_run:
+            # In dry-run, just show what would be fetched
+            for entry in fetch_cfg:
+                name = entry.get("name") or "unnamed"
+                ftype = entry.get("type") or "http"
+                if not fetch_name or name == fetch_name:
+                    logger.info(f"[dry-run] Would fetch: {name} (type: {ftype})")
+        else:
+            staged_paths += _fetch_each_to_named_dirs(
+                fetch_cfg, staging_root, root, verbose, fetch_name, dry_run
+            )
 
-        # Summarize directory structure and counts
-        click.secho("\n[SUMMARY] Staged artifacts:", fg="blue")
-        total = 0
-        for sub in sorted(staging_root.iterdir()):
-            if not sub.is_dir():
-                continue
-            files = [p for p in sorted(sub.rglob("*")) if p.is_file()]
-            count = len(files)
-            total += count
-            click.secho(f"  - {sub.name}/ : {count} file(s)", fg="blue")
-        click.secho(f"  Total: {total} file(s)\n", fg="blue")
+            # Summarize directory structure and counts
+            if not dry_run and staging_root.exists():
+                click.secho("\n[SUMMARY] Staged artifacts:", fg="blue")
+                total = 0
+                for sub in sorted(staging_root.iterdir()):
+                    if not sub.is_dir():
+                        continue
+                    files = [p for p in sorted(sub.rglob("*")) if p.is_file()]
+                    count = len(files)
+                    total += count
+                    click.secho(f"  - {sub.name}/ : {count} file(s)", fg="blue")
+                click.secho(f"  Total: {total} file(s)\n", fg="blue")
+            elif dry_run:
+                click.secho("\n[SUMMARY] [dry-run] Would stage artifacts to:", fg="yellow")
+                click.secho(f"  {staging_root}\n", fg="yellow")
 
     except click.ClickException as e:
         click.secho(f"[ERROR] {e}", fg="red", err=True)
@@ -572,7 +624,10 @@ def main(
         click.secho(f"[ERROR] Fetch failed: {e}", fg="red", err=True)
         sys.exit(2)
 
-    click.secho("[SUCCESS] Fetch completed.", fg="green")
+        if dry_run:
+            click.secho("[SUCCESS] [dry-run] Fetch simulation completed.", fg="yellow")
+        else:
+            click.secho("[SUCCESS] Fetch completed.", fg="green")
 
 
 if __name__ == "__main__":

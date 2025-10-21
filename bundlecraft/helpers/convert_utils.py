@@ -41,6 +41,7 @@ def convert_to_formats(
     formats: list[str],
     fmt_overrides: dict | None = None,
     output_basename: str | None = None,
+    dry_run: bool = False,
 ):
     """
     Convert a canonical PEM bundle into one or more target formats.
@@ -51,6 +52,7 @@ def convert_to_formats(
         formats (list[str]): Target formats (e.g., ["p7b", "jks", "p12"])
         fmt_overrides (dict|None): Optional per-format overrides (alias/password settings)
         output_basename (str|None): Base name for output files (default: input file stem)
+        dry_run (bool): If True, show what would be done without executing
     """
     fmt_overrides = fmt_overrides or {}
     if output_basename is None:
@@ -61,6 +63,9 @@ def convert_to_formats(
         if fmt in ("pem",):
             # Just copy/normalize the PEM into the output directory
             out_path = build_root / f"{output_basename}.pem"
+            if dry_run:
+                print(f"[dry-run] Would write PEM: {out_path}")
+                continue
             if out_path.exists() and not fmt_overrides.get("force", False):
                 raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
             out_path.write_text(
@@ -68,10 +73,16 @@ def convert_to_formats(
             )
             print(f"[INFO] Wrote PEM: {out_path}")
         elif fmt in ("p7b", "pkcs7"):
+            if dry_run:
+                print(f"[dry-run] Would create P7B: {build_root / f'{output_basename}.p7b'}")
+                continue
             create_p7b(
                 pem_path, build_root, output_basename, force=fmt_overrides.get("force", False)
             )
         elif fmt == "jks":
+            if dry_run:
+                print(f"[dry-run] Would create JKS: {build_root / f'{output_basename}.jks'}")
+                continue
             create_jks(
                 pem_path,
                 build_root,
@@ -80,6 +91,9 @@ def convert_to_formats(
                 force=fmt_overrides.get("force", False),
             )
         elif fmt in ("p12", "pfx", "pkcs12"):
+            if dry_run:
+                print(f"[dry-run] Would create PKCS12: {build_root / f'{output_basename}.p12'}")
+                continue
             create_pkcs12(
                 pem_path,
                 build_root,
@@ -88,6 +102,9 @@ def convert_to_formats(
                 force=fmt_overrides.get("force", False),
             )
         elif fmt == "zip":
+            if dry_run:
+                print(f"[dry-run] Would create ZIP: {build_root / f'{output_basename}.zip'}")
+                continue
             create_zip(
                 pem_path, build_root, output_basename, force=fmt_overrides.get("force", False)
             )

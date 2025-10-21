@@ -95,6 +95,11 @@ from bundlecraft.helpers.convert_utils import convert_from_any
     default="dist",
     help="Root directory for build outputs (default: ./dist)",
 )
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be done without actually converting or writing any files",
+)
 def main(
     pem_file,
     input_path,
@@ -107,14 +112,21 @@ def main(
     output_root,
     output_basename,
     force,
+    dry_run,
 ):
     """Convert certificate bundles between formats without losing certificates.
 
     IMPORTANT: Private keys are NOT processed. Only certificates are extracted and converted.
     Output files are always named 'bundlecraft-ca-trust.[FORMAT]'.
     Use --force to overwrite existing files.
+        Use --dry-run to preview what would be converted without making any changes.
     """
     click.secho("\n🔐 BundleCraft Converter\n---------------------------", fg="cyan")
+
+    if dry_run:
+        click.secho(
+            "[DRY RUN MODE] No files will be converted or written\n", fg="yellow", bold=True
+        )
 
     in_path = Path(input_path or pem_file).resolve() if (input_path or pem_file) else None
     if in_path is None:
@@ -160,6 +172,15 @@ def main(
         sys.exit(2)
 
     try:
+        if dry_run:
+            click.secho(f"[dry-run] Would convert from: {in_path}", fg="yellow")
+            click.secho(f"[dry-run] Would write to: {out_dir}", fg="yellow")
+            click.secho(f"[dry-run] Target format(s): {', '.join(formats)}", fg="yellow")
+            if output_basename:
+                click.secho(f"[dry-run] Output basename: {output_basename}", fg="yellow")
+            click.secho("\n[SUCCESS] [dry-run] Conversion simulation complete", fg="yellow")
+            sys.exit(0)
+
         convert_from_any(
             in_path,
             out_dir,
