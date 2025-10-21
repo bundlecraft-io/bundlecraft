@@ -20,6 +20,7 @@ from __future__ import annotations
 import datetime as dt
 import gzip
 import json
+import logging
 import sys
 import tarfile
 from pathlib import Path
@@ -33,6 +34,7 @@ from bundlecraft.helpers.config_schema import (
     validate_defaults_config,
 )
 from bundlecraft.helpers.convert_utils import convert_to_formats
+from bundlecraft.helpers.json_output import suppress_output
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
 # ---------------------------------------------------------------------
@@ -65,7 +67,12 @@ def _clean_dir(path: Path) -> None:
 
 
 def _stage_bundle_sources(
-    bundle_name: str, env: str, workspace_root: Path, verbose: bool = False, dry_run: bool = False
+    bundle_name: str,
+    env: str,
+    workspace_root: Path,
+    verbose: bool = False,
+    dry_run: bool = False,
+    json_output: bool = False,
 ) -> Path:
     """Stage a bundle's sources (includes + fetch) into sources/staged/<env>/<bundle>/.
 
@@ -78,6 +85,13 @@ def _stage_bundle_sources(
         _validate_source_and_fetch_names,
         load_yaml,
     )
+    from bundlecraft.fetch import logger as fetch_logger
+
+    # Suppress fetch logging in JSON mode
+    if json_output:
+        fetch_logger.setLevel(logging.CRITICAL)
+    else:
+        fetch_logger.setLevel(logging.INFO)
 
     bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle_name}.yaml"
     bundle_cfg = load_yaml(bundle_cfg_path, required=True, validate=validate_bundle_config)
@@ -406,13 +420,15 @@ def main(
     # Track errors and targets for JSON output
     json_errors = []
     json_targets = []
-    
+
     if not json_output:
         click.secho("\n🔐 BundleCraft Builder\n---------------------", fg="cyan")
 
         if dry_run:
             click.secho(
-                "[DRY RUN MODE] No files will be written or commands executed\n", fg="yellow", bold=True
+                "[DRY RUN MODE] No files will be written or commands executed\n",
+                fg="yellow",
+                bold=True,
             )
 
     # Load defaults and craft config with proper precedence
@@ -431,12 +447,10 @@ def main(
         if json_output:
             json_errors.append(error_msg)
             from bundlecraft.helpers.json_output import create_build_response, emit_json
-            emit_json(create_build_response(
-                success=False,
-                craft=env,
-                targets=[],
-                errors=json_errors
-            ))
+
+            emit_json(
+                create_build_response(success=False, craft=env, targets=[], errors=json_errors)
+            )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
         sys.exit(2)
@@ -490,12 +504,10 @@ def main(
                 error_msg = "No targets found in craft config and no --bundle provided."
                 json_errors.append(error_msg)
                 from bundlecraft.helpers.json_output import create_build_response, emit_json
-                emit_json(create_build_response(
-                    success=False,
-                    craft=env,
-                    targets=[],
-                    errors=json_errors
-                ))
+
+                emit_json(
+                    create_build_response(success=False, craft=env, targets=[], errors=json_errors)
+                )
             sys.exit(2)
 
     # Precompute craft-safe path and output settings used during caching
@@ -534,7 +546,7 @@ def main(
         for bname in unique_bundles:
             try:
                 staging_dir = _stage_bundle_sources(
-                    bname, env, ROOT, verbose=verbose, dry_run=dry_run
+                    bname, env, ROOT, verbose=verbose, dry_run=dry_run, json_output=json_output
                 )
                 if dry_run:
                     if not json_output:
@@ -597,10 +609,11 @@ def main(
                 _write_canonical_pem(
                     cache_pem, pem_blocks, include_subject_comments, force=True, dry_run=dry_run
                 )
-                click.secho(
-                    f"  [cache] ✓ Wrote cached canonical PEM: {cache_pem.relative_to(ROOT)}",
-                    fg="green",
-                )
+                if not json_output:
+                    click.secho(
+                        f"  [cache] ✓ Wrote cached canonical PEM: {cache_pem.relative_to(ROOT)}",
+                        fg="green",
+                    )
 
                 # Convert cached canonical PEM to configured extra formats (once)
                 extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
@@ -608,18 +621,31 @@ def main(
                     fmt_overrides_combined = dict(fmt_overrides)
                     if force:
                         fmt_overrides_combined["force"] = True
-                    convert_to_formats(
-                        cache_pem,
-                        cache_dir,
-                        extra_formats,
-                        fmt_overrides_combined,
-                        "bundlecraft-ca-trust",
-                        dry_run=dry_run,
-                    )
-                    click.secho(
-                        f"  [cache] ✓ Converted cached bundle to formats: {', '.join(extra_formats)}",
-                        fg="green",
-                    )
+                    # Suppress print output in JSON mode
+                    if json_output:
+                        with suppress_output():
+                            convert_to_formats(
+                                cache_pem,
+                                cache_dir,
+                                extra_formats,
+                                fmt_overrides_combined,
+                                "bundlecraft-ca-trust",
+                                dry_run=dry_run,
+                            )
+                    else:
+                        convert_to_formats(
+                            cache_pem,
+                            cache_dir,
+                            extra_formats,
+                            fmt_overrides_combined,
+                            "bundlecraft-ca-trust",
+                            dry_run=dry_run,
+                        )
+                    if not json_output:
+                        click.secho(
+                            f"  [cache] ✓ Converted cached bundle to formats: {', '.join(extra_formats)}",
+                            fg="green",
+                        )
 
                 bundle_cache_dirs[bname] = cache_dir
             except Exception as e:
@@ -633,7 +659,9 @@ def main(
                 sys.exit(2)
     else:
         if not json_output:
-            click.secho("\n[STAGE 1/3] FETCH - Skipped (using existing staged sources)", fg="yellow")
+            click.secho(
+                "\n[STAGE 1/3] FETCH - Skipped (using existing staged sources)", fg="yellow"
+            )
         for bname in unique_bundles:
             cache_dir = bundle_cache_root / bname
             bundle_cache_dirs[bname] = cache_dir
@@ -649,7 +677,9 @@ def main(
     # STAGE 2: CONVERT
     # =========================================================================
     if not json_output:
-        click.secho("\n[STAGE 2/3] CONVERT - Aggregating and converting formats", fg="blue", bold=True)
+        click.secho(
+            "\n[STAGE 2/3] CONVERT - Aggregating and converting formats", fg="blue", bold=True
+        )
     craft_name_for_path = env_cfg.get("name") or env
     safe_craft = str(craft_name_for_path).replace("/", "-").replace(" ", "-")
 
@@ -707,10 +737,11 @@ def main(
                         display_path = final_build_root.relative_to(ROOT)
                     except ValueError:
                         display_path = final_build_root
-                    click.secho(
-                        f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {display_path}",
-                        fg="green",
-                    )
+                    if not json_output:
+                        click.secho(
+                            f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {display_path}",
+                            fg="green",
+                        )
                 pem_blocks = _read_pem_chunks([cache_pem])
                 per_target_results[target_name] = {
                     "build_root": final_build_root,
@@ -836,25 +867,38 @@ def main(
                     display_path = final_build_root.relative_to(ROOT)
                 except ValueError:
                     display_path = final_build_root
-                click.secho(
-                    f"  [{target_name}] ✓ Wrote merged canonical PEM: {display_path}/bundlecraft-ca-trust.pem",
-                    fg="green",
-                )
+                if not json_output:
+                    click.secho(
+                        f"  [{target_name}] ✓ Wrote merged canonical PEM: {display_path}/bundlecraft-ca-trust.pem",
+                        fg="green",
+                    )
 
             extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
             if extra_formats:
                 fmt_overrides_combined = dict(fmt_overrides)
                 if force:
                     fmt_overrides_combined["force"] = True
-                convert_to_formats(
-                    pem_out,
-                    build_root,
-                    extra_formats,
-                    fmt_overrides_combined,
-                    "bundlecraft-ca-trust",
-                    dry_run=dry_run,
-                )
-                if not dry_run:
+                # Suppress print output in JSON mode
+                if json_output:
+                    with suppress_output():
+                        convert_to_formats(
+                            pem_out,
+                            build_root,
+                            extra_formats,
+                            fmt_overrides_combined,
+                            "bundlecraft-ca-trust",
+                            dry_run=dry_run,
+                        )
+                else:
+                    convert_to_formats(
+                        pem_out,
+                        build_root,
+                        extra_formats,
+                        fmt_overrides_combined,
+                        "bundlecraft-ca-trust",
+                        dry_run=dry_run,
+                    )
+                if not dry_run and not json_output:
                     click.secho(
                         f"  [{target_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
                         fg="green",
@@ -971,7 +1015,7 @@ def main(
             verify_results[target_name] = {
                 "passed": len(errs) == 0,
                 "errors": errs,
-                "warnings": warns
+                "warnings": warns,
             }
             if not json_output:
                 for e in errs:
@@ -986,7 +1030,9 @@ def main(
                     )
                 if fail_on_expired:
                     if not json_output:
-                        click.secho("  Build FAILED due to expired certificates", fg="red", err=True)
+                        click.secho(
+                            "  Build FAILED due to expired certificates", fg="red", err=True
+                        )
                     else:
                         # For JSON mode, we'll output at the end with success=False
                         pass
@@ -1053,7 +1099,8 @@ def main(
             )
             if not json_output:
                 click.secho(
-                    f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}", fg="green"
+                    f"  [{target_name}] ✓ Wrote manifest: {manifest_path.relative_to(ROOT)}",
+                    fg="green",
                 )
 
             all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
@@ -1074,14 +1121,14 @@ def main(
         build_root = result["build_root"]
         pem_blocks = result["pem_blocks"]
         output_formats = result["output_formats"]
-        
+
         # Get bundles for this target
         target_bundles = []
         for tname, include_bundles in targets_to_build:
             if tname == target_name:
                 target_bundles = include_bundles
                 break
-        
+
         target_info = {
             "name": target_name,
             "certificate_count": len(pem_blocks),
@@ -1089,13 +1136,13 @@ def main(
             "output_path": str(build_root.relative_to(ROOT)) if not dry_run else str(build_root),
             "bundles": target_bundles,
         }
-        
+
         # Add verification results if available
         if target_name in verify_results:
             target_info["verification"] = verify_results[target_name]
-        
+
         json_targets.append(target_info)
-    
+
     # Check if any verification errors occurred
     verification_failed = False
     if not skip_verify:
@@ -1107,19 +1154,21 @@ def main(
             if verify_results[target_name]["errors"] and fail_on_expired:
                 verification_failed = True
                 break
-    
+
     # Output results
     if json_output:
         from bundlecraft.helpers.json_output import create_build_response, emit_json
-        
-        emit_json(create_build_response(
-            success=not verification_failed and not json_errors,
-            craft=env_cfg.get("name") or env,
-            targets=json_targets,
-            errors=json_errors if json_errors else None,
-            dry_run=dry_run
-        ))
-        
+
+        emit_json(
+            create_build_response(
+                success=not verification_failed and not json_errors,
+                craft=env_cfg.get("name") or env,
+                targets=json_targets,
+                errors=json_errors if json_errors else None,
+                dry_run=dry_run,
+            )
+        )
+
         if verification_failed:
             sys.exit(5)
     else:

@@ -11,6 +11,6 @@ fetch:
     token_ref: VAULT_TOKEN
     namespace: ''  # Optional Vault namespace
 metadata:
-  owner: secrets-management-team@example.com
+  owner: secrets-management-team@bundlecraft.io
   purpose: Dynamic trust store from centralized secret management
   tags: [vault, dynamic, secrets]

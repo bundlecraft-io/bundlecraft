@@ -136,7 +136,7 @@ Kr7RJQIDAQABMA0GCSqGSIb3DQEBCwUAA4GBAAoJb
         # Create a file that exists but has invalid content
         invalid_pem = tmp_path / "invalid.pem"
         invalid_pem.write_text("not a valid pem file")
-        
+
         result = cli_runner.invoke(
             convert_main,
             [
@@ -264,7 +264,7 @@ class TestJsonOutputSchema:
         # Test with invalid config file
         bundle_config = tmp_path / "invalid.yaml"
         bundle_config.write_text("invalid yaml [[[")
-        
+
         result = cli_runner.invoke(
             fetch_main,
             [
@@ -304,3 +304,191 @@ class TestJsonOutputSchema:
         # Test that output can be re-serialized
         reserialized = json.dumps(data)
         assert json.loads(reserialized) == data
+
+
+class TestBuildJsonOutputPurity:
+    """Test that build command JSON output doesn't mix with human-readable text."""
+
+    def test_build_json_no_human_markers(self, temp_dir, sample_cert_pem, monkeypatch):
+        """Test that --json mode suppresses all human-readable output markers."""
+        from bundlecraft import builder as builder_mod
+
+        cli_runner = CliRunner()
+
+        # Create minimal test structure
+        config_dir = temp_dir / "config"
+        (config_dir / "crafts").mkdir(parents=True)
+        (config_dir / "bundles").mkdir(parents=True)
+        sources_internal = temp_dir / "sources" / "internal" / "test-bundle"
+        sources_internal.mkdir(parents=True)
+
+        # Monkeypatch paths for builder and fetch
+        monkeypatch.setattr(builder_mod, "ROOT", temp_dir)
+        monkeypatch.setattr(builder_mod, "CONFIG_DIR", config_dir)
+        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_dir / "sources")
+        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_dir / "sources" / "staged")
+        monkeypatch.setattr(builder_mod, "DIST_DIR", temp_dir / "dist")
+        import bundlecraft.fetch
+
+        bundlecraft.fetch.ROOT = temp_dir
+        bundlecraft.fetch.CONFIG_DIR = config_dir
+        bundlecraft.fetch.SOURCES_DIR = temp_dir / "sources"
+        bundlecraft.fetch.STAGED_DIR = temp_dir / "sources" / "staged"
+
+        # Use the fixture certificate
+        (sources_internal / "test.pem").write_text(sample_cert_pem, encoding="utf-8")
+
+        # Create minimal bundle config
+        bundle_config = """---
+bundle_name: test-bundle
+description: Test bundle
+repo:
+  - name: test-bundle
+    include:
+      - sources/internal/test-bundle
+"""
+        (config_dir / "bundles" / "test-bundle.yaml").write_text(bundle_config)
+
+        # Create minimal craft config with packaging enabled
+        craft_config = """---
+name: Test
+description: Test craft
+targets:
+  test-target:
+    includes: [test-bundle]
+output_formats:
+  - pem
+package: false
+verify:
+  fail_on_expired: false
+"""
+        (config_dir / "crafts" / "test.yaml").write_text(craft_config)
+
+        # Build with --json flag
+        with cli_runner.isolated_filesystem(temp_dir):
+            result = cli_runner.invoke(
+                build_main,
+                [
+                    "--craft",
+                    "test",
+                    "--bundle",
+                    "test-target",
+                    "--json",
+                ],
+                catch_exceptions=False,
+            )
+
+        # Verify it succeeded
+        assert result.exit_code == 0, f"Build failed: {result.output}"
+
+        # Verify output is valid JSON
+        try:
+            output_data = json.loads(result.output)
+        except json.JSONDecodeError as e:
+            pytest.fail(f"Invalid JSON output: {e}\nOutput: {result.output}")
+
+        # Check that stdout doesn't contain common human-readable patterns
+        output = result.output
+
+        # Should NOT contain these human-readable markers
+        human_patterns = [
+            "🔐 BundleCraft",
+            "[STAGE",
+            "[cache] ✓",
+            "[JKS] ✓",
+            "✅ Build complete",
+            "[INFO] Created",
+            "Wrote cached",
+            "Converted cached",
+        ]
+
+        for pattern in human_patterns:
+            assert pattern not in output, f"Found human-readable text in JSON output: '{pattern}'"
+
+        # Should start with '{' (JSON object start)
+        assert output.strip().startswith("{"), "Output should start with JSON object"
+
+        # Verify JSON structure
+        assert output_data["command"] == "build"
+        assert output_data["success"] is True
+        assert "targets" in output_data
+        assert len(output_data["targets"]) > 0
+
+    def test_build_json_output_is_pure_json(self, temp_dir, sample_cert_pem, monkeypatch):
+        """Test that entire stdout can be parsed as a single JSON object."""
+        from bundlecraft import builder as builder_mod
+
+        cli_runner = CliRunner()
+
+        # Create minimal test structure
+        config_dir = temp_dir / "config"
+        (config_dir / "crafts").mkdir(parents=True)
+        (config_dir / "bundles").mkdir(parents=True)
+        sources_internal = temp_dir / "sources" / "internal" / "test-bundle"
+        sources_internal.mkdir(parents=True)
+
+        # Monkeypatch paths
+        monkeypatch.setattr(builder_mod, "ROOT", temp_dir)
+        monkeypatch.setattr(builder_mod, "CONFIG_DIR", config_dir)
+        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_dir / "sources")
+        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_dir / "sources" / "staged")
+        monkeypatch.setattr(builder_mod, "DIST_DIR", temp_dir / "dist")
+        import bundlecraft.fetch
+
+        bundlecraft.fetch.ROOT = temp_dir
+        bundlecraft.fetch.CONFIG_DIR = config_dir
+        bundlecraft.fetch.SOURCES_DIR = temp_dir / "sources"
+        bundlecraft.fetch.STAGED_DIR = temp_dir / "sources" / "staged"
+
+        (sources_internal / "test.pem").write_text(sample_cert_pem, encoding="utf-8")
+
+        bundle_config = """---
+bundle_name: test-bundle
+description: Test bundle
+repo:
+  - name: test-bundle
+    include:
+      - sources/internal/test-bundle
+"""
+        (config_dir / "bundles" / "test-bundle.yaml").write_text(bundle_config)
+
+        craft_config = """---
+name: Test
+description: Test craft
+targets:
+  test-target:
+    includes: [test-bundle]
+output_formats:
+  - pem
+package: false
+verify:
+  fail_on_expired: false
+"""
+        (config_dir / "crafts" / "test.yaml").write_text(craft_config)
+
+        with cli_runner.isolated_filesystem(temp_dir):
+            result = cli_runner.invoke(
+                build_main,
+                ["--craft", "test", "--bundle", "test-target", "--json"],
+                catch_exceptions=False,
+            )
+
+        assert result.exit_code == 0
+
+        # The ENTIRE output should be parseable as a single JSON object
+        # No leading or trailing text, no multiple objects
+        output = result.output.strip()
+
+        # Should start and end with JSON object delimiters
+        assert output.startswith("{"), "Output should start with '{'"
+        assert output.endswith("}"), "Output should end with '}'"
+
+        # Should contain only one JSON object (no newlines between objects)
+        # Count occurrences of '}{\n' or '}{' which would indicate multiple JSON objects
+        assert "}{\n" not in output, "Output contains multiple JSON objects"
+        assert "}{" not in output, "Output contains multiple JSON objects"
+
+        # Parse and verify it's a single valid object
+        data = json.loads(output)
+        assert isinstance(data, dict)
+        assert "command" in data

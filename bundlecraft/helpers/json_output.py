@@ -8,13 +8,16 @@ to support CI/CD automation and scripting use cases.
 """
 
 import json
+import os
+import sys
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 
 
 def emit_json(data: dict[str, Any], *, file=None) -> None:
     """Emit JSON data to stdout or specified file.
-    
+
     Args:
         data: Dictionary to serialize as JSON
         file: Optional file object to write to (defaults to stdout)
@@ -29,17 +32,17 @@ def emit_json(data: dict[str, Any], *, file=None) -> None:
 
 def create_base_response(success: bool, command: str, **kwargs) -> dict[str, Any]:
     """Create a base JSON response structure.
-    
+
     Args:
         success: Whether the operation succeeded
         command: Name of the command being executed
         **kwargs: Additional fields to include in the response
-        
+
     Returns:
         Base response dictionary with timestamp and version
     """
     from bundlecraft import __version__
-    
+
     response = {
         "success": success,
         "command": command,
@@ -55,10 +58,10 @@ def create_build_response(
     craft: str,
     targets: list[dict[str, Any]],
     errors: list[str] | None = None,
-    **kwargs
+    **kwargs,
 ) -> dict[str, Any]:
     """Create a JSON response for the build command.
-    
+
     Schema:
         {
             "success": bool,
@@ -84,11 +87,7 @@ def create_build_response(
         }
     """
     response = create_base_response(
-        success=success,
-        command="build",
-        craft=craft,
-        targets=targets,
-        **kwargs
+        success=success, command="build", craft=craft, targets=targets, **kwargs
     )
     if errors:
         response["errors"] = errors
@@ -103,10 +102,10 @@ def create_verify_response(
     total_certificates: int = 0,
     errors: list[str] | None = None,
     warnings: list[str] | None = None,
-    **kwargs
+    **kwargs,
 ) -> dict[str, Any]:
     """Create a JSON response for the verify command.
-    
+
     Schema:
         {
             "success": bool,
@@ -128,7 +127,7 @@ def create_verify_response(
         verified_files=verified_files,
         skipped_files=skipped_files,
         total_certificates=total_certificates,
-        **kwargs
+        **kwargs,
     )
     if errors:
         response["errors"] = errors
@@ -144,10 +143,10 @@ def create_convert_response(
     output_format: str,
     certificate_count: int = 0,
     errors: list[str] | None = None,
-    **kwargs
+    **kwargs,
 ) -> dict[str, Any]:
     """Create a JSON response for the convert command.
-    
+
     Schema:
         {
             "success": bool,
@@ -168,7 +167,7 @@ def create_convert_response(
         output_dir=output_dir,
         output_format=output_format,
         certificate_count=certificate_count,
-        **kwargs
+        **kwargs,
     )
     if errors:
         response["errors"] = errors
@@ -183,10 +182,10 @@ def create_fetch_response(
     local_sources: int = 0,
     total_files: int = 0,
     errors: list[str] | None = None,
-    **kwargs
+    **kwargs,
 ) -> dict[str, Any]:
     """Create a JSON response for the fetch command.
-    
+
     Schema:
         {
             "success": bool,
@@ -209,8 +208,29 @@ def create_fetch_response(
         fetched_sources=fetched_sources,
         local_sources=local_sources,
         total_files=total_files,
-        **kwargs
+        **kwargs,
     )
     if errors:
         response["errors"] = errors
     return response
+
+
+@contextmanager
+def suppress_output():
+    """Context manager to suppress stdout (for JSON mode).
+
+    Temporarily redirects stdout to devnull to suppress print statements
+    while preserving stderr for error messages.
+
+    Example:
+        with suppress_output():
+            # All print() calls are suppressed here
+            print("This won't appear")
+    """
+    old_stdout = sys.stdout
+    try:
+        with open(os.devnull, "w") as devnull:
+            sys.stdout = devnull
+            yield
+    finally:
+        sys.stdout = old_stdout
