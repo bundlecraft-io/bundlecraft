@@ -267,13 +267,13 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
     type=click.Path(exists=True),
     help="Path to GPG public keyring file to import for signature verification",
 )
-def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_keyring):
+@click.option(
     "--json",
     "json_output",
     is_flag=True,
     help="Emit machine-readable JSON output (suppresses human-readable output)",
 )
-def main(target, verify_manifest, verify_all, verbose, json_output):
+def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_keyring, json_output):
     """Verify the integrity and consistency of built trust bundles."""
     if not json_output:
         click.secho("\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
