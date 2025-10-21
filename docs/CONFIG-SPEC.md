@@ -8,6 +8,33 @@ This document defines the configuration schema for BundleCraft, clearly separati
 
 ---
 
+## Schema Validation
+
+**All configuration files are validated against a Pydantic schema at load time.**
+
+Benefits:
+- **Fail fast**: Invalid configs are rejected immediately with clear error messages
+- **Type safety**: Field types (strings, integers, booleans, lists) are enforced
+- **Required fields**: Missing required fields are caught early
+- **Value constraints**: Min/max values, string patterns, and enums are validated
+
+When validation fails, you'll see detailed error messages indicating:
+- Which field failed validation
+- The expected type or constraint
+- The actual value that was provided
+
+Example error message:
+```
+Config validation failed for config/bundles/invalid.yaml: Bundle config validation failed: 
+2 validation errors for BundleConfig
+bundle_name
+  Field required [type=missing]
+fetch.0.verify.sha256
+  Input should be a valid string [type=string_type, input_value=0]
+```
+
+---
+
 ## Configuration Philosophy
 
 ### Bundle Configs: Source & Fetch Layer
@@ -46,8 +73,27 @@ Defines certificate sources for a logical bundle.
 
 ### Required Keys
 
-- `bundle_name`: string (logical identifier)
-- `description`: string (purpose/context)
+- `bundle_name`: string (logical identifier, min length: 1)
+- `description`: string (purpose/context, min length: 1)
+
+### Schema Constraints
+
+**Required Fields:**
+- `bundle_name` and `description` are mandatory and cannot be empty
+
+**Validation Rules:**
+- Repository names (`repo[].name`) must be unique within a bundle
+- Fetch names (`fetch[].name`) must be unique if explicitly provided
+- Repository and fetch names cannot conflict with each other
+- Reserved names (`include`, `exclude`, `fetch`) cannot be used as repo or fetch names
+- Fetch type `url` requires a `url` field
+- Fetch type `api` requires either `endpoint` or `url` field
+- Fetch type `vault` requires `mount_point` and `path` fields
+- Include items can be:
+  - Plain strings (file/directory paths)
+  - Objects with `path` field
+  - Objects with `inline` field (for inline PEM content)
+  - Objects cannot have both `path` and `inline`
 
 ### Source Definition
 
@@ -193,6 +239,19 @@ metadata:
 ## 2) Craft Configuration: `config/crafts/<craft>.yaml`
 
 Defines build behavior and deployment configuration for a craft.
+
+### Schema Constraints
+
+**Field Validation:**
+- `output_formats`: Must be one of: `pem`, `p7b`, `jks`, `p12`, `pkcs12`
+- `verify.warn_days_before_expiry`: Must be >= 0
+- `filters.minimum_key_size_rsa`: Must be >= 1024 bits (if specified)
+- `filters.minimum_key_size_ecc`: Must be >= 160 bits (if specified)
+- `targets`: Can be dict format `{name: {includes: [...]}}` or list format with `target_name`/`name` and `includes`/`include_bundles`/`compose`
+
+**Optional Fields:**
+- Most fields have sensible defaults and are optional
+- `name`, `description`, `targets` can be omitted for simple configs
 
 ### Bundle Composition
 
@@ -354,6 +413,16 @@ metadata:
 
 Global fallback settings applied before craft config.
 
+### Schema Constraints
+
+**Field Validation:**
+- `output_formats`: Must be one of: `pem`, `p7b`, `jks`, `p12`, `pkcs12`
+- All validation rules from craft configs apply to defaults
+
+**Behavior:**
+- Empty/minimal defaults configs are valid - model provides sensible defaults
+- Defaults are merged with craft configs (craft settings override defaults)
+
 ```yaml
 ---
 output_formats:
@@ -488,6 +557,68 @@ Supported values for `distribution_metadata.targets[].type`:
 
 ---
 
+## Common Validation Errors
+
+### Bundle Config Errors
+
+**Missing Required Fields**
+```
+Error: Field required [type=missing, input_value={...}]
+Solution: Add required fields 'bundle_name' and 'description'
+```
+
+**Duplicate Names**
+```
+Error: Duplicate repository names found: roots
+Solution: Ensure all repo[].name values are unique
+```
+
+**Name Conflicts**
+```
+Error: Name conflict between repo and fetch entries: remote1
+Solution: Ensure repo names and fetch names don't overlap
+```
+
+**Reserved Names**
+```
+Error: Repository name 'include' is reserved. Choose a different name.
+Solution: Don't use 'include', 'exclude', or 'fetch' as repo/fetch names
+```
+
+**Invalid Include Items**
+```
+Error: Include item cannot have both 'path' and 'inline' fields
+Solution: Use either path OR inline, not both
+```
+
+### Craft Config Errors
+
+**Invalid Output Format**
+```
+Error: Invalid output format 'bad_format'. Valid formats: jks, p12, p7b, pem, pkcs12
+Solution: Use only supported format names
+```
+
+**Invalid Key Size**
+```
+Error: Input should be greater than or equal to 1024 [type=greater_than_equal]
+Solution: Set minimum_key_size_rsa >= 1024 or minimum_key_size_ecc >= 160
+```
+
+**Negative Values**
+```
+Error: Input should be greater than or equal to 0 [type=greater_than_equal]
+Solution: Set warn_days_before_expiry to a non-negative value
+```
+
+### General Tips
+
+1. **Check YAML syntax**: Ensure proper indentation and structure
+2. **Quote strings with special chars**: Use quotes for strings like "0000..." to prevent YAML from parsing as integers
+3. **Required vs Optional**: Bundle configs require name and description; most craft/defaults fields are optional
+4. **Validation on load**: Configs are validated immediately when loaded, so errors are caught early
+5. **Detailed errors**: Pydantic provides the exact field path and constraint that failed
+
 ## Security Best Practices
 
 1. **Fetch verification**: Always pin `sha256` for public/static sources (Mozilla)
@@ -495,3 +626,4 @@ Supported values for `distribution_metadata.targets[].type`:
 3. **Secrets**: Never hardcode passwords; always use `*_env` keys to reference environment variables
 4. **Distribution**: Use `enabled: false` to disable distribution targets in lower environments
 5. **Tags**: Use environment tags to control CI/CD pipeline routing (e.g., only sign/publish `production` tagged envs)
+6. **Validation**: Schema validation helps catch misconfigurations before they cause issues in production
