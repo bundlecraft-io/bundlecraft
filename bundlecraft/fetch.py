@@ -24,6 +24,7 @@ import click
 from bundlecraft.fetchers.api import fetch_api
 from bundlecraft.fetchers.http import fetch_url
 from bundlecraft.fetchers.vault import fetch_vault
+from bundlecraft.helpers.config_schema import validate_bundle_config
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -268,7 +269,9 @@ def run_fetch(
         else (config_dir / "envs" / f"{env}.yaml")
     )
     _ = load_yaml(cfg_path, required=True)
-    bundle_cfg = load_yaml(config_dir / "bundles" / f"{bundle}.yaml", required=True)
+    bundle_cfg = load_yaml(
+        config_dir / "bundles" / f"{bundle}.yaml", required=True, validate=validate_bundle_config
+    )
     fetch_cfg = bundle_cfg.get("fetch") or []
     if not isinstance(fetch_cfg, list):
         raise click.ClickException("Config key 'fetch' must be a list of sources")
@@ -561,7 +564,7 @@ def main(
 
     try:
         root = workspace_root.resolve()
-        cfg = load_yaml(bundle_config_file, required=True)
+        cfg = load_yaml(bundle_config_file, required=True, validate=validate_bundle_config)
         _validate_source_and_fetch_names(cfg)
         fetch_cfg = cfg.get("fetch") or []
         if not isinstance(fetch_cfg, list):

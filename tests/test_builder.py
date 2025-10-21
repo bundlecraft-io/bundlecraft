@@ -158,6 +158,7 @@ class TestBuilder:
         craft_yaml.write_text(
             """
 name: TestCraft
+description: Test craft for unit tests
 targets:
   app-a:
     include_bundles: [test-bundle]
@@ -221,6 +222,7 @@ output_formats: [pem]
         craft_yaml.write_text(
             """
 name: TestCraft
+description: Test craft for manifest and checksums test
 targets:
   a:
     includes: [test-bundle]

@@ -1,8 +1,9 @@
 ---
 bundle_name: test-bundle
 description: Test bundle for unit tests
-include: [sources/internal/sample.pem]
-exclude: []
+repo:
+  - name: internal
+    include: [sources/internal/sample.pem]
 output_formats: [pem, jks, p7b, p12]
 pem:
   include_subject_comments: true

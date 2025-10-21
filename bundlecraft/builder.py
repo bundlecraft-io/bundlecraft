@@ -24,6 +24,11 @@ from pathlib import Path
 
 import click
 
+from bundlecraft.helpers.config_schema import (
+    validate_bundle_config,
+    validate_craft_config,
+    validate_defaults_config,
+)
 from bundlecraft.helpers.convert_utils import convert_to_formats
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
@@ -72,7 +77,7 @@ def _stage_bundle_sources(
     )
 
     bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle_name}.yaml"
-    bundle_cfg = load_yaml(bundle_cfg_path, required=True)
+    bundle_cfg = load_yaml(bundle_cfg_path, required=True, validate=validate_bundle_config)
     # Validate local repo and fetch names
     try:
         _validate_source_and_fetch_names(bundle_cfg)
@@ -332,7 +337,10 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     # Load defaults and craft config with proper precedence
     from bundlecraft.helpers.utils import merge_configs
 
-    defaults = load_yaml(CONFIG_DIR / "defaults.yaml", required=False) or {}
+    defaults = (
+        load_yaml(CONFIG_DIR / "defaults.yaml", required=False, validate=validate_defaults_config)
+        or {}
+    )
     craft_path = CONFIG_DIR / "crafts" / f"{env}.yaml"
     legacy_env_path = CONFIG_DIR / "envs" / f"{env}.yaml"
     cfg_path = craft_path if craft_path.exists() else legacy_env_path
@@ -341,7 +349,7 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
         click.secho(f"[ERROR] Craft config not found: {env}", fg="red", err=True)
         sys.exit(2)
 
-    craft_cfg = load_yaml(cfg_path, required=True)
+    craft_cfg = load_yaml(cfg_path, required=True, validate=validate_craft_config)
     env_cfg = merge_configs(defaults, craft_cfg)
 
     # Normalize targets from craft config

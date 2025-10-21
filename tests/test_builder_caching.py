@@ -28,6 +28,7 @@ def test_bundle_cached_once_and_reused(
     craft_yaml.write_text(
         """
 name: TestCraft
+description: Test craft for caching test
 targets:
   target-a:
     includes: [test-bundle]
@@ -113,6 +114,7 @@ def test_multi_bundle_target_merges_cached_pems(
     craft_yaml.write_text(
         """
 name: TestCraft
+description: Test craft for multi-bundle merging
 targets:
   merged-target:
     includes: [bundle-a, bundle-b]
@@ -136,8 +138,10 @@ filters:
         """
 bundle_name: bundle-a
 description: Test bundle A
-include:
-  - sources/internal/sample.pem
+repo:
+  - name: internal
+    include:
+      - sources/internal/sample.pem
         """.strip()
     )
 
@@ -146,8 +150,10 @@ include:
         """
 bundle_name: bundle-b
 description: Test bundle B
-include:
-  - sources/internal/sample.pem
+repo:
+  - name: internal
+    include:
+      - sources/internal/sample.pem
         """.strip()
     )
 

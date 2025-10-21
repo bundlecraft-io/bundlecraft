@@ -2,11 +2,29 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 
-def load_yaml(path: Path, required: bool = True) -> dict[str, Any] | None:
+def load_yaml(
+    path: Path, required: bool = True, validate: Callable[[dict[str, Any], str], Any] | None = None
+) -> dict[str, Any] | None:
+    """Load and optionally validate a YAML configuration file.
+
+    Args:
+        path: Path to YAML file
+        required: If True, raise error if file doesn't exist
+        validate: Optional validation function that takes (data, path_str) and returns validated model
+
+    Returns:
+        Dictionary from YAML file, or None if not required and doesn't exist
+
+    Raises:
+        FileNotFoundError: If required=True and file doesn't exist
+        RuntimeError: If PyYAML is not installed
+        ValueError: If validation fails (from validate function)
+    """
     if not path.exists():
         if required:
             raise FileNotFoundError(f"Missing YAML file: {path}")
@@ -16,7 +34,18 @@ def load_yaml(path: Path, required: bool = True) -> dict[str, Any] | None:
     except ImportError as e:
         raise RuntimeError("PyYAML is required. Install with: pip install pyyaml") from e
     with path.open("r", encoding="utf-8") as fh:
-        return yaml.safe_load(fh) or {}
+        data = yaml.safe_load(fh) or {}
+
+    # Optionally validate with schema
+    if validate is not None:
+        try:
+            validate(data, str(path))
+        except ValueError:
+            raise  # Re-raise with original error message
+        except Exception as e:
+            raise ValueError(f"Config validation failed for {path}: {e}") from e
+
+    return data
 
 
 def ensure_dir(path: Path) -> None:
