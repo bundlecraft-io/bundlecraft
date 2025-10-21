@@ -244,6 +244,19 @@ class DistributionMetadata(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class OutputMetadata(BaseModel):
+    """Output metadata configuration for GitOps orchestration."""
+
+    model_config = ConfigDict(extra="allow")  # Allow additional metadata fields
+
+    annotations: dict[str, str] = Field(
+        default_factory=dict, description="Annotations for Kubernetes/GitOps (e.g., ArgoCD sync-wave)"
+    )
+    labels: dict[str, str] = Field(
+        default_factory=dict, description="Labels for Kubernetes/GitOps (e.g., environment, component)"
+    )
+
+
 class TargetEntry(BaseModel):
     """Target entry in craft config."""
 
@@ -332,6 +345,9 @@ class CraftConfig(BaseModel):
     distribution_metadata: DistributionMetadata | None = None
     metadata: MetadataModel = Field(default_factory=MetadataModel)
     build_path: str | None = Field(None, description="Custom build output path")
+    output_metadata: OutputMetadata | None = Field(
+        None, description="Output metadata for GitOps (annotations/labels with templating)"
+    )
 
     @field_validator("output_formats")
     @classmethod

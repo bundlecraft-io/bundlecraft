@@ -1,0 +1,247 @@
+"""Tests for output metadata templating functionality."""
+
+import datetime as dt
+from pathlib import Path
+
+import pytest
+
+from bundlecraft.helpers.template_utils import (
+    expand_metadata_dict,
+    expand_output_metadata,
+    expand_template_variables,
+    get_git_commit,
+)
+
+
+class TestGetGitCommit:
+    """Test git commit hash retrieval."""
+
+    def test_get_git_commit_returns_string(self):
+        """Test that get_git_commit returns a string."""
+        result = get_git_commit()
+        assert isinstance(result, str)
+        # Should be either a 7-char hash or 'unknown'
+        assert len(result) == 7 or result == "unknown"
+
+
+class TestExpandTemplateVariables:
+    """Test template variable expansion."""
+
+    def test_expand_bundle_variable(self):
+        """Test expansion of {{bundle}} variable."""
+        result = expand_template_variables("prefix-{{bundle}}-suffix", bundle="test-bundle")
+        assert result == "prefix-test-bundle-suffix"
+
+    def test_expand_env_variable(self):
+        """Test expansion of {{env}} variable."""
+        result = expand_template_variables("{{env}}-bundle", env="production")
+        assert result == "production-bundle"
+
+    def test_expand_multiple_variables(self):
+        """Test expansion of multiple variables."""
+        result = expand_template_variables(
+            "{{bundle}}-{{env}}", bundle="internal", env="prod"
+        )
+        assert result == "internal-prod"
+
+    def test_expand_date_variable(self):
+        """Test expansion of {{date}} variable."""
+        result = expand_template_variables("build-{{date}}")
+        # Should match YYYY-MM-DD format
+        assert result.startswith("build-")
+        date_part = result.replace("build-", "")
+        # Validate date format
+        dt.datetime.strptime(date_part, "%Y-%m-%d")
+
+    def test_expand_timestamp_variable(self):
+        """Test expansion of {{timestamp}} variable."""
+        result = expand_template_variables("{{timestamp}}")
+        # Should be ISO 8601 format
+        assert "T" in result
+        assert result.endswith("Z")
+
+    def test_expand_git_commit_variable(self):
+        """Test expansion of {{git_commit}} variable."""
+        result = expand_template_variables("commit-{{git_commit}}")
+        assert result.startswith("commit-")
+        commit_part = result.replace("commit-", "")
+        assert len(commit_part) == 7 or commit_part == "unknown"
+
+    def test_expand_with_custom_timestamp(self):
+        """Test expansion with provided timestamp."""
+        timestamp = "2025-10-21T12:00:00Z"
+        result = expand_template_variables(
+            "{{date}}-{{timestamp}}", timestamp_utc=timestamp
+        )
+        assert result == "2025-10-21-2025-10-21T12:00:00Z"
+
+    def test_expand_no_variables(self):
+        """Test expansion with no template variables."""
+        result = expand_template_variables("plain-text", bundle="test")
+        assert result == "plain-text"
+
+    def test_expand_empty_string(self):
+        """Test expansion of empty string."""
+        result = expand_template_variables("", bundle="test")
+        assert result == ""
+
+    def test_expand_unknown_variable(self):
+        """Test that unknown variables are left unchanged."""
+        result = expand_template_variables("{{unknown}}", bundle="test")
+        assert result == "{{unknown}}"
+
+
+class TestExpandMetadataDict:
+    """Test metadata dictionary expansion."""
+
+    def test_expand_simple_dict(self):
+        """Test expansion of simple metadata dict."""
+        metadata = {
+            "build-id": "{{bundle}}-{{env}}",
+            "environment": "{{env}}",
+        }
+        result = expand_metadata_dict(metadata, bundle="internal", env="prod")
+        assert result == {
+            "build-id": "internal-prod",
+            "environment": "prod",
+        }
+
+    def test_expand_empty_dict(self):
+        """Test expansion of empty dict."""
+        result = expand_metadata_dict({})
+        assert result == {}
+
+    def test_expand_dict_with_no_variables(self):
+        """Test expansion of dict with no template variables."""
+        metadata = {
+            "static-key": "static-value",
+        }
+        result = expand_metadata_dict(metadata)
+        assert result == metadata
+
+
+class TestExpandOutputMetadata:
+    """Test output metadata expansion."""
+
+    def test_expand_annotations_and_labels(self):
+        """Test expansion of both annotations and labels."""
+        output_metadata = {
+            "annotations": {
+                "build-timestamp": "{{timestamp}}",
+                "bundle-version": "{{bundle}}-{{env}}-{{date}}",
+            },
+            "labels": {
+                "environment": "{{env}}",
+                "bundle-id": "{{bundle}}",
+            },
+        }
+        timestamp = "2025-10-21T12:00:00Z"
+        result = expand_output_metadata(
+            output_metadata, bundle="internal", env="prod", timestamp_utc=timestamp
+        )
+        assert result is not None
+        assert "annotations" in result
+        assert "labels" in result
+        assert result["annotations"]["build-timestamp"] == timestamp
+        assert result["annotations"]["bundle-version"] == "internal-prod-2025-10-21"
+        assert result["labels"]["environment"] == "prod"
+        assert result["labels"]["bundle-id"] == "internal"
+
+    def test_expand_annotations_only(self):
+        """Test expansion with annotations only."""
+        output_metadata = {
+            "annotations": {
+                "sync-wave": "1",
+                "bundle": "{{bundle}}",
+            }
+        }
+        result = expand_output_metadata(output_metadata, bundle="test")
+        assert result is not None
+        assert "annotations" in result
+        assert "labels" not in result
+        assert result["annotations"]["sync-wave"] == "1"
+        assert result["annotations"]["bundle"] == "test"
+
+    def test_expand_labels_only(self):
+        """Test expansion with labels only."""
+        output_metadata = {
+            "labels": {
+                "app": "bundlecraft",
+                "env": "{{env}}",
+            }
+        }
+        result = expand_output_metadata(output_metadata, env="staging")
+        assert result is not None
+        assert "labels" in result
+        assert "annotations" not in result
+        assert result["labels"]["env"] == "staging"
+
+    def test_expand_none_metadata(self):
+        """Test expansion with None input."""
+        result = expand_output_metadata(None)
+        assert result is None
+
+    def test_expand_empty_metadata(self):
+        """Test expansion with empty dict."""
+        result = expand_output_metadata({})
+        assert result is None
+
+    def test_expand_empty_annotations_and_labels(self):
+        """Test expansion with empty annotations and labels."""
+        output_metadata = {
+            "annotations": {},
+            "labels": {},
+        }
+        result = expand_output_metadata(output_metadata)
+        assert result is None
+
+
+class TestTemplateExpansionIntegration:
+    """Integration tests for template expansion."""
+
+    def test_realistic_argocd_metadata(self):
+        """Test realistic ArgoCD metadata expansion."""
+        output_metadata = {
+            "annotations": {
+                "argocd.argoproj.io/sync-wave": "1",
+                "build-timestamp": "{{timestamp}}",
+                "bundle-version": "{{bundle}}-{{env}}-{{date}}",
+                "git-commit": "{{git_commit}}",
+            },
+            "labels": {
+                "environment": "{{env}}",
+                "bundle-id": "{{bundle}}",
+                "app.kubernetes.io/component": "trust-bundle",
+                "app.kubernetes.io/managed-by": "bundlecraft",
+            },
+        }
+        timestamp = "2025-10-21T05:00:00Z"
+        result = expand_output_metadata(
+            output_metadata, bundle="internal-prod", env="production", timestamp_utc=timestamp
+        )
+        
+        assert result is not None
+        assert result["annotations"]["argocd.argoproj.io/sync-wave"] == "1"
+        assert result["annotations"]["build-timestamp"] == timestamp
+        assert result["annotations"]["bundle-version"] == "internal-prod-production-2025-10-21"
+        assert result["labels"]["environment"] == "production"
+        assert result["labels"]["bundle-id"] == "internal-prod"
+        assert result["labels"]["app.kubernetes.io/component"] == "trust-bundle"
+
+    def test_realistic_flux_metadata(self):
+        """Test realistic Flux metadata expansion."""
+        output_metadata = {
+            "annotations": {
+                "kustomize.toolkit.fluxcd.io/prune": "true",
+                "build-date": "{{date}}",
+            },
+            "labels": {
+                "kustomize.toolkit.fluxcd.io/name": "trust-bundles",
+                "environment": "{{env}}",
+            },
+        }
+        result = expand_output_metadata(output_metadata, env="dev", timestamp_utc="2025-10-21T12:00:00Z")
+        
+        assert result is not None
+        assert result["labels"]["environment"] == "dev"
+        assert result["annotations"]["build-date"] == "2025-10-21"
