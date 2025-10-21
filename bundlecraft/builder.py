@@ -26,6 +26,7 @@ from pathlib import Path
 
 import click
 
+from bundlecraft.helpers.atomic_build import AtomicBuildContext
 from bundlecraft.helpers.config_schema import (
     validate_bundle_config,
     validate_craft_config,
@@ -232,23 +233,25 @@ def _aggregate_staged_sources(staging_dirs: list[Path], verbose: bool = False) -
 
 def _create_deterministic_tar(build_root: Path, output_name: str = "package") -> Path:
     """Create a deterministic tar.gz archive with normalized metadata.
-    
+
     All files in build_root (except the tar itself) are added with:
     - mtime=0 (epoch time)
     - uid=0, gid=0
     - uname='', gname=''
     - Sorted entries for consistent ordering
     - gzip mtime=0 for deterministic compression
-    
+
     Returns the path to the created tar.gz file.
     """
     import io
-    
+
     tar_path = build_root / f"{output_name}.tar.gz"
-    
+
     # Collect all files except the tar itself, sorted for consistency
-    files_to_add = sorted([f for f in build_root.glob("*") if f.is_file() and f.name != tar_path.name])
-    
+    files_to_add = sorted(
+        [f for f in build_root.glob("*") if f.is_file() and f.name != tar_path.name]
+    )
+
     # Create tar in memory first
     tar_buffer = io.BytesIO()
     with tarfile.open(fileobj=tar_buffer, mode="w", format=tarfile.PAX_FORMAT) as tar:
@@ -260,16 +263,16 @@ def _create_deterministic_tar(build_root: Path, output_name: str = "package") ->
             tarinfo.gid = 0
             tarinfo.uname = ""
             tarinfo.gname = ""
-            
+
             # Add file with normalized metadata
-            with open(file_path, 'rb') as f:
+            with open(file_path, "rb") as f:
                 tar.addfile(tarinfo, f)
-    
+
     # Write compressed tar with mtime=0 for gzip determinism
     tar_buffer.seek(0)
-    with gzip.GzipFile(filename='', fileobj=open(tar_path, 'wb'), mode='wb', mtime=0) as gz:
+    with gzip.GzipFile(filename="", fileobj=open(tar_path, "wb"), mode="wb", mtime=0) as gz:
         gz.write(tar_buffer.read())
-    
+
     return tar_path
 
 
@@ -388,6 +391,22 @@ def _verify_certificates(
     help="Skip SBOM generation",
 )
 def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose, force, dry_run, sign, gpg_key_id, generate_sbom, no_sbom):
+    "--keep-temp",
+    is_flag=True,
+    help="Preserve temporary build directories on failure (for debugging)",
+)
+def main(
+    env,
+    bundle,
+    verify_only,
+    skip_fetch,
+    skip_verify,
+    output_root,
+    verbose,
+    force,
+    dry_run,
+    keep_temp,
+):
     """Build trust bundles by orchestrating: fetch → convert → verify.
 
     This command coordinates the three core BundleCraft stages:
@@ -634,119 +653,294 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
     per_target_results: dict[str, dict] = {}
     import shutil
 
+    # Process each target atomically
     for target_name, bundle_dirs in staging_map.items():
-        build_root = (Path(output_root) / safe_craft / target_name).resolve()
-        if not dry_run:
-            ensure_dir(build_root)
+        final_build_root = (Path(output_root) / safe_craft / target_name).resolve()
 
-        # Single-bundle target: copy cached outputs directly
-        if len(bundle_dirs) == 1:
-            if dry_run:
-                # Use absolute path if outside ROOT, otherwise relative
-                try:
-                    display_path = build_root.relative_to(ROOT)
-                except ValueError:
-                    display_path = build_root
-                click.secho(
-                    f"  [{target_name}] [dry-run] Would copy cached bundle to: {display_path}",
-                    fg="yellow",
-                )
+        # Use atomic build context for each target
+        with AtomicBuildContext(
+            final_build_root, keep_temp=keep_temp, verbose=verbose, dry_run=dry_run
+        ) as build_root:
+            # Ensure build directory exists (atomic context handles this)
+            if not dry_run:
+                ensure_dir(build_root)
+
+            # Single-bundle target: copy cached outputs directly
+            if len(bundle_dirs) == 1:
+                if dry_run:
+                    # Use absolute path if outside ROOT, otherwise relative
+                    try:
+                        display_path = final_build_root.relative_to(ROOT)
+                    except ValueError:
+                        display_path = final_build_root
+                    click.secho(
+                        f"  [{target_name}] [dry-run] Would copy cached bundle to: {display_path}",
+                        fg="yellow",
+                    )
+                    per_target_results[target_name] = {
+                        "build_root": final_build_root,
+                        "pem_blocks": ["# dry-run placeholder"],
+                        "output_formats": output_formats,
+                    }
+                    continue
+
+                bdir = bundle_dirs[0]
+                cache_pem = bdir / "bundlecraft-ca-trust.pem"
+                if cache_pem.exists():
+                    for f in sorted([p for p in bdir.iterdir() if p.is_file()]):
+                        dst = build_root / f.name
+                        try:
+                            shutil.copy2(f, dst)
+                        except Exception:
+                            dst.write_bytes(f.read_bytes())
+                    # Use absolute path if outside ROOT, otherwise relative
+                    try:
+                        display_path = final_build_root.relative_to(ROOT)
+                    except ValueError:
+                        display_path = final_build_root
+                    click.secho(
+                        f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {display_path}",
+                        fg="green",
+                    )
+                pem_blocks = _read_pem_chunks([cache_pem])
                 per_target_results[target_name] = {
-                    "build_root": build_root,
-                    "pem_blocks": ["# dry-run placeholder"],
+                    "build_root": final_build_root,
+                    "pem_blocks": pem_blocks,
                     "output_formats": output_formats,
                 }
+
+                # Write manifest and checksums for single-bundle target too
+                if not dry_run:
+                    # Check if packaging is enabled
+                    package_enabled = env_cfg.get("package", True)
+
+                    # Create deterministic tar package if enabled (before computing checksums)
+                    if package_enabled:
+                        tar_path = _create_deterministic_tar(build_root, "package")
+                        if verbose:
+                            click.echo(
+                                f"  [{target_name}] ✓ Created deterministic package: {tar_path.name}",
+                                err=True,
+                            )
+
+                    # Prepare manifest object
+                    manifest_obj = {
+                        "craft": env_cfg.get("name") or env,
+                        "environment": env,  # retained for compatibility
+                        "target": target_name,
+                        "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime(
+                            "%Y-%m-%dT%H:%M:%SZ"
+                        ),
+                        "certificate_count": len(pem_blocks),
+                        "output_formats": output_formats,
+                    }
+
+                    # Add verification summary if not skipped
+                    if not skip_verify:
+                        verify_cfg = env_cfg.get("verify") or {}
+                        manifest_obj["verification"] = {
+                            "fail_on_expired": (
+                                verify_cfg.get("fail_on_expired", True)
+                                if isinstance(verify_cfg, dict)
+                                else True
+                            ),
+                            "warn_days": (
+                                verify_cfg.get("warn_days_before_expiry", 30)
+                                if isinstance(verify_cfg, dict)
+                                else 30
+                            ),
+                        }
+
+                    # Collect all output files except manifest.json and checksums.sha256
+                    output_files = sorted(
+                        [
+                            f.name
+                            for f in build_root.glob("*")
+                            if f.is_file() and f.name not in ("manifest.json", "checksums.sha256")
+                        ]
+                    )
+
+                    # Compute checksums once for all files (including tar if created)
+                    manifest_obj["files"] = [
+                        {"path": fname, "sha256": sha256_file(build_root / fname)}
+                        for fname in output_files
+                    ]
+
+                    # Write manifest
+                    manifest_path = build_root / "manifest.json"
+                    manifest_path.write_text(
+                        json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                    )
+                    if verbose:
+                        click.echo(
+                            f"  [{target_name}] ✓ Wrote manifest: {manifest_path.name}",
+                            err=True,
+                        )
+
+                    # Write checksums file with all files including manifest
+                    all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+                    checksum_lines = [
+                        f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files
+                    ]
+                    checksum_path = build_root / "checksums.sha256"
+                    checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+                    if verbose:
+                        click.echo(
+                            f"  [{target_name}] ✓ Wrote checksums: {checksum_path.name}",
+                            err=True,
+                        )
+
+                # Continue to next target (exit atomic context)
                 continue
 
-        bdir = bundle_dirs[0]
-        cache_pem = bdir / "bundlecraft-ca-trust.pem"
-        if cache_pem.exists():
-            for f in sorted([p for p in bdir.iterdir() if p.is_file()]):
-                dst = build_root / f.name
-                try:
-                    shutil.copy2(f, dst)
-                except Exception:
-                    dst.write_bytes(f.read_bytes())
-            # Use absolute path if outside ROOT, otherwise relative
-            try:
-                display_path = build_root.relative_to(ROOT)
-            except ValueError:
-                display_path = build_root
-            click.secho(
-                f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {display_path}",
-                fg="green",
-            )
-        pem_blocks = _read_pem_chunks([cache_pem])
-        per_target_results[target_name] = {
-            "build_root": build_root,
-            "pem_blocks": pem_blocks,
-            "output_formats": output_formats,
-        }
-        continue
+            # Multi-bundle target: merge cached canonical PEMs
+            merged_blocks: list[str] = []
+            for bdir in bundle_dirs:
+                cache_pem = bdir / "bundlecraft-ca-trust.pem"
+                if cache_pem.exists():
+                    merged_blocks.extend(_read_pem_chunks([cache_pem]))
+                else:
+                    pem_files = _aggregate_staged_sources([bdir], verbose=verbose)
+                    merged_blocks.extend(_read_pem_chunks(pem_files))
 
-        # Multi-bundle target: merge cached canonical PEMs
-        merged_blocks: list[str] = []
-        for bdir in bundle_dirs:
-            cache_pem = bdir / "bundlecraft-ca-trust.pem"
-            if cache_pem.exists():
-                merged_blocks.extend(_read_pem_chunks([cache_pem]))
-            else:
-                pem_files = _aggregate_staged_sources([bdir], verbose=verbose)
-                merged_blocks.extend(_read_pem_chunks(pem_files))
+            # Apply filters to merged blocks
+            from bundlecraft.helpers.utils import apply_filters
 
-        # Apply filters to merged blocks
-        from bundlecraft.helpers.utils import apply_filters
+            filters_cfg = env_cfg.get("filters") or {}
+            merged_blocks = apply_filters(merged_blocks, filters_cfg)
 
-        filters_cfg = env_cfg.get("filters") or {}
-        merged_blocks = apply_filters(merged_blocks, filters_cfg)
+            if not merged_blocks:
+                click.secho(
+                    f"  [ERROR] [{target_name}] No valid PEM certificates parsed for merged target.",
+                    fg="red",
+                    err=True,
+                )
+                sys.exit(3)
 
-        if not merged_blocks:
-            click.secho(
-                f"  [ERROR] [{target_name}] No valid PEM certificates parsed for merged target.",
-                fg="red",
-                err=True,
-            )
-            sys.exit(3)
-
-        pem_out = build_root / "bundlecraft-ca-trust.pem"
-        _write_canonical_pem(
-            pem_out, merged_blocks, include_subject_comments, force=force, dry_run=dry_run
-        )
-        if not dry_run:
-            # Use absolute path if outside ROOT, otherwise relative
-            try:
-                display_path = pem_out.relative_to(ROOT)
-            except ValueError:
-                display_path = pem_out
-            click.secho(
-                f"  [{target_name}] ✓ Wrote merged canonical PEM: {display_path}",
-                fg="green",
-            )
-
-        extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
-        if extra_formats:
-            fmt_overrides_combined = dict(fmt_overrides)
-            if force:
-                fmt_overrides_combined["force"] = True
-            convert_to_formats(
-                pem_out,
-                build_root,
-                extra_formats,
-                fmt_overrides_combined,
-                "bundlecraft-ca-trust",
-                dry_run=dry_run,
+            pem_out = build_root / "bundlecraft-ca-trust.pem"
+            _write_canonical_pem(
+                pem_out, merged_blocks, include_subject_comments, force=force, dry_run=dry_run
             )
             if not dry_run:
+                # Use absolute path if outside ROOT, otherwise relative
+                try:
+                    display_path = final_build_root.relative_to(ROOT)
+                except ValueError:
+                    display_path = final_build_root
                 click.secho(
-                    f"  [{target_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
+                    f"  [{target_name}] ✓ Wrote merged canonical PEM: {display_path}/bundlecraft-ca-trust.pem",
                     fg="green",
                 )
 
-        per_target_results[target_name] = {
-            "build_root": build_root,
-            "pem_blocks": merged_blocks,
-            "output_formats": output_formats,
-        }
+            extra_formats = [fmt for fmt in output_formats if fmt.lower() != "pem"]
+            if extra_formats:
+                fmt_overrides_combined = dict(fmt_overrides)
+                if force:
+                    fmt_overrides_combined["force"] = True
+                convert_to_formats(
+                    pem_out,
+                    build_root,
+                    extra_formats,
+                    fmt_overrides_combined,
+                    "bundlecraft-ca-trust",
+                    dry_run=dry_run,
+                )
+                if not dry_run:
+                    click.secho(
+                        f"  [{target_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
+                        fg="green",
+                    )
+
+            per_target_results[target_name] = {
+                "build_root": final_build_root,
+                "pem_blocks": merged_blocks,
+                "output_formats": output_formats,
+            }
+
+            # =========================================================================
+            # FINALIZE (inside atomic context): Manifest and checksums
+            # =========================================================================
+            if not dry_run:
+                # Check if packaging is enabled
+                package_enabled = env_cfg.get("package", True)
+
+                # Create deterministic tar package if enabled (before computing checksums)
+                if package_enabled:
+                    tar_path = _create_deterministic_tar(build_root, "package")
+                    if verbose:
+                        click.echo(
+                            f"  [{target_name}] ✓ Created deterministic package: {tar_path.name}",
+                            err=True,
+                        )
+
+                # Prepare manifest object
+                manifest_obj = {
+                    "craft": env_cfg.get("name") or env,
+                    "environment": env,  # retained for compatibility
+                    "target": target_name,
+                    "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"
+                    ),
+                    "certificate_count": len(merged_blocks),
+                    "output_formats": output_formats,
+                }
+
+                # Add verification summary if not skipped
+                if not skip_verify:
+                    verify_cfg = env_cfg.get("verify") or {}
+                    manifest_obj["verification"] = {
+                        "fail_on_expired": (
+                            verify_cfg.get("fail_on_expired", True)
+                            if isinstance(verify_cfg, dict)
+                            else True
+                        ),
+                        "warn_days": (
+                            verify_cfg.get("warn_days_before_expiry", 30)
+                            if isinstance(verify_cfg, dict)
+                            else 30
+                        ),
+                    }
+
+                # Collect all output files except manifest.json and checksums.sha256
+                output_files = sorted(
+                    [
+                        f.name
+                        for f in build_root.glob("*")
+                        if f.is_file() and f.name not in ("manifest.json", "checksums.sha256")
+                    ]
+                )
+
+                # Compute checksums once for all files (including tar if created)
+                manifest_obj["files"] = [
+                    {"path": fname, "sha256": sha256_file(build_root / fname)}
+                    for fname in output_files
+                ]
+
+                # Write manifest
+                manifest_path = build_root / "manifest.json"
+                manifest_path.write_text(
+                    json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                )
+                if verbose:
+                    click.echo(
+                        f"  [{target_name}] ✓ Wrote manifest: {manifest_path.name}",
+                        err=True,
+                    )
+
+                # Write checksums file with all files including manifest
+                all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
+                checksum_lines = [
+                    f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files
+                ]
+                checksum_path = build_root / "checksums.sha256"
+                checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+                if verbose:
+                    click.echo(
+                        f"  [{target_name}] ✓ Wrote checksums: {checksum_path.name}",
+                        err=True,
+                    )
+
+            # Atomic context commits temp → final on successful __exit__
 
     # =========================================================================
     # STAGE 3: VERIFY
@@ -788,7 +982,7 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
         click.secho("\n[STAGE 3/3] VERIFY - Skipped", fg="yellow")
 
     # =========================================================================
-    # FINALIZE: Manifest and checksums
+    # Build complete
     # =========================================================================
     if not dry_run:
         click.secho("\nFinalizing build artifacts...", fg="blue")
@@ -972,6 +1166,10 @@ def main(env, bundle, verify_only, skip_fetch, skip_verify, output_root, verbose
             "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
             fg="bright_green",
             bold=True,
+        )
+        click.secho(
+            "All targets committed atomically to final locations.",
+            fg="green",
         )
 
 
