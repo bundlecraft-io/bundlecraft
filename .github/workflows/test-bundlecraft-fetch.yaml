@@ -1,6 +1,6 @@
 ---
 name: 🥏 BundleCraft Fetch Test Suite
-run-name: 'Fetch test suite - ${{ github.ref_name }} - Run  #${{ github.run_number }}'
+run-name: 'BundleCraft Fetch Test Suite - Run #${{ github.run_number }}'
 on:
   workflow_dispatch:
     inputs:
