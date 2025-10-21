@@ -192,7 +192,7 @@ class TestFormatting:
         result = compare_bundles(bundle_dir_1, bundle_dir_2)
         formatted = format_human_readable(result)
 
-        assert "BUNDLE DIFF REPORT" in formatted
+        assert "🔐 BundleCraft Differ" in formatted
         assert "SUMMARY" in formatted
         assert "Added:     1" in formatted
         assert "Removed:   1" in formatted
@@ -235,7 +235,7 @@ class TestCLI:
         """Test diff command with human-readable output."""
         result = cli_runner.invoke(main, ["--from", str(bundle_dir_1), "--to", str(bundle_dir_2)])
         assert result.exit_code == 0
-        assert "BUNDLE DIFF REPORT" in result.output
+        assert "🔐 BundleCraft Differ" in result.output
         assert "Added:     1" in result.output
         assert "Removed:   1" in result.output
 
@@ -263,7 +263,7 @@ class TestCLI:
         assert output_file.exists()
 
         content = output_file.read_text(encoding="utf-8")
-        assert "BUNDLE DIFF REPORT" in content
+        assert "🔐 BundleCraft Differ" in content
 
     def test_diff_command_no_changes(self, cli_runner, bundle_dir_1):
         """Test diff command with identical bundles."""

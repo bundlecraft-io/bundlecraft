@@ -174,9 +174,9 @@ def format_human_readable(diff_result: dict[str, any]) -> str:
     """
     lines = []
 
-    lines.append("=" * 80)
-    lines.append("BUNDLE DIFF REPORT")
-    lines.append("=" * 80)
+    lines.append("=" * 25)
+    lines.append("🔐 BundleCraft Differ")
+    lines.append("=" * 25)
     lines.append("")
 
     # From/To paths
