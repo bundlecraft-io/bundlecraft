@@ -616,7 +616,7 @@ bundlecraft build --env prod --bundle internal-prod --force
 bundlecraft fetch --source-config-file config/cert_sources/mozilla.yaml --workspace-root .
 ```
 
-- Loads `config/cert_sources/mozilla.yaml` and stages into `cert_sources/staged/<source_name>/`
+- Loads `config/sources/mozilla.yaml` and stages into `cert_sources/staged/<source_name>/`
   - Remote entries are under `fetch/<name>/`; local repos are `<repo_name>/`, legacy include under `include/`
 - Note: `bundlecraft build` performs fetch automatically unless `--skip-fetch` is used
 

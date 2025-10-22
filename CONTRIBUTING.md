@@ -65,8 +65,8 @@ This installs:
 #### Prepare Certificate Source Configurations
 
 - Bring your own certs, or use `scripts/generate_test_cas.py` to generate some **TEST** CA certificates.
-- Place PEM files in appropriate folders under `cert_sources/`
-- Update `config/cert_sources/` YAMLs to specify what certificates each source will be comprised of
+- Place PEM files in appropriate folders under `cert_cert_sources/`
+- Update `config/sources/` YAMLs to specify what certificates each source will be comprised of
 - Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault, etc..)
 
 #### Prepare Certificate Environment Configurations
@@ -150,8 +150,8 @@ bundlecraft/
 ├── config/                # Configuration files
 │   ├── defaults.yaml      # Global defaults
 │   ├── envs/              # Environment definitions
-│   └── cert_sources/           # Cert sources definitions
-├── cert_sources/               # Certificate sources
+│   └── sources/           # Cert sources definitions
+├── cert_sources/          # Certificate sources
 │   ├── internal/          # Committed certificates
 │   └── staged/            # Fetched certificates (ephemeral)
 ├── dist/                  # Build outputs (gitignored)

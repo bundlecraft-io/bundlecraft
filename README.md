@@ -87,7 +87,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 ├── config/                 # YAML configuration (defaults, envs, sources)
 │   ├── defaults.yaml
 │   ├── envs/
-│   └── cert_sources/
+│   └── sources/
 ├── bundlecraft/            # Python scripts for build, verify, convert, helpers
 ├── dist/                   # Generated outputs (per env/bundle)
 ├── docs/                   # Project documentation
@@ -314,7 +314,7 @@ eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 ### 2. Prepare Certificate Sources
 
 - Place PEM files in appropriate folders under `cert_sources/`
-- Update `config/cert_sources/` YAMLs to specify which sources to include/exclude
+- Update `config/sources/` YAMLs to specify which sources to include/exclude
 - Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault)
 
 ### 3. Fetch and Build

@@ -61,11 +61,12 @@ Commands:
 ### 🌐 `bundlecraft fetch`
 
 Purpose: Reach out to preconfigured and trusted certificate sources at build-time, verify content, and stage PEMs for the builder. No persistent caching; artifacts are staged under `cert_sources/staged/<source_name>/` (remote entries under `fetch/<name>/`) by default (configurable via `--output-dir`) and cleaned on each run unless `--no-clean` is used.
+Purpose: Reach out to preconfigured and trusted certificate sources at build-time, verify content, and stage PEMs for the builder. No persistent caching; artifacts are staged under `cert_sources/staged/<source_name>/` (remote entries under `fetch/<name>/`) by default (configurable via `--output-dir`) and cleaned on each run unless `--no-clean` is used.
 
 Usage:
 
 ```bash
-bundlecraft fetch --source-config-file config/cert_sources/<source>.yaml \
+bundlecraft fetch --source-config-file config/sources/<source>.yaml \
   [--output-dir ./cert_sources/staged] [--fetch-name <name>] [--workspace-root <dir>] \
   [--no-clean] [--dry-run] [--json] [--verbose]
 ```
@@ -99,6 +100,7 @@ Notes:
 - Optional TLS security: custom CA bundle and leaf certificate fingerprint pinning.
 - Staging only: no persistent cache. Staging dir is cleaned per run unless `--no-clean`.
   Treat `cert_sources/staged/` as ephemeral staging, not a cache.
+  Treat `cert_sources/staged/` as ephemeral staging, not a cache.
 
 Philosophy & best practices:
 
@@ -106,6 +108,7 @@ Philosophy & best practices:
 - Prefer HTTPS + CA pinning for APIs; add TLS leaf fingerprint pinning during rotations.
 - Pin content hashes for static bundles (e.g., Mozilla public roots) when feasible.
 - Keep secrets in env vars, not YAML; use CI secret stores.
+- Treat `cert_sources/staged/` as ephemeral staging, not a cache.
 - Treat `cert_sources/staged/` as ephemeral staging, not a cache.
 
 ### 🔐 Vault fetcher
@@ -240,6 +243,8 @@ repo:
   - name: roots
     include:
       # Path entries (string or {path: ...})
+      - cert_sources/internal/roots/
+      - { path: cert_sources/internal/rootCA.pem }
       - cert_sources/internal/roots/
       - { path: cert_sources/internal/rootCA.pem }
       # Inline PEM entry (optional name)
