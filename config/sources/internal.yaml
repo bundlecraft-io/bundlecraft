@@ -1,4 +1,6 @@
 ---
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
 source_name: internal
 description: Trust bundle for internal PKI services (root + issuing CAs)
 repo:
@@ -8,3 +10,4 @@ metadata:
   owner: pki-team@bundlecraft.io
   purpose: Internal service authentication and TLS
   tags: [internal, production]
+  labels: {team: security, tier: core}

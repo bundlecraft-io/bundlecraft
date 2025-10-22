@@ -257,9 +257,6 @@ package: true  # Create .tar.gz of outputs
 
 ### Verification & Filtering
 
-<!-- Env-wide fetch defaults intentionally not supported to preserve separation. -->
-
-
 ```yaml
 verify:
   fail_on_expired: true
@@ -381,8 +378,6 @@ labels:
 - **Kubernetes Labels**: Organize and select resources with standard labels
 - **Versioning**: Track bundle versions with dynamic template variables
 - **Traceability**: Link builds to git commits for audit trails
-
-```
 
 ### Distribution Metadata (for CI/CD pipeline use only)
 
@@ -740,7 +735,7 @@ For step-by-step guidance on interpreting and fixing validation errors (plus pyt
 
 #### Error: Missing required field
 
-```
+```text
 1 validation error for BundleConfig
 bundle_name
   Field required [type=missing, input_value={...}, input_type=dict]
@@ -757,7 +752,7 @@ description: My bundle description
 
 #### Error: Empty string
 
-```
+```text
 1 validation error for BundleConfig
 description
   String should have at least 1 character [type=string_too_short, input_value='', input_type=str]
@@ -773,7 +768,7 @@ description: Internal CA roots for production
 
 #### Error: Invalid output format
 
-```
+```text
 1 validation error for CraftConfig
 output_formats
   Value error, Invalid output format 'jsk'. Valid formats: der, jks, p12, p7b, pem, pkcs12
@@ -789,7 +784,7 @@ output_formats: [pem, jks, p7b, p12]  # Fixed: jsk → jks
 
 #### Error: Insecure HTTP URL
 
-```
+```text
 1 validation error for BundleConfig
 fetch.0.url
   Value error, Only HTTPS URLs are allowed for security. Use https:// or file:// schemes.
@@ -808,7 +803,7 @@ fetch:
 
 #### Error: Reserved name
 
-```
+```text
 1 validation error for BundleConfig
 bundle_name
   Value error, 'fetch' is a reserved bundle name
@@ -824,7 +819,7 @@ bundle_name: mozilla-fetch  # Changed from 'fetch'
 
 #### Error: Duplicate names
 
-```
+```text
 1 validation error for BundleConfig
   Value error, Duplicate repo names found: internal
 ```
@@ -843,7 +838,7 @@ repo:
 
 #### Error: No sources defined
 
-```
+```text
 1 validation error for BundleConfig
   Value error, Bundle must have at least one 'repo' or 'fetch' entry
 ```
@@ -860,7 +855,7 @@ repo:
 
 #### Error: Missing type-specific field
 
-```
+```text
 1 validation error for BundleConfig
 fetch.0
   Value error, 'url' is required for fetch type 'url'
@@ -879,7 +874,7 @@ fetch:
 
 #### Error: Key size too small
 
-```
+```text
 1 validation error for DefaultsConfig
 filters.minimum_key_size_rsa
   Value error, RSA key size must be at least 1024 bits for security
@@ -912,7 +907,7 @@ metadata:
   - Bundle configs: validated in `builder.py` and `fetch.py`
   - Env configs: validated in `builder.py`
   - Defaults config: validated in `builder.py`
-- **Error Handling:** All validation errors are caught and re-raised as `ValueError` with full Pydantic error details
+- **Error Handling:** All validation errors are caught and re-raised as `ValueError` with full error details
 - **Extra Fields:** Allowed via `ConfigDict(extra="allow")` for forward compatibility
 
 ### Testing

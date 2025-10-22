@@ -1,4 +1,6 @@
 ---
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
 source_name: mozilla
 description: Mozilla NSS CA certificate program - publicly trusted root CAs
 fetch:
@@ -10,3 +12,4 @@ metadata:
   purpose: Public web PKI trust anchors
   upstream: https://wiki.mozilla.org/CA
   tags: [public, mozilla, web-pki]
+  labels: {ecosystem: mozilla, visibility: public}

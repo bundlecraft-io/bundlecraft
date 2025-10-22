@@ -487,7 +487,7 @@ Notes
 
 ---
 
-## 🏭 CI/CD Pipeline
+## 🧪 CI/CD Pipeline (reference)
 
 The included workflows automate builds and fetch tests:
 
