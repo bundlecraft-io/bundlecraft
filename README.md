@@ -110,10 +110,10 @@ fetch → convert → verify (CI orchestrates discover → build → collect →
 1. **Defaults** (`config/defaults.yaml`):
    Global settings (verification, filters, formats)
 
-2. **Craft** (`config/crafts/<craft>.yaml`):
+2. **Craft** (`config/envs/<craft>.yaml`):
   Contextual overrides (paths, secrets, output formats, targets)
 
-3. **Bundle** (`config/bundles/<bundle>.yaml`):
+3. **Bundle** (`config/sources/<bundle>.yaml`):
    Content definition (certificate sources to include/exclude)
 
 4. **Fetch (optional but recommended)** (`fetch:` in bundle):
@@ -133,28 +133,28 @@ fetch → convert → verify (CI orchestrates discover → build → collect →
 
 ---
 
-### ⚙️ Target/Bundle Composition in Craft Config Files
+### ⚙️ Target/Bundle Composition in Environment Config Files
 
 Environments can define composed target bundles that merge one or more base bundles.
 
-In `config/crafts/dev.yaml`:
+In `config/envs/dev.yaml`:
 
 ```yaml
-targets:
+bundles:
   internal-dev:
-    includes: [internal, mozilla]
+    include_sources: [internal, mozilla]
   mozilla:
-    includes: [mozilla]
+    include_sources: [mozilla]
 ```
 
 Commands:
 
 ```bash
 # Build the composed target (composed from bundles)
-bundlecraft build --craft dev --bundle internal-dev
+bundlecraft build --env dev --bundle internal-dev
 
 # Build one target from a production craft
-bundlecraft build --craft prod --bundle mozilla
+bundlecraft build --env prod --bundle mozilla
 ```
 
 Outputs:
@@ -166,7 +166,7 @@ Outputs:
 
 ## 📦 Configuration Deep Dive
 
-### Bundle Config (`config/bundles/*.yaml`)
+### Source Config (`config/sources/*.yaml`)
 
 These configuration files are your **trusted certificate sources.**
 
@@ -175,7 +175,7 @@ It defines where BundleCraft where retrieve CA certificates from and stage them 
 - `repo`: a locally committed source, useful for simplicity or if you'd like explicit control of which exact certificates are built from within the repository, along with the rest of `bundlecraft` build configuration.
 - `fetch`: a trusted remote source, such as HashiCorp Vault, Keyfactor Command, or the Mozilla CA Bundle from [curl.se](https://curl.se/docs/caextract.html). Useful when managing trusted certificates in separate systems, while still being able to use `bundlecraft` configuration to perform further filtering.
 
-These bundles are then referenced by craft configuration files, which will go on to define which bundles these sourced certificates will appear in.
+These bundles are then referenced by environment configuration files, which will go on to define which bundles these sourced certificates will appear in.
 
 ```yaml
 bundle_name: internal
@@ -200,13 +200,13 @@ fetch:
     url: https://curl.se/ca/cacert.pem
 ```
 
-### Craft Config (`config/crafts/*.yaml`)
+### Environment Config (`config/envs/*.yaml`)
 
 Defines **how** bundles are built in a specific context, including secrets, output path, global filters, and format behavior.
 
 These configuration files are your **customized certificate trust bundles.**
 
-It defines how BundleCraft (based on the certificate source configurations from `config/bundles/`) will build, merge, package, and prepare your trust bundle files for distribution. These are essentially your environment specific configuration files.
+It defines how BundleCraft (based on the certificate source configurations from `config/sources/`) will build, merge, package, and prepare your trust bundle files for distribution. These are essentially your environment specific configuration files.
 
 Additional build filters, verification guardrails, packaging settings, and formatting options can be specified here.
 
@@ -240,7 +240,7 @@ metadata:
 ### Defaults (`config/defaults.yaml`)
 
 Baseline settings for verification, filters, output formats, and metadata.
-These can be overridden by environment or bundle configs.
+These can be overridden by environment or source configs.
 
 ---
 
@@ -290,14 +290,14 @@ eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 ### 2. Prepare Certificate Sources
 
 - Place PEM files in appropriate folders under `sources/`
-- Update `config/bundles/` YAMLs to specify which sources to include/exclude
+- Update `config/sources/` YAMLs to specify which sources to include/exclude
 - Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault)
 
 ### 3. Fetch and Build
 
 ```bash
 # Build a craft target (fetch runs automatically unless skipped)
-bundlecraft build --craft prod --bundle internal-prod
+bundlecraft build --env prod --bundle internal-prod
 ```
 
 - Produces artifacts in `dist/prod/internal-prod/`:
@@ -385,7 +385,7 @@ gpg --full-generate-key
 
 # Build and sign artifacts
 export GPG_KEY_ID=ABCD1234EFGH5678
-bundlecraft build --craft prod --bundle mozilla --sign
+bundlecraft build --env prod --bundle mozilla --sign
 
 # Verify signatures
 bundlecraft verify --target dist/Production/mozilla --verify-signatures
@@ -404,8 +404,8 @@ See [SIGNING-AND-SBOM.md](docs/SIGNING-AND-SBOM.md) for the complete guide on:
 
 |Script|Purpose|Example Usage|
 |---|---|---|
-| `bundlecraft.fetch` (CLI: `bundlecraft fetch`) | Securely fetch remote sources and stage them (no persistent cache) | `bundlecraft fetch --craft prod --bundle internal` |
-| `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --craft prod --bundle internal-prod` |
+| `bundlecraft.fetch` (CLI: `bundlecraft fetch`) | Securely fetch remote sources and stage them (no persistent cache) | `bundlecraft fetch --env prod --bundle internal` |
+| `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --env prod --bundle internal-prod` |
 | `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify dist/prod/internal` |
 | `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert any supported input to any supported output (PEM, P7B, JKS, P12, ZIP) | `bundlecraft convert --input dist/prod/internal/bundlecraft-ca-trust.pem --output-dir dist/prod/internal/ --output-format jks` |
 
@@ -415,7 +415,7 @@ For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/R
 
 ## 📐 Trust Matrix (Environments × Bundles)
 
-The release pipeline now publishes a trust matrix that shows which crafts (rows) trust which bundles (columns), derived from `config/crafts/*.yaml` composition (`targets.<name>.includes`).
+The release pipeline now publishes a trust matrix that shows which crafts (rows) trust which bundles (columns), derived from `config/envs/*.yaml` composition (`targets.<name>.includes`).
 
 Artifacts attached to releases:
 
@@ -438,7 +438,7 @@ python scripts/trust_matrix.py --config-dir config --format json --output trust-
 Notes:
 
 - Trust for an environment is the union of all bundles included by its targets
-- Legacy `bundle_targets: [...]` is also supported and treated as trusted bundles
+- Legacy `bundle_bundles: [...]` is also supported and treated as trusted bundles
 
 ---
 
@@ -450,7 +450,7 @@ The included workflows automate builds and fetch tests:
 - [test-bundlecraft-fetch.yaml](.github/workflows/test-bundlecraft-fetch.yaml): Fetch test suite (Vault, HTTP, API)
 
 - Discover → Build → Collect → Verify → Publish
-- Build per-craft “targets” declared in `config/crafts/<env>.yaml` under `targets:` (composition-aware)
+- Build per-craft “targets” declared in `config/envs/<env>.yaml` under `bundles:` (composition-aware)
 - For each target, the job runs `bundlecraft build` and respects `build_path` via `--output-root`
 - Uploads artifacts per target using the naming `trust-store-<env>-<target>`
 - Optionally signs and publishes a release tarball
@@ -648,10 +648,10 @@ Best config practices
 
 ```bash
 # Build all bundles in the production environment
-bundlecraft build --craft prod
+bundlecraft build --env prod
 
 # Build only the internal bundle in the production environment
-bundlecraft build --craft prod --bundle internal
+bundlecraft build --env prod --bundle internal
 
 # Verify a bundle
 bundlecraft verify --target dist/prod/internal --verify-all
@@ -660,7 +660,7 @@ bundlecraft verify --target dist/prod/internal --verify-all
 bundlecraft convert --input bundlecraft-ca-trust.pem --output-dir ./ --output-format jks
 
 # Build with packaging
-bundlecraft build --craft prod --bundle internal --force
+bundlecraft build --env prod --bundle internal --force
 
 # Force overwrite during conversion
 bundlecraft convert --input bundlecraft-ca-trust.der --output-dir ./ --output-format pem --force
@@ -672,10 +672,10 @@ All BundleCraft commands support `--json` flag for CI/CD automation and scriptin
 
 ```bash
 # Get structured output for automation
-bundlecraft build --craft prod --bundle mozilla --json | jq .
+bundlecraft build --env prod --bundle mozilla --json | jq .
 
 # Parse specific fields in scripts
-SUCCESS=$(bundlecraft fetch --bundle-config-file config/bundles/mozilla.yaml --json | jq -r '.success')
+SUCCESS=$(bundlecraft fetch --bundle-config-file config/sources/mozilla.yaml --json | jq -r '.success')
 if [ "$SUCCESS" = "true" ]; then
   echo "Fetch succeeded"
 fi
@@ -697,8 +697,8 @@ bundlecraft verify --target dist/prod/mozilla --json | jq -r '.verified_files'
 ### Configuration Files
 
 - `config/defaults.yaml` - Global baseline settings
-- `config/crafts/*.yaml` - Craft-specific configs (dev, qa, prod)
-- `config/bundles/*.yaml` - Bundle definitions (what certs to include)
+- `config/envs/*.yaml` - Craft-specific configs (dev, qa, prod)
+- `config/sources/*.yaml` - Bundle definitions (what certs to include)
 
 ### Output Artifacts
 
@@ -754,7 +754,7 @@ or reach out via [GitHub Discussions](https://github.com/bundlecraft-io/bundlecr
 
 ---
 
-© 2025 Chris J. Pich
+© 2025 BundleCraft.io
 Licensed under the [MIT License](./LICENSE).
 
 > Made with ❤️ (and ☕) for anyone who’s ever debugged a broken trust chain.
