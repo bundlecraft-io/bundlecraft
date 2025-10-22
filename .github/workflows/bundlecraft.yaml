@@ -35,9 +35,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${INPUT_ENVIRONMENTS:-}" ]; then
-            python scripts/detect_env_bundles.py --envs "${INPUT_ENVIRONMENTS}" --github-release-only | tee env_bundles.json
+            python scripts/detect_env_targets.py --envs "${INPUT_ENVIRONMENTS}" --github-release-only | tee env_bundles.json
           else
-            python scripts/detect_env_bundles.py --github-release-only | tee env_bundles.json
+            python scripts/detect_env_targets.py --github-release-only | tee env_bundles.json
           fi
           echo "env_bundles=$(cat env_bundles.json)" >> "$GITHUB_OUTPUT"
       - name: Summarize selection and validate
@@ -50,7 +50,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y jq
           fi
-          ALL_JSON=$(python scripts/detect_env_bundles.py)
+          ALL_JSON=$(python scripts/detect_env_targets.py)
           FILTERED_JSON=$(cat env_bundles.json)
           ALL_ENVS_FILE=$(mktemp)
           echo "$ALL_JSON" | jq -r '.[].env' | sort -u > "$ALL_ENVS_FILE"

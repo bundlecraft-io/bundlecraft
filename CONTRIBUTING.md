@@ -300,7 +300,7 @@ We keep things simple and consistent:
 - Support optional CA pinning (`verify.ca_file`)
 - Support optional TLS fingerprint pinning (`verify.tls_fingerprint_sha256`)
 - Support optional content hash pinning (`verify.sha256`)
-- No persistent caches; staging is cleaned per run (`sources/staged/<bundle>/`)
+- No persistent caches; staging is cleaned per run (`sources/staged/<source_name>/`)
 - Update `docs/adr-0002-fetch.md` and `docs/troubleshooting.md` for behavior changes
 
 ---
@@ -345,7 +345,7 @@ See `docs/adr-0006-corerelease.md` for the full distribution strategy.
 
 ## 🌐 Notes on the Fetch Layer
 
-- Fetch is staging-only: do not introduce persistent caches; use `sources/staged/<env>/<sources>/` which is cleaned per run.
+- Fetch is staging-only: do not introduce persistent caches; use `sources/staged/<source_name>/` which is cleaned per run.
 - Security controls to uphold:
   - HTTPS only for remote endpoints (URLs/APIs)
   - Optional custom CA (`verify.ca_file`), optional TLS leaf fingerprint pin (`verify.tls_fingerprint_sha256`)

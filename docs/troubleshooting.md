@@ -41,7 +41,7 @@ This guide covers common issues, root causes, and quick fixes when using the Fet
 ## Build issues
 
 - Empty or missing outputs
-  - Check inputs in `sources/` and `sources/staged/<craft>/`
+  - Check inputs in `sources/` and `sources/staged/<source_name>/`
   - Ensure include paths in the source config are correct.
 
 - Unexpected duplicates or missing certs

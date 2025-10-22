@@ -183,7 +183,7 @@ Each target builds atomically in `bundlecraft/builder.py`:
 
 ```python
 for target_name, bundle_dirs in staging_map.items():
-    final_build_root = Path(output_root) / craft / target_name
+    final_build_root = Path(output_root) / env / bundle_name
 
     with AtomicBuildContext(final_build_root, keep_temp=keep_temp) as build_root:
         # All build operations happen in build_root (temp)

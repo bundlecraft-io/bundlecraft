@@ -4,7 +4,7 @@ fetch.py
 First stage of the BundleCraft pipeline: securely fetch and stage certificate sources.
 
 Design choices per ADR-0002 and user guidance:
- - No persistent caching; fetched artifacts are staged under sources/fetched/<craft>/<bundle>/
+ - No persistent caching; fetched artifacts are staged under sources/staged/<source_name>/fetch/<name>/
  - Staging directory is cleaned at the start of each fetch run
  - Only trusted origins: HTTPS/file URLs supported; optional content SHA256 pinning
  - Staged files are treated the same as local sources by the build stage
@@ -526,10 +526,11 @@ def _fetch_each_to_named_dirs(
                 )
                 path = src.get("path")
                 logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
-            logger.info(f"[dry-run]   to directory: {staging_root / name}")
+            logger.info(f"[dry-run]   to directory: {staging_root / 'fetch' / name}")
             continue
 
-        subdir = staging_root / name
+        # New structure: stage remote fetches under a dedicated 'fetch/<name>' subdirectory
+        subdir = staging_root / "fetch" / name
         ensure_dir(subdir)
         try:
             out_paths = _fetch_from_config([src], subdir, root, verbose=verbose)
@@ -598,9 +599,9 @@ def main(
 
     This command operates entirely on a single bundle config file and does not consult craft/env configs.
 
-    Steps:
+        Steps:
       1) Create the staging directory (--output-dir)
-      2) Create per-source subdirectories: 'include/' for local paths and one subdirectory per fetch 'name'
+            2) Create per-source subdirectories: 'include/' or named repo dirs for local paths, and 'fetch/<name>/' for each remote fetch entry
       3) Copy local includes (unless --fetch-only) and perform remote fetches into their respective subdirectories
       4) Summarize the resulting directory structure and file counts
 

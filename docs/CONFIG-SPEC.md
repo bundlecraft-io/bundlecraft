@@ -87,7 +87,7 @@ You can declare local certificate sources in two ways. The new preferred schema 
   - Indentation is handled automatically; trailing whitespace is trimmed.
   - If `name` is omitted, files are created as `inline-<N>.pem` within the repo folder.
 
-  Staging layout: `sources/staged/<craft>/<bundle>/<name>/...`
+  Staging layout (repos): `sources/staged/<source_name>/<name>/...`
 
 - Legacy: flat `include`/`exclude` keys at the top level
 
@@ -99,7 +99,7 @@ You can declare local certificate sources in two ways. The new preferred schema 
     - sources/partners/deprecated.pem
   ```
 
-  Staging layout: `sources/staged/<craft>/<bundle>/include/...`
+  Staging layout (legacy include): `sources/staged/<source_name>/include/...`
 
 Validation rules for names:
 
@@ -575,8 +575,8 @@ bundlecraft build --env prod --bundle internal-prod --force
 bundlecraft fetch --source-config-file config/sources/mozilla.yaml --workspace-root .
 ```
 
-- Loads `config/sources/mozilla.yaml` and stages into `sources/staged/<craft>/<bundle>/`
-  - Stages into `sources/staged/<craft>/<target>/` during build
+- Loads `config/sources/mozilla.yaml` and stages into `sources/staged/<source_name>/`
+  - Remote entries are under `fetch/<name>/`; local repos are `<repo_name>/`, legacy include under `include/`
 - Note: `bundlecraft build` performs fetch automatically unless `--skip-fetch` is used
 
 ### Using Existing Staged Sources
@@ -585,7 +585,7 @@ bundlecraft fetch --source-config-file config/sources/mozilla.yaml --workspace-r
 bundlecraft build --env prod --bundle internal-prod --skip-fetch
 ```
 
-- Uses existing staged sources at `sources/staged/prod/*` and does not perform network fetches
+- Uses existing staged sources at `sources/staged/*` and does not perform network fetches
 
 ---
 

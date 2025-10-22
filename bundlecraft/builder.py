@@ -9,10 +9,10 @@ Architecture:
   3) VERIFY: Validate certificates and produce compliance reports
 
 Changes from legacy builder:
-  - Removed --prefetch flag (fetch is now always executed)
-    - Staging directory: sources/staged/<craft>/<bundle>/ (cleaner separation from sources/)
-    - Build output: dist/<craft>/<target>/ (craft display name and target name)
-  - Clearer orchestration: each stage is self-contained with explicit inputs/outputs
+    - Removed --prefetch flag (fetch is now always executed)
+        - Staging directory: sources/staged/<source_name>/(include|repo|fetch/<name>)/
+        - Build output: dist/<craft>/<target>/ (craft display name and target name)
+    - Clearer orchestration: each stage is self-contained with explicit inputs/outputs
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ def _stage_bundle_sources(
     dry_run: bool = False,
     json_output: bool = False,
 ) -> Path:
-    """Stage a bundle's sources (includes + fetch) into sources/staged/<env>/<bundle>/.
+    """Stage a bundle's sources (includes + fetch) into sources/staged/<source_name>/.
 
     This mirrors the fetch CLI behavior but writes to a staging area for build.
     Returns the staging directory path.
@@ -104,7 +104,9 @@ def _stage_bundle_sources(
     except Exception as e:
         raise click.ClickException(str(e)) from e
 
-    staging_root = STAGED_DIR / env / bundle_name
+    # Use the explicit source_name from the source config if provided; fallback to file stem
+    source_name = source_cfg.get("source_name") or bundle_name
+    staging_root = STAGED_DIR / source_name
 
     if dry_run:
         if verbose:
@@ -125,7 +127,7 @@ def _stage_bundle_sources(
 
     # Stage local includes
     if verbose:
-        click.echo(f"[Fetch] Staging local includes for bundle: {bundle_name}", err=True)
+        click.echo(f"[Fetch] Staging local includes for source: {bundle_name}", err=True)
     _stage_local_includes(source_cfg, staging_root, workspace_root, verbose)
 
     # Stage remote fetches
@@ -133,7 +135,7 @@ def _stage_bundle_sources(
     if fetch_cfg:
         if verbose:
             click.echo(
-                f"[Fetch] Fetching {len(fetch_cfg)} remote source(s) for bundle: {bundle_name}",
+                f"[Fetch] Fetching {len(fetch_cfg)} remote source(s) for source: {bundle_name}",
                 err=True,
             )
         _fetch_each_to_named_dirs(
@@ -721,7 +723,8 @@ def main(
     for bundle_name, include_sources in bundles_to_build:
         per_bundle = []
         for bname in include_sources:
-            per_bundle.append(bundle_cache_dirs.get(bname, STAGED_DIR / env / bname))
+            # Fallback to the new staging layout if cache dir is not present
+            per_bundle.append(bundle_cache_dirs.get(bname, STAGED_DIR / bname))
         staging_map[bundle_name] = per_bundle
 
     # =========================================================================

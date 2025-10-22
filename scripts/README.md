@@ -380,7 +380,7 @@ export VAULT_TOKEN="root"
 bundlecraft fetch --craft dev --bundle local-vault
 ```
 
-This will stage the local Vault-provided PEM under `sources/fetched/dev/local-vault/from_vault.pem`.
+This will stage the local Vault-provided PEM under `sources/staged/<source_name>/fetch/from_vault/from_vault.pem`.
 
 
 Reference:
@@ -644,7 +644,7 @@ export VAULT_TOKEN="root"
 bundlecraft fetch --craft dev --bundle local-vault
 ```
 
-This will stage the local Vault-provided PEM under `sources/fetched/dev/local-vault/from_vault.pem`.
+This will stage the local Vault-provided PEM under `sources/staged/<source_name>/fetch/from_vault/from_vault.pem`.
 
 ### 🥏 BundleCraft Fetch Test Suite
 
@@ -677,7 +677,7 @@ Each test job:
 - ✅ Self-signed certificates properly handled via `ca_file` with absolute paths
 - ✅ Automatic cleanup with `podman rm -f` in workflow cleanup steps
 
-**Outputs:** All jobs stage to `sources/fetched/ci/<test-id>/` with:
+**Outputs:** All jobs stage to `sources/staged/<test-id>/` (remote entries under `fetch/<name>/`) with:
 - Fetched PEM files
 - `provenance.fetch.json` with origin and SHA256
 

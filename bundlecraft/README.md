@@ -60,12 +60,12 @@ Commands:
 
 ### 🌐 `bundlecraft fetch`
 
-Purpose: Reach out to preconfigured and trusted certificate sources at build-time, verify content, and stage PEMs for the builder. No persistent caching; artifacts are staged under `sources/staged/<bundle>/` by default (configurable via `--output-dir`) and cleaned on each run unless `--no-clean` is used.
+Purpose: Reach out to preconfigured and trusted certificate sources at build-time, verify content, and stage PEMs for the builder. No persistent caching; artifacts are staged under `sources/staged/<source_name>/` (remote entries under `fetch/<name>/`) by default (configurable via `--output-dir`) and cleaned on each run unless `--no-clean` is used.
 
 Usage:
 
 ```bash
-bundlecraft fetch --source-config-file config/bundles/<bundle>.yaml \
+bundlecraft fetch --source-config-file config/sources/<source>.yaml \
   [--output-dir ./sources/staged] [--fetch-name <name>] [--workspace-root <dir>] \
   [--no-clean] [--dry-run] [--json] [--verbose]
 ```

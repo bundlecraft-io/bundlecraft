@@ -120,14 +120,14 @@ BundleCraft provides the building blocks for trust bundle creation, while your C
   Contextual overrides (paths, secrets, output formats, targets)
 
 3. **Sources** (`config/sources/<source>.yaml`):
-   Bundle content definition (certificate sources to include/exclude)
-    - **Fetch** (`fetch:` in `<source>`):
-  Securely fetch and stage certificates from trusted remote origins into `sources/staged/<env>/<bundle>/`. Staging is cleaned each run; no persistent cache.
+Bundle content definition (certificate sources to include/exclude)
+
+- **Fetch** (`fetch:` in `<source>`): Securely fetch and stage certificates under `sources/staged/<source_name>/fetch/<name>/`. Local includes are staged under `sources/staged/<source_name>/<repo_name>/` (or `include/` for legacy). Staging is cleaned each run; no persistent cache.
 
 **Flow:**
 
 - Merge config layers: defaults ← env ← bundle
-- If `fetch:` is present, securely stage remote sources under `sources/staged/<env>/<bundle>/` with provenance
+- If `fetch:` is present, securely stage remote sources under `sources/staged/<source_name>/fetch/<name>/` with provenance
 - Deduplicate, verify, and annotate certs
 - Generate canonical PEM bundle
 - Convert to JKS, P7B, P12
@@ -616,7 +616,7 @@ Best config practices
 - For APIs/services, prefer TLS CA pinning and optionally leaf fingerprint pinning during rollout windows
 - Keep tokens in env vars (`*_TOKEN`) and never in YAML
 - Commit sample configs but not secrets; use CI secret stores for tokens
-- Treat `sources/fetched/` as ephemeral; do not rely on it as a cache
+- Treat `sources/staged/` as ephemeral; do not rely on it as a cache
 
 - Chain validation (issuer/subject path building)
 - Test suite + CI templates

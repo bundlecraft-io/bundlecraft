@@ -47,15 +47,20 @@ def main() -> None:
         base = os.path.basename(path)
         if base.startswith("example"):
             continue
-        env = os.path.splitext(base)[0]
-        if sel_envs and env not in sel_envs:
-            continue
+        file_stem_env = os.path.splitext(base)[0]
         try:
             with open(path, encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
         except Exception as e:
             print(f"::warning::Failed to parse {path}: {e}")
             cfg = {}
+
+        # Prefer the human-friendly environment name from config, fallback to filename stem
+        env = str(cfg.get("name") or file_stem_env)
+
+        # If a subset of environments was specified, filter here using the resolved name
+        if sel_envs and env not in sel_envs:
+            continue
 
         if github_release_only:
             dist = cfg.get("distribution_metadata") or cfg.get("distribution") or {}
