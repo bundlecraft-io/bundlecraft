@@ -1,5 +1,5 @@
 ---
-bundle_name: vault
+source_name: vault
 description: Trust bundle sourced from HashiCorp Vault secret store
 fetch:
   - name: from_vault

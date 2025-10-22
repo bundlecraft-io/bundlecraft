@@ -13,7 +13,7 @@ class TestUtils:
 
     def test_load_yaml_existing_file(self, test_data_dir):
         """Test loading an existing YAML file."""
-        yaml_file = test_data_dir / "configs" / "bundles" / "test-bundle.yaml"
+        yaml_file = test_data_dir / "configs" / "sources" / "test-bundle.yaml"
         if yaml_file.exists():
             result = utils.load_yaml(yaml_file)
             assert result is not None

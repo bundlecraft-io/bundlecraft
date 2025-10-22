@@ -148,7 +148,7 @@ class TestFetchDryRun:
         bundle_config = temp_dir / "bundle.yaml"
         bundle_config.write_text(
             """
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle
 fetch:
   - type: url
@@ -177,7 +177,7 @@ fetch:
         bundle_config = temp_dir / "bundle.yaml"
         bundle_config.write_text(
             """
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle
 fetch:
   - type: url
@@ -204,7 +204,7 @@ fetch:
         bundle_config = temp_dir / "bundle.yaml"
         bundle_config.write_text(
             """
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle
 repo:
   - name: local-source

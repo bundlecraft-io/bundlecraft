@@ -38,7 +38,7 @@ def temp_workspace(temp_dir, test_data_dir):
     This provides an isolated environment for each test.
     """
     # Create standard directory structure
-    dirs = ["sources/internal", "config/bundles", "config/crafts", "build"]
+    dirs = ["sources/internal", "config/sources", "config/envs", "build"]
     for d in dirs:
         (temp_dir / d).mkdir(parents=True)
 
@@ -80,7 +80,7 @@ def multi_cert_bundle(tmp_path, sample_cert_path, intermediate_cert_path) -> Pat
 @pytest.fixture(scope="function")
 def sample_bundle_config(test_data_dir) -> Path:
     """Return path to a sample bundle configuration."""
-    return test_data_dir / "configs" / "bundles" / "test-bundle.yaml"
+    return test_data_dir / "configs" / "sources" / "test-bundle.yaml"
 
 
 @pytest.fixture(scope="function")

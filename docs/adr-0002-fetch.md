@@ -52,7 +52,7 @@ fetch  →  build  →  verify  →  convert
 | **Reproducibility**           | Build logs include exact hashes and timestamps so the same inputs can be re-fetched later.    |
 | **Offline/air-gapped**        | Offline-friendly flow: pre-stage fetch inputs and run `bundlecraft build --skip-fetch`; builds proceed only with committed or pre-staged artifacts. |
 
-### Example bundle config excerpt
+### Example source config excerpt
 
 ```yaml
 fetch:
@@ -191,7 +191,7 @@ fetch:
 ## 11️⃣ Next Steps
 
 1. Implement `bundlecraft/fetch.py` with URL/API/Vault fetchers, TLS options, and SHA pinning.
-2. Define `fetch:` schema additions in `config/bundles/*.yaml`.
+2. Define `fetch:` schema additions in `config/sources/*.yaml`.
 3. Update manifest spec to include:
 
    ```json

@@ -14,8 +14,8 @@ def cli_runner():
 def test_repo_schema_staging(cli_runner, temp_workspace, sample_bundle_config, monkeypatch):
     """Ensure named repos are staged under their own subdirectories."""
     # Create craft and bundle config using repo schema
-    craft_dir = temp_workspace / "config" / "crafts"
-    bundles_dir = temp_workspace / "config" / "bundles"
+    craft_dir = temp_workspace / "config" / "envs"
+    bundles_dir = temp_workspace / "config" / "sources"
     craft_dir.mkdir(parents=True, exist_ok=True)
     bundles_dir.mkdir(parents=True, exist_ok=True)
 
@@ -23,9 +23,9 @@ def test_repo_schema_staging(cli_runner, temp_workspace, sample_bundle_config, m
         """
 name: TestCraft
 description: Test craft for repo schema validation
-targets:
+bundles:
   only:
-    includes: [repo-bundle]
+    include_sources: [repo-bundle]
 output_formats: [pem]
         """.strip()
     )
@@ -39,7 +39,7 @@ output_formats: [pem]
     # Bundle with two repos
     (bundles_dir / "repo-bundle.yaml").write_text(
         """
-bundle_name: repo-bundle
+source_name: repo-bundle
 description: Bundle using named repos
 repo:
   - name: roots
@@ -84,8 +84,8 @@ repo:
 
 def test_duplicate_name_validation(cli_runner, temp_workspace, monkeypatch):
     """Duplicate names across repo/fetch should raise an error."""
-    craft_dir = temp_workspace / "config" / "crafts"
-    bundles_dir = temp_workspace / "config" / "bundles"
+    craft_dir = temp_workspace / "config" / "envs"
+    bundles_dir = temp_workspace / "config" / "sources"
     craft_dir.mkdir(parents=True, exist_ok=True)
     bundles_dir.mkdir(parents=True, exist_ok=True)
 
@@ -93,9 +93,9 @@ def test_duplicate_name_validation(cli_runner, temp_workspace, monkeypatch):
         """
 name: TestCraft
 description: Test craft for duplicate name validation
-targets:
+bundles:
   only:
-    includes: [dup]
+    include_sources: [dup]
 output_formats: [pem]
         """.strip()
     )
@@ -103,7 +103,7 @@ output_formats: [pem]
     # Bundle where repo and fetch share the same name 'conflict'
     (bundles_dir / "dup.yaml").write_text(
         """
-bundle_name: dup
+source_name: dup
 description: Duplicate name test
 repo:
   - name: conflict

@@ -1,5 +1,5 @@
 ---
-bundle_name: internal
+source_name: internal
 description: Trust bundle for internal PKI services (root + issuing CAs)
 repo:
   - name: internal

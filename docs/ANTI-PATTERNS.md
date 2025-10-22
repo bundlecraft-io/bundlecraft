@@ -64,14 +64,14 @@ Follow these quick checks to ensure your BundleCraft configuration remains align
 ### ✅ Trust Definition
 
 - [ ] Remote fetch sources include SHA-256 verification (`verify.sha256`) for static downloads or TLS pinning (`verify.tls_fingerprint_sha256`) for dynamic endpoints.
-- [ ] Filter `root_certs_only: true` is enabled in defaults or craft configs to exclude subordinate/intermediate CAs from trust anchors.
+- [ ] Filter `root_certs_only: true` is enabled in defaults or environment configs to exclude subordinate/intermediate CAs from trust anchors.
 - [ ] Filter `ca_certs_only: true` ensures only certificates with BasicConstraints CA:TRUE are included.
-- [ ] Internal and external roots are maintained in **separate bundle configs** (e.g., `internal.yaml`, `mozilla.yaml`).
+- [ ] Internal and external roots are maintained in **separate source configs** (e.g., `internal.yaml`, `mozilla.yaml`).
 
 ### 🧱 Build Integrity
 
 - [ ] Builds are executed in controlled CI/CD or provisioning workflows - **not as periodic background jobs or cron tasks**.
-- [ ] Package option (`package: true`) is enabled in craft configs when deterministic tar archives are required.
+- [ ] Package option (`package: true`) is enabled in environment configs when deterministic tar archives are required.
 - [ ] Generated `checksums.sha256` files are validated and versioned alongside bundles.
 - [ ] Build artifacts are committed to version control or signed in CI for audit trails.
 
@@ -85,7 +85,7 @@ Follow these quick checks to ensure your BundleCraft configuration remains align
 
 ### 🧭 Governance
 
-- [ ] Every bundle config change (new sources, modified fetch URLs) is peer-reviewed via pull request.
+- [ ] Every source config change (new sources, modified fetch URLs) is peer-reviewed via pull request.
 - [ ] CI workflows validate fetch source integrity (SHA-256 matches, TLS pins) before accepting downloaded content.
 - [ ] Build diffs are reviewed between releases to ensure no unapproved trust anchors or expired certificates are introduced.
 - [ ] Craft configs specify explicit target compositions (`targets.<name>.includes`) to prevent unintended bundle merging.

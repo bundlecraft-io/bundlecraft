@@ -71,7 +71,7 @@ Graceful cleanup on interruption (Ctrl+C, SIGTERM):
 
 ```bash
 # Start build
-bundlecraft build --craft prod --bundle root-ca
+bundlecraft build --env prod --bundle root-ca
 
 # Press Ctrl+C during build
 ^C
@@ -86,7 +86,7 @@ Temp directories are automatically removed, preventing disk space waste.
 Use `--keep-temp` to preserve temp directory on failure for debugging:
 
 ```bash
-bundlecraft build --craft prod --bundle root-ca --keep-temp
+bundlecraft build --env prod --bundle root-ca --keep-temp
 
 # On failure:
 [atomic] Build failed, cleaning up temp directory: /tmp/bundlecraft-build-abc123/
@@ -106,7 +106,7 @@ rm -rf /tmp/bundlecraft-build-*
 Dry-run mode shows what would happen without committing:
 
 ```bash
-bundlecraft build --craft prod --bundle root-ca --dry-run
+bundlecraft build --env prod --bundle root-ca --dry-run
 
 [atomic] Created temp build directory: /tmp/bundlecraft-build-abc123/
 [dry-run] Would fetch: 3 sources
@@ -259,6 +259,6 @@ pytest tests/test_atomic_build.py -v
 
 ## See Also
 
-- [Issue #50: Atomic build implementation for resiliency](https://github.com/chrisjpich/bundlecraft/issues/50)
+- [Issue #50: Atomic build implementation for resiliency](https://github.com/bundlecraft-io/bundlecraft/issues/50)
 - [CONFIG-SPEC.md](CONFIG-SPEC.md) - Configuration options
 - [troubleshooting.md](troubleshooting.md) - Common issues

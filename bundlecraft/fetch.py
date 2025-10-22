@@ -24,7 +24,7 @@ import click
 from bundlecraft.fetchers.api import fetch_api
 from bundlecraft.fetchers.http import fetch_url
 from bundlecraft.fetchers.vault import fetch_vault
-from bundlecraft.helpers.config_schema import validate_bundle_config
+from bundlecraft.helpers.config_schema import validate_source_config
 from bundlecraft.helpers.exit_codes import ExitCode
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
@@ -297,7 +297,7 @@ def run_fetch(
     )
     _ = load_yaml(cfg_path, required=True)
     bundle_cfg = load_yaml(
-        config_dir / "bundles" / f"{bundle}.yaml", required=True, validate=validate_bundle_config
+        config_dir / "bundles" / f"{bundle}.yaml", required=True, validate=validate_source_config
     )
     fetch_cfg = bundle_cfg.get("fetch") or []
     if not isinstance(fetch_cfg, list):
@@ -542,7 +542,7 @@ def _fetch_each_to_named_dirs(
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
     "--bundle-config-file",
-    "bundle_config_file",
+    "source_config_file",
     type=click.Path(exists=True, dir_okay=False, file_okay=True, path_type=Path),
     required=True,
     help="Path to a bundle config YAML to fetch from directly (reads include/exclude/fetch only)",
@@ -584,7 +584,7 @@ def _fetch_each_to_named_dirs(
     help="Emit machine-readable JSON output (suppresses human-readable output)",
 )
 def main(
-    bundle_config_file: Path,
+    source_config_file: Path,
     fetch_name: str | None,
     workspace_root: Path,
     no_clean: bool,
@@ -628,21 +628,21 @@ def main(
 
     try:
         root = workspace_root.resolve()
-        cfg = load_yaml(bundle_config_file, required=True, validate=validate_bundle_config)
+        cfg = load_yaml(source_config_file, required=True, validate=validate_source_config)
         _validate_source_and_fetch_names(cfg)
         fetch_cfg = cfg.get("fetch") or []
         if not isinstance(fetch_cfg, list):
             raise click.ClickException("Config key 'fetch' must be a list of sources")
 
         # Determine bundle identifier for staging root
-        bundle_name = cfg.get("bundle_name") or cfg.get("id") or bundle_config_file.stem
+        source_name = cfg.get("source_name") or cfg.get("id") or source_config_file.stem
 
-        # Prepare staging dir: <output_dir>/<bundle_name>
+        # Prepare staging dir: <output_dir>/<source_name>
         # If output_dir is relative, resolve it against workspace_root
         if not output_dir.is_absolute():
-            staging_root = (root / output_dir / bundle_name).resolve()
+            staging_root = (root / output_dir / source_name).resolve()
         else:
-            staging_root = (output_dir / bundle_name).resolve()
+            staging_root = (output_dir / source_name).resolve()
         if not dry_run:
             ensure_dir(staging_root)
         if not no_clean and not dry_run:
@@ -694,7 +694,7 @@ def main(
             emit_json(
                 create_fetch_response(
                     success=True,
-                    bundle_name=bundle_name,
+                    source_name=source_name,
                     staging_path=str(staging_root),
                     fetched_sources=len(fetch_cfg),
                     local_sources=local_count if not fetch_only else 0,
@@ -716,7 +716,7 @@ def main(
 
             emit_json(
                 create_fetch_response(
-                    success=False, bundle_name="", staging_path="", errors=json_errors
+                    success=False, source_name="", staging_path="", errors=json_errors
                 )
             )
         else:
@@ -730,7 +730,7 @@ def main(
 
             emit_json(
                 create_fetch_response(
-                    success=False, bundle_name="", staging_path="", errors=json_errors
+                    success=False, source_name="", staging_path="", errors=json_errors
                 )
             )
         else:

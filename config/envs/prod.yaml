@@ -1,20 +1,20 @@
 ---
 # =====================================================================
-# Production Craft Configuration
+# Production Environment Configuration
 # =====================================================================
-# Craft configs define HOW to build and WHERE to distribute.
+# Environment configs define HOW to build and WHERE to distribute.
 # Controls output formats, verification, secrets, and deployment targets.
 # =====================================================================
 name: production
-description: Production craft with full certificate suite and signed releases
+description: Production environment with full certificate suite and signed releases
 # ---------------------------------------------------------------------
 # Bundle Composition
 # ---------------------------------------------------------------------
-targets:
+bundles:
   internal-and-mozilla:
-    includes: [internal, mozilla]  # Merge internal + Mozilla roots
+    include_sources: [internal, mozilla]  # Merge internal + Mozilla roots
   mozilla-only:
-    includes: [mozilla]  # Mozilla roots only
+    include_sources: [mozilla]  # Mozilla roots only
 # ---------------------------------------------------------------------
 # Output Configuration
 # ---------------------------------------------------------------------

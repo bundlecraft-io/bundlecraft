@@ -28,11 +28,11 @@ class TestFetch:
 
     def test_fetch_no_section(self, cli_runner, temp_workspace, test_data_dir):
         # Create a bundle config with includes only (no fetch section)
-        bundle_dir = temp_workspace / "config" / "bundles"
+        bundle_dir = temp_workspace / "config" / "sources"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         # Ensure sample exists at sources/sample.pem (conftest copies certs there)
         bundle_yaml = """
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle with no fetch section
 repo:
   - name: local
@@ -62,11 +62,11 @@ repo:
 
     def test_fetch_file_url(self, cli_runner, temp_workspace, test_data_dir):
         sample_pem = test_data_dir / "certs" / "sample.pem"
-        bundle_dir = temp_workspace / "config" / "bundles"
+        bundle_dir = temp_workspace / "config" / "sources"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         sha = _sha256_of(sample_pem)
         bundle_yaml = f"""
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle for file URL fetch
 fetch:
   - name: sample
@@ -95,11 +95,11 @@ fetch:
 
     def test_fetch_sha_mismatch_fails(self, cli_runner, temp_workspace, test_data_dir):
         sample_pem = test_data_dir / "certs" / "sample.pem"
-        bundle_dir = temp_workspace / "config" / "bundles"
+        bundle_dir = temp_workspace / "config" / "sources"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         wrong_sha = "0" * 64
         bundle_yaml = f"""
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle for SHA mismatch test
 fetch:
   - name: sample
@@ -122,10 +122,10 @@ fetch:
         assert "SHA256 mismatch" in result.output
 
     def test_fetch_rejects_insecure_http(self, cli_runner, temp_workspace):
-        bundle_dir = temp_workspace / "config" / "bundles"
+        bundle_dir = temp_workspace / "config" / "sources"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle for insecure HTTP rejection
 fetch:
   - name: bad
@@ -147,12 +147,12 @@ fetch:
 
     def test_fetch_cleans_staging_by_default(self, cli_runner, temp_workspace, test_data_dir):
         sample_pem = test_data_dir / "certs" / "sample.pem"
-        bundle_dir = temp_workspace / "config" / "bundles"
+        bundle_dir = temp_workspace / "config" / "sources"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         sha = _sha256_of(sample_pem)
         (bundle_dir / "test-bundle.yaml").write_text(
             f"""
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle for staging cleanup
 fetch:
   - name: sample
@@ -187,10 +187,10 @@ fetch:
         assert list((staging / "test-bundle" / "sample").glob("*.pem"))
 
     def test_fetch_api_https_required(self, cli_runner, temp_workspace):
-        bundle_dir = temp_workspace / "config" / "bundles"
+        bundle_dir = temp_workspace / "config" / "sources"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle for API HTTPS requirement
 fetch:
   - name: api_bad
@@ -212,10 +212,10 @@ fetch:
 
     def test_fetch_vault_missing_token(self, cli_runner, monkeypatch, temp_workspace):
         monkeypatch.delenv("VAULT_TOKEN", raising=False)
-        bundle_dir = temp_workspace / "config" / "bundles"
+        bundle_dir = temp_workspace / "config" / "sources"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle for Vault token missing
 fetch:
   - name: from_vault
@@ -272,10 +272,10 @@ fetch:
         monkeypatch.setenv("VAULT_TOKEN", "tkn")
         monkeypatch.setattr(vault_mod, "_import_hvac", lambda: MockHVAC)
 
-        bundle_dir = temp_workspace / "config" / "bundles"
+        bundle_dir = temp_workspace / "config" / "sources"
         bundle_dir.mkdir(parents=True, exist_ok=True)
         bundle_yaml = """
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle for Vault mock client
 fetch:
   - name: from_vault
@@ -299,5 +299,5 @@ fetch:
         assert (staged / "test-bundle" / "from_vault").exists()
         pems = list((staged / "test-bundle" / "from_vault").glob("*.pem"))
         assert len(pems) > 0
-        # Under new CLI, files go under <output-dir>/<bundle_name>/<fetch-name>
+        # Under new CLI, files go under <output-dir>/<source_name>/<fetch-name>
         assert list((staged / "test-bundle" / "from_vault").glob("*.pem"))

@@ -61,7 +61,7 @@ BundleCraft uses standardized exit codes to communicate command outcomes to call
 | Exit Code | Scenario |
 |-----------|----------|
 | `0` | Build completed successfully |
-| `2` | Invalid craft config file (schema error, syntax error) |
+| `2` | Invalid environment config file (schema error, syntax error) |
 | `3` | Missing required config file |
 | `31` | Certificate(s) expired during build |
 | `32` | Invalid or malformed certificate(s) in source |
@@ -69,7 +69,7 @@ BundleCraft uses standardized exit codes to communicate command outcomes to call
 
 **Example:**
 ```bash
-bundlecraft build --craft-config-file craft.yaml
+bundlecraft build --env-config-file craft.yaml
 echo $?  # Check exit code
 ```
 
@@ -115,7 +115,7 @@ fi
 | Exit Code | Scenario |
 |-----------|----------|
 | `0` | Fetch completed successfully |
-| `2` | Invalid bundle config file |
+| `2` | Invalid source config file |
 | `20` | Network connection failure |
 | `21` | Authentication/authorization failure |
 | `22` | Fetch failed (resource not found, invalid response) |
@@ -146,7 +146,7 @@ fi
 ```yaml
 - name: Build trust bundle
   id: build
-  run: bundlecraft build --craft-config-file craft.yaml
+  run: bundlecraft build --env-config-file craft.yaml
   continue-on-error: true
 
 - name: Handle build failure
@@ -161,7 +161,7 @@ fi
       # Continue with build but notify team
     elif [ "$EXIT_CODE" -eq 20 ]; then
       echo "::warning::Network error - retrying"
-      bundlecraft build --craft-config-file craft.yaml
+      bundlecraft build --env-config-file craft.yaml
     else
       echo "::error::Build failed with exit code $EXIT_CODE"
       exit 1
@@ -173,7 +173,7 @@ fi
 ```yaml
 build_bundle:
   script:
-    - bundlecraft build --craft-config-file craft.yaml
+    - bundlecraft build --env-config-file craft.yaml
   allow_failure:
     exit_codes:
       - 31  # Allow expired cert warnings in dev
@@ -190,10 +190,10 @@ pipeline {
             steps {
                 script {
                     def exitCode = sh(
-                        script: 'bundlecraft build --craft-config-file craft.yaml',
+                        script: 'bundlecraft build --env-config-file craft.yaml',
                         returnStatus: true
                     )
-                    
+
                     if (exitCode == 0) {
                         echo 'Build successful'
                     } else if (exitCode == 2) {
@@ -203,7 +203,7 @@ pipeline {
                     } else if (exitCode == 20) {
                         // Retry on network errors
                         retry(3) {
-                            sh 'bundlecraft build --craft-config-file craft.yaml'
+                            sh 'bundlecraft build --env-config-file craft.yaml'
                         }
                     } else {
                         error("Build failed with exit code: ${exitCode}")
@@ -249,7 +249,7 @@ RETRY_DELAY=5
 for i in $(seq 1 $MAX_RETRIES); do
     bundlecraft fetch --bundle-config-file bundle.yaml
     EXIT_CODE=$?
-    
+
     if [ $EXIT_CODE -eq 0 ]; then
         echo "Fetch successful"
         break
@@ -266,7 +266,7 @@ done
 #### Expired Certificate Handling
 ```bash
 #!/bin/bash
-bundlecraft build --craft-config-file craft.yaml
+bundlecraft build --env-config-file craft.yaml
 EXIT_CODE=$?
 
 case $EXIT_CODE in
@@ -293,7 +293,7 @@ esac
 
 1. **Always check exit codes in automation:**
    ```bash
-   bundlecraft build --craft-config-file craft.yaml || exit $?
+   bundlecraft build --env-config-file craft.yaml || exit $?
    ```
 
 2. **Use exit codes for conditional logic:**
@@ -315,7 +315,7 @@ esac
    - name: Test exit codes
      run: |
        # Test config error
-       bundlecraft build --craft-config-file invalid.yaml || true
+       bundlecraft build --env-config-file invalid.yaml || true
        # Test network error handling
        bundlecraft fetch --bundle-config-file bundle.yaml || true
    ```
@@ -352,4 +352,4 @@ Existing CI/CD pipelines checking only for `$? -eq 0` (success) or `$? -ne 0` (f
 
 ## Feedback
 
-If you encounter an error scenario that doesn't map clearly to an exit code, please [open an issue](https://github.com/chrisjpich/bundlecraft/issues) with details.
+If you encounter an error scenario that doesn't map clearly to an exit code, please [open an issue](https://github.com/bundlecraft-io/bundlecraft/issues) with details.

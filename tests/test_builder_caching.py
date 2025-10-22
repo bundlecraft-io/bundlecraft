@@ -20,20 +20,20 @@ def test_bundle_cached_once_and_reused(
 ):
     """Ensure a bundle referenced by multiple targets is only staged/converted once."""
     # Prepare craft with two targets that both reference the same bundle
-    craft_dir = temp_workspace / "config" / "crafts"
+    craft_dir = temp_workspace / "config" / "envs"
     craft_dir.mkdir(parents=True, exist_ok=True)
-    (temp_workspace / "config" / "bundles").mkdir(parents=True, exist_ok=True)
+    (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)
 
     craft_yaml = craft_dir / "test.yaml"
     craft_yaml.write_text(
         """
 name: TestCraft
 description: Test craft for caching test
-targets:
+bundles:
   target-a:
-    includes: [test-bundle]
+    include_sources: [test-bundle]
   target-b:
-    includes: [test-bundle]
+    include_sources: [test-bundle]
 output_formats: [pem, jks]
         """.strip()
     )
@@ -46,7 +46,7 @@ output_formats: [pem, jks]
     )
 
     # Bundle config
-    (temp_workspace / "config" / "bundles" / "test-bundle.yaml").write_text(
+    (temp_workspace / "config" / "sources" / "test-bundle.yaml").write_text(
         sample_bundle_config.read_text()
     )
 
@@ -106,18 +106,18 @@ def test_multi_bundle_target_merges_cached_pems(
 ):
     """Ensure targets with multiple bundles merge cached canonical PEMs."""
     # Prepare craft with one target that references two bundles
-    craft_dir = temp_workspace / "config" / "crafts"
+    craft_dir = temp_workspace / "config" / "envs"
     craft_dir.mkdir(parents=True, exist_ok=True)
-    (temp_workspace / "config" / "bundles").mkdir(parents=True, exist_ok=True)
+    (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)
 
     craft_yaml = craft_dir / "test.yaml"
     craft_yaml.write_text(
         """
 name: TestCraft
 description: Test craft for multi-bundle merging
-targets:
+bundles:
   merged-target:
-    includes: [bundle-a, bundle-b]
+    include_sources: [bundle-a, bundle-b]
 output_formats: [pem]
 filters:
   unique_by_fingerprint: true
@@ -133,10 +133,10 @@ filters:
     )
 
     # Create two bundle configs
-    bundle_a_yaml = temp_workspace / "config" / "bundles" / "bundle-a.yaml"
+    bundle_a_yaml = temp_workspace / "config" / "sources" / "bundle-a.yaml"
     bundle_a_yaml.write_text(
         """
-bundle_name: bundle-a
+source_name: bundle-a
 description: Test bundle A
 repo:
   - name: internal
@@ -145,10 +145,10 @@ repo:
         """.strip()
     )
 
-    bundle_b_yaml = temp_workspace / "config" / "bundles" / "bundle-b.yaml"
+    bundle_b_yaml = temp_workspace / "config" / "sources" / "bundle-b.yaml"
     bundle_b_yaml.write_text(
         """
-bundle_name: bundle-b
+source_name: bundle-b
 description: Test bundle B
 repo:
   - name: internal

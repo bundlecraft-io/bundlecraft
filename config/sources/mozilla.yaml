@@ -1,5 +1,5 @@
 ---
-bundle_name: mozilla
+source_name: mozilla
 description: Mozilla NSS CA certificate program - publicly trusted root CAs
 fetch:
   - name: mozilla_roots

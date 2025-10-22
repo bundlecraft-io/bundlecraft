@@ -10,72 +10,72 @@ import pytest
 from pydantic import ValidationError
 
 from bundlecraft.helpers.config_schema import (
-    validate_bundle_config,
-    validate_craft_config,
     validate_defaults_config,
+    validate_env_config,
+    validate_source_config,
 )
 
 
 class TestBundleConfigValidation:
     """Test bundle configuration validation."""
 
-    def test_missing_bundle_name(self):
-        """Bundle config must have bundle_name field."""
+    def test_missing_source_name(self):
+        """Bundle config must have source_name field."""
         data = {"description": "Test bundle"}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
-        assert "bundle_name" in str(exc_info.value).lower()
+            validate_source_config(data)
+        assert "source_name" in str(exc_info.value).lower()
 
     def test_missing_description(self):
         """Bundle config must have description field."""
-        data = {"bundle_name": "test"}
+        data = {"source_name": "test"}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "description" in str(exc_info.value).lower()
 
-    def test_empty_bundle_name(self):
+    def test_empty_source_name(self):
         """Bundle name cannot be empty string."""
-        data = {"bundle_name": "", "description": "Test"}
+        data = {"source_name": "", "description": "Test"}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
-        assert "bundle_name" in str(exc_info.value).lower()
+            validate_source_config(data)
+        assert "source_name" in str(exc_info.value).lower()
 
     def test_empty_description(self):
         """Description cannot be empty string."""
-        data = {"bundle_name": "test", "description": ""}
+        data = {"source_name": "test", "description": ""}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "description" in str(exc_info.value).lower()
 
     def test_no_sources(self):
         """Bundle must have at least one repo or fetch entry."""
-        data = {"bundle_name": "test", "description": "Test bundle"}
+        data = {"source_name": "test", "description": "Test bundle"}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "at least one" in str(exc_info.value).lower()
 
-    def test_reserved_bundle_name(self):
+    def test_reserved_source_name(self):
         """Bundle name cannot be a reserved keyword."""
-        data = {"bundle_name": "fetch", "description": "Test", "repo": [{"name": "test"}]}
+        data = {"source_name": "fetch", "description": "Test", "repo": [{"name": "test"}]}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "reserved" in str(exc_info.value).lower()
 
     def test_duplicate_repo_names(self):
         """Repo entries must have unique names."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test",
             "repo": [{"name": "duplicate"}, {"name": "duplicate"}],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "duplicate" in str(exc_info.value).lower()
 
     def test_duplicate_fetch_names(self):
         """Fetch entries must have unique names."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test",
             "fetch": [
                 {"name": "duplicate", "type": "url", "url": "https://example.com/ca.pem"},
@@ -83,96 +83,96 @@ class TestBundleConfigValidation:
             ],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "duplicate" in str(exc_info.value).lower()
 
     def test_repo_fetch_name_conflict(self):
         """Repo and fetch entries cannot share names."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test",
             "repo": [{"name": "conflict"}],
             "fetch": [{"name": "conflict", "type": "url", "url": "https://example.com/ca.pem"}],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "conflict" in str(exc_info.value).lower()
 
     def test_reserved_repo_name(self):
         """Repo name cannot be a reserved keyword."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test",
             "repo": [{"name": "include"}],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "reserved" in str(exc_info.value).lower()
 
     def test_reserved_fetch_name(self):
         """Fetch name cannot be a reserved keyword."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test",
             "fetch": [{"name": "exclude", "type": "url", "url": "https://example.com/ca.pem"}],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "reserved" in str(exc_info.value).lower()
 
     def test_insecure_http_url(self):
         """HTTP URLs (non-localhost) should be rejected."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test",
             "fetch": [{"name": "insecure", "type": "url", "url": "http://example.com/ca.pem"}],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "https" in str(exc_info.value).lower()
 
     def test_url_fetch_missing_url(self):
         """URL fetch type requires url field."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test",
             "fetch": [{"name": "test", "type": "url"}],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "url" in str(exc_info.value).lower() and "required" in str(exc_info.value).lower()
 
     def test_vault_fetch_missing_mount(self):
         """Vault fetch type requires mount field."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test",
             "fetch": [{"name": "test", "type": "vault", "path": "secret/ca"}],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "mount" in str(exc_info.value).lower()
 
     def test_vault_fetch_missing_path(self):
         """Vault fetch type requires path field."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test",
             "fetch": [{"name": "test", "type": "vault", "mount": "pki"}],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "path" in str(exc_info.value).lower()
 
     def test_api_fetch_missing_endpoint(self):
         """API fetch type requires endpoint field."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test",
             "fetch": [{"name": "test", "type": "api"}],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_bundle_config(data)
+            validate_source_config(data)
         assert "endpoint" in str(exc_info.value).lower()
 
 
@@ -183,21 +183,21 @@ class TestCraftConfigValidation:
         """Craft config must have name field."""
         data = {"description": "Test craft", "targets": {"internal": {"includes": ["test"]}}}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_craft_config(data)
+            validate_env_config(data)
         assert "name" in str(exc_info.value).lower()
 
     def test_missing_description(self):
         """Craft config must have description field."""
         data = {"name": "Test", "targets": {"internal": {"includes": ["test"]}}}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_craft_config(data)
+            validate_env_config(data)
         assert "description" in str(exc_info.value).lower()
 
     def test_empty_targets(self):
         """Craft must have at least one target."""
         data = {"name": "Test", "description": "Test craft", "targets": {}}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_craft_config(data)
+            validate_env_config(data)
         assert "at least one target" in str(exc_info.value).lower()
 
     def test_invalid_output_format(self):
@@ -209,7 +209,7 @@ class TestCraftConfigValidation:
             "output_formats": ["pem", "invalid_format"],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_craft_config(data)
+            validate_env_config(data)
         assert "invalid" in str(exc_info.value).lower() or "format" in str(exc_info.value).lower()
 
     def test_duplicate_target_names_list(self):
@@ -223,7 +223,7 @@ class TestCraftConfigValidation:
             ],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_craft_config(data)
+            validate_env_config(data)
         assert "duplicate" in str(exc_info.value).lower()
 
     def test_target_missing_includes(self):
@@ -234,7 +234,7 @@ class TestCraftConfigValidation:
             "targets": {"internal": {}},
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
-            validate_craft_config(data)
+            validate_env_config(data)
         assert "at least one" in str(exc_info.value).lower()
 
 
@@ -280,22 +280,22 @@ class TestValidConfigsPass:
     def test_valid_bundle_with_repo(self):
         """Valid bundle config with repo should pass."""
         data = {
-            "bundle_name": "test",
+            "source_name": "test",
             "description": "Test bundle",
             "repo": [{"name": "internal", "include": ["sources/internal/rootCA.pem"]}],
         }
-        config = validate_bundle_config(data)
-        assert config.bundle_name == "test"
+        config = validate_source_config(data)
+        assert config.source_name == "test"
 
     def test_valid_bundle_with_fetch(self):
         """Valid bundle config with fetch should pass."""
         data = {
-            "bundle_name": "mozilla",
+            "source_name": "mozilla",
             "description": "Mozilla roots",
             "fetch": [{"name": "mozilla", "type": "url", "url": "https://curl.se/ca/cacert.pem"}],
         }
-        config = validate_bundle_config(data)
-        assert config.bundle_name == "mozilla"
+        config = validate_source_config(data)
+        assert config.source_name == "mozilla"
 
     def test_valid_craft_config(self):
         """Valid craft config should pass."""
@@ -305,7 +305,7 @@ class TestValidConfigsPass:
             "targets": {"internal": {"includes": ["internal"]}},
             "output_formats": ["pem", "jks"],
         }
-        config = validate_craft_config(data)
+        config = validate_env_config(data)
         assert config.name == "Development"
 
     def test_valid_defaults_config(self):

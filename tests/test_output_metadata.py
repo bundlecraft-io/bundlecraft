@@ -258,19 +258,19 @@ class TestOutputMetadataInBuild:
 
         # Setup test workspace
         temp = tmp_path
-        (temp / "config" / "crafts").mkdir(parents=True, exist_ok=True)
-        (temp / "config" / "bundles").mkdir(parents=True, exist_ok=True)
+        (temp / "config" / "envs").mkdir(parents=True, exist_ok=True)
+        (temp / "config" / "sources").mkdir(parents=True, exist_ok=True)
         (temp / "sources" / "internal").mkdir(parents=True, exist_ok=True)
 
         # Create craft config with output_metadata
-        craft_yaml = temp / "config" / "crafts" / "test.yaml"
+        craft_yaml = temp / "config" / "envs" / "test.yaml"
         craft_yaml.write_text(
             """
 name: TestCraft
 description: Test craft
-targets:
+bundles:
   test-target:
-    includes: [test-bundle]
+    include_sources: [test-bundle]
 output_formats: [pem]
 output_metadata:
   annotations:
@@ -283,10 +283,10 @@ output_metadata:
         )
 
         # Create bundle config
-        bundle_yaml = temp / "config" / "bundles" / "test-bundle.yaml"
+        bundle_yaml = temp / "config" / "sources" / "test-bundle.yaml"
         bundle_yaml.write_text(
             """
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle
 repo:
   - name: internal

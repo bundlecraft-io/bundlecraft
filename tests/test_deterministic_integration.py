@@ -23,8 +23,8 @@ class TestDeterministicBuilds:
 
         # Create minimal test structure
         config_dir = temp_dir / "config"
-        (config_dir / "crafts").mkdir(parents=True)
-        (config_dir / "bundles").mkdir(parents=True)
+        (config_dir / "envs").mkdir(parents=True)
+        (config_dir / "sources").mkdir(parents=True)
         sources_internal = temp_dir / "sources" / "internal" / "test-bundle"
         sources_internal.mkdir(parents=True)
 
@@ -47,29 +47,29 @@ class TestDeterministicBuilds:
 
         # Create minimal bundle config
         bundle_config = """---
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle
 repo:
   - name: test-bundle
     include:
       - sources/internal/test-bundle
 """
-        (config_dir / "bundles" / "test-bundle.yaml").write_text(bundle_config)
+        (config_dir / "sources" / "test-bundle.yaml").write_text(bundle_config)
 
         # Create minimal craft config with packaging enabled
         craft_config = """---
 name: Test
 description: Test craft
-targets:
+bundles:
   test-target:
-    includes: [test-bundle]
+    include_sources: [test-bundle]
 output_formats:
   - pem
 package: true
 verify:
   fail_on_expired: false
 """
-        (config_dir / "crafts" / "test.yaml").write_text(craft_config)
+        (config_dir / "envs" / "test.yaml").write_text(craft_config)
 
         # Build 1
         output1 = temp_dir / "output1"
@@ -130,8 +130,8 @@ verify:
 
         # Create minimal test structure
         config_dir = temp_dir / "config"
-        (config_dir / "crafts").mkdir(parents=True)
-        (config_dir / "bundles").mkdir(parents=True)
+        (config_dir / "envs").mkdir(parents=True)
+        (config_dir / "sources").mkdir(parents=True)
         sources_internal = temp_dir / "sources" / "internal" / "test-bundle"
         sources_internal.mkdir(parents=True)
 
@@ -153,29 +153,29 @@ verify:
 
         # Bundle config
         bundle_config = """---
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle
 repo:
   - name: test-bundle
     include:
       - sources/internal/test-bundle
 """
-        (config_dir / "bundles" / "test-bundle.yaml").write_text(bundle_config)
+        (config_dir / "sources" / "test-bundle.yaml").write_text(bundle_config)
 
         # Create minimal craft config with packaging enabled
         craft_config = """---
 name: Test
 description: Test craft
-targets:
+bundles:
   test-target:
-    includes: [test-bundle]
+    include_sources: [test-bundle]
 output_formats:
   - pem
 package: true
 verify:
   fail_on_expired: false
 """
-        (config_dir / "crafts" / "test.yaml").write_text(craft_config)
+        (config_dir / "envs" / "test.yaml").write_text(craft_config)
 
         # Build
         output = temp_dir / "output"

@@ -1,17 +1,17 @@
 ---
 # =====================================================================
-# Example bundle configuration for BundleCraft
-# Location: config/bundles/example-bundle.yaml
+# Example source configuration for BundleCraft
+# Location: config/sources/example-source.yaml
 #
-# Bundle configs define WHAT certificates to source and WHERE to get them.
+# Source configs define WHAT certificates to source and WHERE to get them.
 # They control certificate gathering, fetch operations, and source metadata.
 #
 # Build settings (formats, verification, passwords) belong in environment configs.
 # =====================================================================
-bundle_name: example-bundle
+source_name: example-source
 description: >
   Demonstration of all supported source and fetch options.
-  Bundle configs focus purely on certificate sourcing - no build settings.
+  Source configs focus purely on certificate sourcing - no build settings.
 # ---------------------------------------------------------------------
 # Certificate Sources (preferred schema: named repos)
 # ---------------------------------------------------------------------

@@ -85,14 +85,14 @@ We need a **simple, secure release strategy** that:
 **Release:**
 
 * GitHub Actions build on tag push
-* Push to `ghcr.io/chrisjpich/bundlecraft:vX.Y.Z` and `:latest`
+* Push to `ghcr.io/bundlecraft-io/bundlecraft:vX.Y.Z` and `:latest`
 * Automatic signing via GitHub's Sigstore integration (no manual cosign setup needed)
 * Basic attestation with build provenance
 
 **Usage:**
 
 ```bash
-docker run --rm -v $(pwd)/config:/config ghcr.io/chrisjpich/bundlecraft:latest build --bundle production
+docker run --rm -v $(pwd)/config:/config ghcr.io/bundlecraft-io/bundlecraft:latest build --bundle production
 ```
 
 ### 6.2 PyPI Package (Developer Tool)
@@ -177,7 +177,7 @@ jobs:
 **OCI:**
 
 ```bash
-docker buildx imagetools inspect ghcr.io/chrisjpich/bundlecraft:v1.0.0 --format "{{json .Provenance}}"
+docker buildx imagetools inspect ghcr.io/bundlecraft-io/bundlecraft:v1.0.0 --format "{{json .Provenance}}"
 ```
 
 **PyPI:** Sigstore signatures automatically available via PyPI's transparency log

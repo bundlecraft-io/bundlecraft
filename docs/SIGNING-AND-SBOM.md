@@ -68,12 +68,12 @@ gpg --armor --export ABCD1234EFGH5678 > public-key.asc
 **Basic signing during build:**
 ```bash
 # Sign with key ID specified
-bundlecraft build --craft prod --bundle mozilla \
+bundlecraft build --env prod --bundle mozilla \
   --sign --gpg-key-id ABCD1234EFGH5678
 
 # Or use environment variable
 export GPG_KEY_ID=ABCD1234EFGH5678
-bundlecraft build --craft prod --bundle mozilla --sign
+bundlecraft build --env prod --bundle mozilla --sign
 ```
 
 **With passphrase (optional):**
@@ -81,7 +81,7 @@ bundlecraft build --craft prod --bundle mozilla --sign
 # Provide passphrase via environment variable (for CI/CD)
 export GPG_KEY_ID=ABCD1234EFGH5678
 export GPG_PASSPHRASE="your-passphrase"
-bundlecraft build --craft prod --bundle mozilla --sign
+bundlecraft build --env prod --bundle mozilla --sign
 
 # Note: If GPG_PASSPHRASE is not set, GPG will prompt for it interactively
 ```
@@ -176,13 +176,13 @@ BundleCraft automatically generates a CycloneDX JSON SBOM for every build, provi
 **Enabled by default:**
 ```bash
 # SBOM is generated automatically
-bundlecraft build --craft prod --bundle mozilla
+bundlecraft build --env prod --bundle mozilla
 ```
 
 **Disable SBOM generation:**
 ```bash
 # Skip SBOM if not needed
-bundlecraft build --craft prod --bundle mozilla --no-sbom
+bundlecraft build --env prod --bundle mozilla --no-sbom
 ```
 
 **SBOM output location:**
@@ -298,7 +298,7 @@ jobs:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          bundlecraft build --craft prod --bundle mozilla --sign
+          bundlecraft build --env prod --bundle mozilla --sign
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -384,7 +384,7 @@ jobs:
 # Solution: Set the key ID
 export GPG_KEY_ID=ABCD1234EFGH5678
 # Or use --gpg-key-id flag
-bundlecraft build --craft prod --bundle mozilla --sign --gpg-key-id ABCD1234EFGH5678
+bundlecraft build --env prod --bundle mozilla --sign --gpg-key-id ABCD1234EFGH5678
 ```
 
 **"Key not found in keyring"**
@@ -417,7 +417,7 @@ bundlecraft verify --target dist/Production/mozilla \
 # Check for dependency issues
 pip install cyclonedx-bom
 # Or skip SBOM generation if not needed
-bundlecraft build --craft prod --bundle mozilla --no-sbom
+bundlecraft build --env prod --bundle mozilla --no-sbom
 ```
 
 ---
@@ -434,5 +434,5 @@ bundlecraft build --craft prod --bundle mozilla --no-sbom
 ## Support
 
 For questions or issues:
-- Open an [issue](https://github.com/chrisjpich/bundlecraft/issues)
-- Join [GitHub Discussions](https://github.com/chrisjpich/bundlecraft/discussions)
+- Open an [issue](https://github.com/bundlecraft-io/bundlecraft/issues)
+- Join [GitHub Discussions](https://github.com/bundlecraft-io/bundlecraft/discussions)

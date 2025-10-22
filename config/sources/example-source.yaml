@@ -1,0 +1,83 @@
+---
+# =====================================================================
+# Example source configuration for BundleCraft
+# Location: config/sources/example-source.yaml
+#
+# Source configs define WHAT certificates to source and WHERE to get them.
+# They control certificate gathering, fetch operations, and source metadata.
+#
+# Build settings (formats, verification, passwords) belong in environment configs.
+# =====================================================================
+source_name: example-source
+description: >
+  Demonstration of all supported source and fetch options.
+  Source configs focus purely on certificate sourcing - no build settings.
+# ---------------------------------------------------------------------
+# Certificate Sources (preferred schema: named repos)
+# ---------------------------------------------------------------------
+repo:
+  - name: roots
+    include:  # Relative paths from repo root; supports path and inline entries
+      # Path entries (string or {path: ...})
+      - sources/example/roots/  # All .pem files in this directory
+      - {path: sources/example/special.pem}  # Single file reference
+      # Inline PEM entry (optional); omit name to auto-generate filename
+      # - name: special-inline.pem
+      #   inline: |
+      #     -----BEGIN CERTIFICATE-----
+      #     ...PEM-CONTENT-ELIDED...
+      #     -----END CERTIFICATE-----
+    exclude: [sources/example/roots/deprecated/]  # Optional explicit exclusions scoped to this repo
+  - name: intermediates
+    include: [sources/example/intermediates/]
+    exclude:
+      - sources/example/intermediates/old-ca.pem
+# ---------------------------------------------------------------------
+# Remote Fetch Definitions
+# ---------------------------------------------------------------------
+fetch:
+  # Example: Public URL with content pinning
+  - name: mozilla_roots
+    type: url
+    url: https://curl.se/ca/cacert.pem
+    verify:
+      # The sha256 value below must be the exact SHA256 hash of the file as downloaded.
+      # If the hash does not match, the download will be rejected and not verified.
+      # To calculate: download the file, run 'sha256sum <filename>', and copy the hash here.
+      sha256: <expected_sha256>  # Recommended for static/public sources
+
+  # Example: API endpoint with authentication and custom retry settings
+  - name: partner_roots
+    type: api
+    endpoint: https://api.partner.com/v1/pki/roots
+    provider: Partner PKI Service
+    token_ref: PARTNER_API_TOKEN  # Read from environment variable
+    # Optional: Override fetch retry/timeout settings for slow APIs
+    timeout: 90  # Increase timeout for slower API (default: 30s)
+    retries: 5  # More aggressive retries for flaky endpoint (default: 3)
+    verify:
+      ca_file: sources/partner-ca.pem  # Custom CA for TLS verification
+      tls_fingerprint_sha256: <leaf_cert_pin>  # Pin leaf certificate
+      headers:
+        X-API-Version: '2'
+
+  # Example: HashiCorp Vault
+  - name: vault_roots
+    type: vault
+    mount: secret
+    path: pki/trusted_roots
+    pem_field: pem
+    addr: https://vault.example.com:8200
+    token_ref: VAULT_TOKEN
+    namespace: production
+    verify:
+      ca_file: sources/vault-ca.pem
+# ---------------------------------------------------------------------
+# Metadata
+# ---------------------------------------------------------------------
+metadata:
+  owner: pki-team@bundlecraft.io
+  purpose: Example demonstrating all bundle configuration options
+  change_control: CAB-2025-001  # Optional audit tracking
+  upstream: https://internal.example.com/pki/docs
+  tags: [example, multi-source, documented]

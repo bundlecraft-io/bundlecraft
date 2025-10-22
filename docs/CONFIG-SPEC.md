@@ -1,16 +1,16 @@
-# BundleCraft Configuration Specification
+# BundleEnvironment Configuration Specification
 
 This document defines the configuration schema for BundleCraft, clearly separating concerns between:
 
-- **Bundle configs** (`config/bundles/*.yaml`) - Certificate sourcing and gathering
-- **Craft configs** (`config/crafts/*.yaml`) - Build, output, and deployment configuration
+- **Bundle configs** (`config/sources/*.yaml`) - Certificate sourcing and gathering
+- **Craft configs** (`config/envs/*.yaml`) - Build, output, and deployment configuration
 - **Defaults** (`config/defaults.yaml`) - Global fallback settings
 
 ---
 
 ## Configuration Philosophy
 
-### Bundle Configs: Source & Fetch Layer
+### Source Configs: Source & Fetch Layer
 
 **Purpose:** Define WHAT certificates to source and WHERE to get them
 
@@ -23,7 +23,7 @@ This document defines the configuration schema for BundleCraft, clearly separati
 
 **Forbidden:** Output formats, build paths, passwords, verification policies
 
-### Craft Configs: Build & Deploy Layer
+### Environment Configs: Build & Deploy Layer
 
 **Purpose:** Define HOW to build and WHERE to distribute
 
@@ -40,7 +40,7 @@ This document defines the configuration schema for BundleCraft, clearly separati
 
 ---
 
-## 1) Bundle Configuration: `config/bundles/<bundle>.yaml`
+## 1) Source Configuration: `config/sources/<bundle>.yaml`
 
 Defines certificate sources for a logical bundle.
 
@@ -181,7 +181,7 @@ All fetch operations support configurable timeout and retry behavior to handle t
   - 503: Service Unavailable (temporary service error)
   - 504: Gateway Timeout (temporary timeout)
 
-These settings can be configured globally in `config/defaults.yaml` under the `fetch:` section, or overridden per-source in bundle configs. Network errors (timeouts, connection failures) are always retried automatically.
+These settings can be configured globally in `config/defaults.yaml` under the `fetch:` section, or overridden per-source in source configs. Network errors (timeouts, connection failures) are always retried automatically.
 
 ### Metadata
 
@@ -193,7 +193,7 @@ metadata:
   tags: [internal, production]
 ```
 
-### Complete Bundle Config Example
+### Complete Source Config Example
 
 ```yaml
 ---
@@ -214,18 +214,18 @@ metadata:
 
 ---
 
-## 2) Craft Configuration: `config/crafts/<craft>.yaml`
+## 2) Environment Configuration: `config/envs/<craft>.yaml`
 
 Defines build behavior and deployment configuration for a craft.
 
 ### Bundle Composition
 
 ```yaml
-targets:
+bundles:
   internal-prod:
-    includes: [internal, mozilla]  # Merge multiple bundles
+    include_sources: [internal, mozilla]  # Merge multiple bundles
   mozilla-only:
-    includes: [mozilla]
+    include_sources: [mozilla]
 ```
 
 ### Output Configuration
@@ -374,7 +374,7 @@ distribution_metadata:
   # NOTE: BundleCraft CLI does NOT publish or upload bundles directly.
   # This section provides metadata for CI/CD pipelines (e.g., GitHub Actions)
   # to know where and how to distribute built bundles. Keys/values are flexible.
-  targets:
+  bundles:
     - type: github-release
       enabled: true
       assets:
@@ -408,18 +408,18 @@ output_metadata:
     app.kubernetes.io/managed-by: "bundlecraft"
 ```
 
-### Complete Craft Config Example
+### Complete Environment Config Example
 
 ```yaml
 ---
 name: Production
 description: Production craft with full certificate suite
 
-targets:
+bundles:
   internal-prod:
-    includes: [internal, mozilla]
+    include_sources: [internal, mozilla]
   mozilla-only:
-    includes: [mozilla]
+    include_sources: [mozilla]
 
 output_formats:
   - pem
@@ -459,7 +459,7 @@ distribution_metadata:
   # NOTE: BundleCraft CLI does NOT publish or upload bundles directly.
   # This section provides metadata for CI/CD pipelines (e.g., GitHub Actions)
   # to know where and how to distribute built bundles. Keys/values are flexible.
-  targets:
+  bundles:
     - type: github-release
       enabled: true
       description: Publish to GitHub Releases (handled by pipeline)
@@ -487,7 +487,7 @@ metadata:
 
 ## 3) Defaults: `config/defaults.yaml`
 
-Global fallback settings applied before craft config.
+Global fallback settings applied before environment config.
 
 ```yaml
 ---
@@ -539,14 +539,14 @@ metadata:
 
 ## Configuration Precedence
 
-**For build settings:** `built-in defaults` → `config/defaults.yaml` → `config/crafts/<craft>.yaml`
+**For build settings:** `built-in defaults` → `config/defaults.yaml` → `config/envs/<craft>.yaml`
 
-**For sources:** Only `config/bundles/<bundle>.yaml` is consulted (no merging with craft)
+**For sources:** Only `config/sources/<bundle>.yaml` is consulted (no merging with craft)
 
-**For composed targets:**
+**For composed bundles:**
 
-- Craft defines `targets.<name>.includes: [bundle1, bundle2]`
-- Builder loads each bundle config and merges their `include` + `exclude` lists
+- Craft defines `targets.<name>.include_sources: [bundle1, bundle2]`
+- Builder loads each source config and merges their `include` + `exclude` lists
 - Craft config controls ALL build behavior (formats, verification, etc.)
 
 ---
@@ -556,33 +556,33 @@ metadata:
 ### Build
 
 ```bash
-bundlecraft build --craft prod --bundle internal-prod
+bundlecraft build --env prod --bundle internal-prod
 ```
 
-- Loads `config/crafts/prod.yaml` for build settings
-- Composes sources from `internal` and `mozilla` bundle configs
+- Loads `config/envs/prod.yaml` for build settings
+- Composes sources from `internal` and `mozilla` source configs
 - Outputs to `dist/Production/internal-prod/`
 
 To overwrite existing artifacts:
 
 ```bash
-bundlecraft build --craft prod --bundle internal-prod --force
+bundlecraft build --env prod --bundle internal-prod --force
 ```
 
 ### Fetch
 
 ```bash
-bundlecraft fetch --bundle-config-file config/bundles/mozilla.yaml --workspace-root .
+bundlecraft fetch --bundle-config-file config/sources/mozilla.yaml --workspace-root .
 ```
 
-- Loads `config/bundles/mozilla.yaml` and stages into `sources/staged/<craft>/<bundle>/`
+- Loads `config/sources/mozilla.yaml` and stages into `sources/staged/<craft>/<bundle>/`
   - Stages into `sources/staged/<craft>/<target>/` during build
 - Note: `bundlecraft build` performs fetch automatically unless `--skip-fetch` is used
 
 ### Using Existing Staged Sources
 
 ```bash
-bundlecraft build --craft prod --bundle internal-prod --skip-fetch
+bundlecraft build --env prod --bundle internal-prod --skip-fetch
 ```
 
 - Uses existing staged sources at `sources/staged/prod/*` and does not perform network fetches
@@ -624,13 +624,13 @@ For step-by-step guidance on interpreting and fixing validation errors (plus pyt
 
 ### Required Fields
 
-**Bundle Configs:**
+**Source Configs:**
 
 - `bundle_name` (string, non-empty) - Unique identifier for the bundle
 - `description` (string, non-empty) - Human-readable purpose/context
 - At least one of: `repo[]` or `fetch[]` - Must define at least one certificate source
 
-**Craft Configs:**
+**Environment Configs:**
 
 - `name` (string, non-empty) - Display name for the craft
 - `description` (string, non-empty) - Human-readable purpose/context

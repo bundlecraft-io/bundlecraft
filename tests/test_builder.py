@@ -150,20 +150,20 @@ class TestBuilder:
     ):
         """Ensure build writes to dist/<craft-name>/<target-name> with standard filenames."""
         # Craft config with two simple targets referencing the sample bundle file name
-        craft_dir = temp_workspace / "config" / "crafts"
+        craft_dir = temp_workspace / "config" / "envs"
         craft_dir.mkdir(parents=True, exist_ok=True)
-        (temp_workspace / "config" / "bundles").mkdir(parents=True, exist_ok=True)
+        (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)
         # Write a minimal craft config that composes the sample bundle twice
         craft_yaml = craft_dir / "test.yaml"
         craft_yaml.write_text(
             """
 name: TestCraft
 description: Test craft for unit tests
-targets:
+bundles:
   app-a:
     include_bundles: [test-bundle]
   app-b:
-    includes: [test-bundle]
+    include_sources: [test-bundle]
 output_formats: [pem]
             """.strip()
         )
@@ -177,7 +177,7 @@ output_formats: [pem]
         )
 
         # Copy the sample bundle config into temp workspace
-        (temp_workspace / "config" / "bundles" / "test-bundle.yaml").write_text(
+        (temp_workspace / "config" / "sources" / "test-bundle.yaml").write_text(
             sample_bundle_config.read_text()
         )
 
@@ -215,17 +215,17 @@ output_formats: [pem]
     ):
         """Ensure manifest.json and checksums.sha256 are emitted per target."""
         # Prepare craft and bundle configurations
-        craft_dir = temp_workspace / "config" / "crafts"
+        craft_dir = temp_workspace / "config" / "envs"
         craft_dir.mkdir(parents=True, exist_ok=True)
-        (temp_workspace / "config" / "bundles").mkdir(parents=True, exist_ok=True)
+        (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)
         craft_yaml = craft_dir / "test.yaml"
         craft_yaml.write_text(
             """
 name: TestCraft
 description: Test craft for manifest and checksums test
-targets:
+bundles:
   a:
-    includes: [test-bundle]
+    include_sources: [test-bundle]
   b:
     include_bundles: [test-bundle]
 output_formats: [pem]
@@ -240,7 +240,7 @@ output_formats: [pem]
             str(temp_workspace / "sources" / "internal" / "sample.pem"),
         )
         # Bundle config
-        (temp_workspace / "config" / "bundles" / "test-bundle.yaml").write_text(
+        (temp_workspace / "config" / "sources" / "test-bundle.yaml").write_text(
             sample_bundle_config.read_text()
         )
 

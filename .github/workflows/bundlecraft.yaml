@@ -123,7 +123,7 @@ jobs:
         run: |
           echo "Building target: ${{ matrix.item.target }} in craft: ${{ matrix.item.env }}"
           bundlecraft build \
-            --craft ${{ matrix.item.env }} \
+            --env ${{ matrix.item.env }} \
             --bundle ${{ matrix.item.target }} \
             --output-root "${{ matrix.item.output_root }}" \
             --verbose --json
@@ -530,7 +530,7 @@ jobs:
             **Verify GPG signature:**
             ```bash
             # Download and import the public GPG key
-            curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
+            curl -O https://raw.githubusercontent.com/bundlecraft-io/bundlecraft/main/docs/public-gpg-key.asc
             gpg --import public-gpg-key.asc
 
             # Verify the signature

@@ -78,7 +78,7 @@ The `build` command produces the following JSON structure:
 
 **Successful build:**
 ```bash
-bundlecraft build --craft prod --bundle mozilla --json
+bundlecraft build --env prod --bundle mozilla --json
 ```
 
 ```json
@@ -285,7 +285,7 @@ The `fetch` command produces the following JSON structure:
 
 **Successful fetch:**
 ```bash
-bundlecraft fetch --bundle-config-file config/bundles/mozilla.yaml --json
+bundlecraft fetch --bundle-config-file config/sources/mozilla.yaml --json
 ```
 
 ```json
@@ -331,7 +331,7 @@ When a command fails, the JSON response will:
 #!/bin/bash
 
 # Build and capture JSON output
-output=$(bundlecraft build --craft prod --bundle mozilla --json)
+output=$(bundlecraft build --env prod --bundle mozilla --json)
 
 # Check if successful
 if echo "$output" | jq -e '.success' > /dev/null; then
@@ -354,7 +354,7 @@ import sys
 
 # Run build command
 result = subprocess.run(
-    ["bundlecraft", "build", "--craft", "prod", "--bundle", "mozilla", "--json"],
+    ["bundlecraft", "build", "--env", "prod", "--bundle", "mozilla", "--json"],
     capture_output=True,
     text=True
 )
@@ -381,7 +381,7 @@ else:
 - name: Build trust bundle
   id: build
   run: |
-    bundlecraft build --craft prod --bundle mozilla --json > build-output.json
+    bundlecraft build --env prod --bundle mozilla --json > build-output.json
     echo "success=$(jq -r '.success' build-output.json)" >> $GITHUB_OUTPUT
     echo "cert_count=$(jq -r '.targets[0].certificate_count' build-output.json)" >> $GITHUB_OUTPUT
 

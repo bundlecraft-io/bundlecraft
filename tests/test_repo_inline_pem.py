@@ -9,21 +9,21 @@ def test_inline_pem_in_repo_include(temp_workspace, monkeypatch):
     runner = CliRunner()
 
     # Craft config
-    craft_dir = temp_workspace / "config" / "crafts"
+    craft_dir = temp_workspace / "config" / "envs"
     craft_dir.mkdir(parents=True, exist_ok=True)
     (craft_dir / "test.yaml").write_text(
         """
 name: TestCraft
 description: Test craft for inline PEM validation
-targets:
+bundles:
   only:
-    includes: [inline-bundle]
+    include_sources: [inline-bundle]
 output_formats: [pem]
         """.strip()
     )
 
     # Bundle config with inline cert entry
-    bundles_dir = temp_workspace / "config" / "bundles"
+    bundles_dir = temp_workspace / "config" / "sources"
     bundles_dir.mkdir(parents=True, exist_ok=True)
     sample_cert = temp_workspace / "sources" / "certs" / "sample.pem"
     # Ensure sample.pem exists in temp workspace (copied by test fixtures)
@@ -40,7 +40,7 @@ output_formats: [pem]
     import yaml  # type: ignore
 
     cfg = {
-        "bundle_name": "inline-bundle",
+        "source_name": "inline-bundle",
         "description": "Bundle with inline certificate",
         "repo": [
             {

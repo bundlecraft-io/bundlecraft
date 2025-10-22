@@ -1,8 +1,8 @@
 ---
 # =====================================================================
-# Development Craft Configuration
+# Development Environment Configuration
 # =====================================================================
-# Craft configs define HOW to build and WHERE to distribute.
+# Environment configs define HOW to build and WHERE to distribute.
 # Controls output formats, verification, secrets, and deployment targets.
 # =====================================================================
 name: Development
@@ -10,9 +10,9 @@ description: Development environment for testing and local builds
 # ---------------------------------------------------------------------
 # Bundle Composition
 # ---------------------------------------------------------------------
-targets:
+bundles:
   internal:
-    includes: [internal]  # Internal certs only for dev
+    include_sources: [internal]  # Internal certs only for dev
 # ---------------------------------------------------------------------
 # Output Configuration
 # ---------------------------------------------------------------------

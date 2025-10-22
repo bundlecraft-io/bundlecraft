@@ -42,10 +42,10 @@ This guide covers common issues, root causes, and quick fixes when using the Fet
 
 - Empty or missing outputs
   - Check inputs in `sources/` and `sources/staged/<craft>/`
-  - Ensure include paths in the bundle config are correct.
+  - Ensure include paths in the source config are correct.
 
 - Unexpected duplicates or missing certs
-  - Ensure filters (e.g., unique_by_fingerprint) are set appropriately in defaults or craft config.
+  - Ensure filters (e.g., unique_by_fingerprint) are set appropriately in defaults or environment config.
 
 - Packaging problems
   - Verify OpenSSL and keytool are installed for P7B/JKS/P12 conversions.
@@ -59,7 +59,7 @@ When a config file doesn't meet the schema, BundleCraft shows a Pydantic error w
 ### What the error looks like
 
 ```text
-[ERROR] Fetch failed: Config validation failed for /path/to/config/bundles/test-bundle.yaml:
+[ERROR] Fetch failed: Config validation failed for /path/to/config/sources/test-bundle.yaml:
 1 validation error for BundleConfig
 fetch.0.url
   Value error, Only HTTPS URLs are allowed for security. Use https:// or file:// schemes.
@@ -116,7 +116,7 @@ python3 - <<'PY'
 from pathlib import Path
 from bundlecraft.helpers.utils import load_yaml
 from bundlecraft.helpers.config_schema import validate_bundle_config
-load_yaml(Path('config/bundles/example-bundle.yaml'), validate=validate_bundle_config)
+load_yaml(Path('config/sources/example-bundle.yaml'), validate=validate_bundle_config)
 print('OK')
 PY
 
@@ -125,7 +125,7 @@ python3 - <<'PY'
 from pathlib import Path
 from bundlecraft.helpers.utils import load_yaml
 from bundlecraft.helpers.config_schema import validate_craft_config
-load_yaml(Path('config/crafts/example-craft.yaml'), validate=validate_craft_config)
+load_yaml(Path('config/envs/example-craft.yaml'), validate=validate_craft_config)
 print('OK')
 PY
 ```

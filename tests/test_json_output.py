@@ -25,7 +25,7 @@ class TestFetchJsonOutput:
         bundle_config = tmp_path / "test-bundle.yaml"
         bundle_config.write_text(
             """
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle for JSON output
 include:
   - sources/mozilla
@@ -54,7 +54,7 @@ fetch:
         assert data["command"] == "fetch"
         assert "timestamp" in data
         assert "version" in data
-        assert data["bundle_name"] == "test-bundle"
+        assert data["source_name"] == "test-bundle"
         assert "staging_path" in data
         assert "dry_run" in data
         assert data["dry_run"] is True
@@ -238,7 +238,7 @@ class TestJsonOutputSchema:
         """Test that all commands include base schema fields."""
         # Test with fetch (easiest to set up)
         bundle_config = tmp_path / "test.yaml"
-        bundle_config.write_text("bundle_name: test\ndescription: Test bundle\n")
+        bundle_config.write_text("source_name: test\ndescription: Test bundle\n")
 
         result = cli_runner.invoke(
             fetch_main,
@@ -288,7 +288,7 @@ class TestJsonOutputSchema:
     def test_json_output_parseable(self, cli_runner, tmp_path):
         """Test that JSON output is always valid and parseable."""
         bundle_config = tmp_path / "test.yaml"
-        bundle_config.write_text("bundle_name: test\ndescription: Test bundle\n")
+        bundle_config.write_text("source_name: test\ndescription: Test bundle\n")
 
         result = cli_runner.invoke(
             fetch_main,
@@ -320,8 +320,8 @@ class TestBuildJsonOutputPurity:
 
         # Create minimal test structure
         config_dir = temp_dir / "config"
-        (config_dir / "crafts").mkdir(parents=True)
-        (config_dir / "bundles").mkdir(parents=True)
+        (config_dir / "envs").mkdir(parents=True)
+        (config_dir / "sources").mkdir(parents=True)
         sources_internal = temp_dir / "sources" / "internal" / "test-bundle"
         sources_internal.mkdir(parents=True)
 
@@ -343,29 +343,29 @@ class TestBuildJsonOutputPurity:
 
         # Create minimal bundle config
         bundle_config = """---
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle
 repo:
   - name: test-bundle
     include:
       - sources/internal/test-bundle
 """
-        (config_dir / "bundles" / "test-bundle.yaml").write_text(bundle_config)
+        (config_dir / "sources" / "test-bundle.yaml").write_text(bundle_config)
 
         # Create minimal craft config with packaging enabled
         craft_config = """---
 name: Test
 description: Test craft
-targets:
+bundles:
   test-target:
-    includes: [test-bundle]
+    include_sources: [test-bundle]
 output_formats:
   - pem
 package: false
 verify:
   fail_on_expired: false
 """
-        (config_dir / "crafts" / "test.yaml").write_text(craft_config)
+        (config_dir / "envs" / "test.yaml").write_text(craft_config)
 
         # Build with --json flag
         with cli_runner.isolated_filesystem(temp_dir):
@@ -425,8 +425,8 @@ verify:
 
         # Create minimal test structure
         config_dir = temp_dir / "config"
-        (config_dir / "crafts").mkdir(parents=True)
-        (config_dir / "bundles").mkdir(parents=True)
+        (config_dir / "envs").mkdir(parents=True)
+        (config_dir / "sources").mkdir(parents=True)
         sources_internal = temp_dir / "sources" / "internal" / "test-bundle"
         sources_internal.mkdir(parents=True)
 
@@ -446,28 +446,28 @@ verify:
         (sources_internal / "test.pem").write_text(sample_cert_pem, encoding="utf-8")
 
         bundle_config = """---
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle
 repo:
   - name: test-bundle
     include:
       - sources/internal/test-bundle
 """
-        (config_dir / "bundles" / "test-bundle.yaml").write_text(bundle_config)
+        (config_dir / "sources" / "test-bundle.yaml").write_text(bundle_config)
 
         craft_config = """---
 name: Test
 description: Test craft
-targets:
+bundles:
   test-target:
-    includes: [test-bundle]
+    include_sources: [test-bundle]
 output_formats:
   - pem
 package: false
 verify:
   fail_on_expired: false
 """
-        (config_dir / "crafts" / "test.yaml").write_text(craft_config)
+        (config_dir / "envs" / "test.yaml").write_text(craft_config)
 
         with cli_runner.isolated_filesystem(temp_dir):
             result = cli_runner.invoke(

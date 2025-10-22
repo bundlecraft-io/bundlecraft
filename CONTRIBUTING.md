@@ -66,12 +66,12 @@ This installs:
 
 - Bring your own certs, or use `scripts/generate_test_cas.py` to generate some **TEST** CA certificates.
 - Place PEM files in appropriate folders under `sources/`
-- Update `config/bundles/` YAMLs to specify what certificates each source will be comprised of
+- Update `config/sources/` YAMLs to specify what certificates each source will be comprised of
 - Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault, etc..)
 
-#### Prepare Certificate Craft Configurations
+#### Prepare Certificate Environment Configurations
 
-- Update `config/crafts/` YAMLs to specify which sources to include into which bundles
+- Update `config/envs/` YAMLs to specify which sources to include into which bundles
 - Define where each environment/bundle is meant be bundle
 - Optionally add various filters and parameters to the final output of the trust store build.
 
@@ -94,7 +94,7 @@ Now you can:
 Run the CLI to see your changes in action:
 
 ```bash
-bundlecraft build --craft dev --verbose
+bundlecraft build --env dev --verbose
 ```
 
 Run the test suite:
@@ -198,8 +198,8 @@ bundlecraft/
 #### Configuration
 
 - `config/defaults.yaml` – Global defaults for all crafts/bundles
-- `config/crafts/*.yaml` – Environment/craft definitions (targets, filters, verify policies)
-- `config/bundles/*.yaml` – Bundle definitions (sources, fetch specs)
+- `config/envs/*.yaml` – Environment/craft definitions (targets, filters, verify policies)
+- `config/sources/*.yaml` – Bundle definitions (sources, fetch specs)
 
 ---
 
@@ -207,14 +207,14 @@ bundlecraft/
 
 ### Running the CLI
 
-Once you have bundle and craft configs, test the CLI directly:
+Once you have bundle and environment configs, test the CLI directly:
 
 ```bash
 # Full build pipeline
-bundlecraft build --craft dev
+bundlecraft build --env dev
 
 # Individual stages
-bundlecraft fetch --bundle-config-file config/bundles/internal.yaml
+bundlecraft fetch --bundle-config-file config/sources/internal.yaml
 bundlecraft convert --input dist/dev/internal/bundlecraft-ca-trust.pem --output-dir dist/dev/internal
 bundlecraft verify --target dist/dev/internal --verify-all
 bundlecraft diff --from sources/staged/internal/rootCA.pem --to dist/dev/internal/bundlecraft-ca-trust.pem
@@ -366,9 +366,9 @@ Handy commands for common tasks:
 | Format code          | `black .`                                                     |
 | Lint code            | `ruff check . --fix`                                          |
 | Run tests            | `pytest -v`                                                   |
-| Build bundle         | `bundlecraft build --craft dev --bundle internal`             |
+| Build bundle         | `bundlecraft build --env dev --bundle internal`             |
 | Verify bundle        | `bundlecraft verify --target dist/dev/internal --verify-all`  |
-| Fetch remote sources | `bundlecraft fetch --bundle-config-file config/bundles/*.yaml` |
+| Fetch remote sources | `bundlecraft fetch --bundle-config-file config/sources/*.yaml` |
 | Build Python package | `python -m build`                                             |
 | Validate package     | `twine check dist/*`                                          |
 

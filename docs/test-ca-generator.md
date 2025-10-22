@@ -148,10 +148,10 @@ generated-test-cas/
 
 ## Integration with BundleCraft
 
-### Use in Bundle Configs
+### Use in Source Configs
 
 ```yaml
-# config/bundles/test-bundle.yaml
+# config/sources/test-bundle.yaml
 bundle_name: test-internal
 description: Test bundle with generated CAs
 repo:
@@ -171,7 +171,7 @@ repo:
 Build:
 
 ```bash
-bundlecraft build --craft dev --bundle test-internal
+bundlecraft build --env dev --bundle test-internal
 ```
 
 ### Use in CI/CD
@@ -190,7 +190,7 @@ Generate test chains in CI for fetch/verify testing:
 - name: Test with generated CAs
   run: |
     bundlecraft build \
-      --craft test \
+      --env test \
       --bundle ci-test \
       --output-root dist
 ```
