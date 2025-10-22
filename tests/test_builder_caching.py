@@ -39,10 +39,10 @@ output_formats: [pem, jks]
     )
 
     # Ensure include source exists
-    (temp_workspace / "sources" / "internal").mkdir(parents=True, exist_ok=True)
+    (temp_workspace / "cert_sources" / "internal").mkdir(parents=True, exist_ok=True)
     shutil.copyfile(
         str(sample_bundle_config.parent.parent.parent / "certs" / "sample.pem"),
-        str(temp_workspace / "sources" / "internal" / "sample.pem"),
+        str(temp_workspace / "cert_sources" / "internal" / "sample.pem"),
     )
 
     # Bundle config
@@ -55,8 +55,8 @@ output_formats: [pem, jks]
 
     monkeypatch.setattr(builder_mod, "ROOT", temp_workspace)
     monkeypatch.setattr(builder_mod, "CONFIG_DIR", temp_workspace / "config")
-    monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "sources")
-    monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "sources" / "staged")
+    monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "cert_sources")
+    monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "cert_sources" / "staged")
     monkeypatch.setattr(builder_mod, "DIST_DIR", temp_workspace / "dist")
 
     from bundlecraft.builder import main as build_main
@@ -125,11 +125,11 @@ filters:
     )
 
     # Ensure include sources exist
-    (temp_workspace / "sources" / "internal").mkdir(parents=True, exist_ok=True)
+    (temp_workspace / "cert_sources" / "internal").mkdir(parents=True, exist_ok=True)
     sample_cert_path = sample_bundle_config.parent.parent.parent / "certs" / "sample.pem"
     shutil.copyfile(
         str(sample_cert_path),
-        str(temp_workspace / "sources" / "internal" / "sample.pem"),
+        str(temp_workspace / "cert_sources" / "internal" / "sample.pem"),
     )
 
     # Create two bundle configs
@@ -162,8 +162,8 @@ repo:
 
     monkeypatch.setattr(builder_mod, "ROOT", temp_workspace)
     monkeypatch.setattr(builder_mod, "CONFIG_DIR", temp_workspace / "config")
-    monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "sources")
-    monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "sources" / "staged")
+    monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "cert_sources")
+    monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "cert_sources" / "staged")
     monkeypatch.setattr(builder_mod, "DIST_DIR", temp_workspace / "dist")
 
     from bundlecraft.builder import main as build_main

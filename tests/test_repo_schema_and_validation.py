@@ -31,7 +31,7 @@ output_formats: [pem]
     )
 
     # Prepare local files to include
-    src_dir = temp_workspace / "sources" / "internal"
+    src_dir = temp_workspace / "cert_sources" / "internal"
     src_dir.mkdir(parents=True, exist_ok=True)
     sample_cert = sample_bundle_config.parent.parent.parent / "certs" / "sample.pem"
     (src_dir / "sample.pem").write_bytes(sample_cert.read_bytes())
@@ -56,8 +56,8 @@ repo:
 
     monkeypatch.setattr(builder_mod, "ROOT", temp_workspace)
     monkeypatch.setattr(builder_mod, "CONFIG_DIR", temp_workspace / "config")
-    monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "sources")
-    monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "sources" / "staged")
+    monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "cert_sources")
+    monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "cert_sources" / "staged")
     monkeypatch.setattr(builder_mod, "DIST_DIR", temp_workspace / "dist")
 
     from bundlecraft.builder import main as build_main
@@ -77,7 +77,7 @@ repo:
     cache_root = temp_workspace / "build_cache" / "TestCraft" / "repo-bundle"
     assert cache_root.exists()
     # build_cache stores canonical outputs, but staging happens under cert_sources/staged/<source_name>/<repo>
-    staged_repo_root = temp_workspace / "sources" / "staged" / "repo-bundle"
+    staged_repo_root = temp_workspace / "cert_sources" / "staged" / "repo-bundle"
     assert (staged_repo_root / "roots").exists()
     assert (staged_repo_root / "extras").exists()
 

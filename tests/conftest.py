@@ -45,7 +45,7 @@ def temp_workspace(temp_dir, test_data_dir):
     # Copy sample test data if it exists
     if test_data_dir.exists():
         if (test_data_dir / "certs").exists():
-            shutil.copytree(test_data_dir / "certs", temp_dir / "sources", dirs_exist_ok=True)
+            shutil.copytree(test_data_dir / "certs", temp_dir / "cert_sources", dirs_exist_ok=True)
         if (test_data_dir / "configs").exists():
             shutil.copytree(test_data_dir / "configs", temp_dir / "config", dirs_exist_ok=True)
 

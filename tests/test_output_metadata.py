@@ -260,7 +260,7 @@ class TestOutputMetadataInBuild:
         temp = tmp_path
         (temp / "config" / "envs").mkdir(parents=True, exist_ok=True)
         (temp / "config" / "sources").mkdir(parents=True, exist_ok=True)
-        (temp / "sources" / "internal").mkdir(parents=True, exist_ok=True)
+        (temp / "cert_sources" / "internal").mkdir(parents=True, exist_ok=True)
 
         # Create env config with output_metadata
         craft_yaml = temp / "config" / "envs" / "test.yaml"
@@ -298,7 +298,7 @@ repo:
         sample_pem_src = Path(
             "/home/runner/work/bundlecraft/bundlecraft/tests/data/certs/sample.pem"
         )
-        sample_dest = temp / "sources" / "internal" / "sample.pem"
+        sample_dest = temp / "cert_sources" / "internal" / "sample.pem"
         if sample_pem_src.exists():
             shutil.copyfile(sample_pem_src, sample_dest)
         else:
@@ -345,8 +345,8 @@ repo:
 
         builder_mod.ROOT = temp
         builder_mod.CONFIG_DIR = temp / "config"
-        builder_mod.SOURCES_DIR = temp / "sources"
-        builder_mod.STAGED_DIR = temp / "sources" / "staged"
+        builder_mod.SOURCES_DIR = temp / "cert_sources"
+        builder_mod.STAGED_DIR = temp / "cert_sources" / "staged"
         builder_mod.DIST_DIR = temp / "dist"
 
         # Run build

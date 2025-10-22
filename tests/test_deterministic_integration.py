@@ -25,22 +25,22 @@ class TestDeterministicBuilds:
         config_dir = temp_dir / "config"
         (config_dir / "envs").mkdir(parents=True)
         (config_dir / "sources").mkdir(parents=True)
-        sources_internal = temp_dir / "sources" / "internal" / "test-bundle"
+        sources_internal = temp_dir / "cert_sources" / "internal" / "test-bundle"
         sources_internal.mkdir(parents=True)
 
         # Monkeypatch paths for builder and fetch
         monkeypatch.setattr(builder_mod, "ROOT", temp_dir)
         monkeypatch.setattr(builder_mod, "CONFIG_DIR", config_dir)
-        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_dir / "sources")
-        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_dir / "sources" / "staged")
+        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_dir / "cert_sources")
+        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_dir / "cert_sources" / "staged")
         monkeypatch.setattr(builder_mod, "DIST_DIR", temp_dir / "dist")
         monkeypatch.setattr(fetch_mod, "CURRENT_DIR", temp_dir / "bundlecraft")
         import bundlecraft.fetch
 
         bundlecraft.fetch.ROOT = temp_dir
         bundlecraft.fetch.CONFIG_DIR = config_dir
-        bundlecraft.fetch.SOURCES_DIR = temp_dir / "sources"
-        bundlecraft.fetch.STAGED_DIR = temp_dir / "sources" / "staged"
+        bundlecraft.fetch.SOURCES_DIR = temp_dir / "cert_sources"
+        bundlecraft.fetch.STAGED_DIR = temp_dir / "cert_sources" / "staged"
 
         # Use the fixture certificate
         (sources_internal / "test.pem").write_text(sample_cert_pem, encoding="utf-8")
@@ -133,21 +133,21 @@ verify:
         config_dir = temp_dir / "config"
         (config_dir / "envs").mkdir(parents=True)
         (config_dir / "sources").mkdir(parents=True)
-        sources_internal = temp_dir / "sources" / "internal" / "test-bundle"
+        sources_internal = temp_dir / "cert_sources" / "internal" / "test-bundle"
         sources_internal.mkdir(parents=True)
 
         # Monkeypatch paths for builder and fetch
         monkeypatch.setattr(builder_mod, "ROOT", temp_dir)
         monkeypatch.setattr(builder_mod, "CONFIG_DIR", config_dir)
-        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_dir / "sources")
-        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_dir / "sources" / "staged")
+        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_dir / "cert_sources")
+        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_dir / "cert_sources" / "staged")
         monkeypatch.setattr(builder_mod, "DIST_DIR", temp_dir / "dist")
         import bundlecraft.fetch
 
         bundlecraft.fetch.ROOT = temp_dir
         bundlecraft.fetch.CONFIG_DIR = config_dir
-        bundlecraft.fetch.SOURCES_DIR = temp_dir / "sources"
-        bundlecraft.fetch.STAGED_DIR = temp_dir / "sources" / "staged"
+        bundlecraft.fetch.SOURCES_DIR = temp_dir / "cert_sources"
+        bundlecraft.fetch.STAGED_DIR = temp_dir / "cert_sources" / "staged"
 
         # Use the fixture certificate
         (sources_internal / "test.pem").write_text(sample_cert_pem, encoding="utf-8")

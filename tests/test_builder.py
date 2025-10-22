@@ -177,10 +177,10 @@ output_formats: [pem]
         # Ensure the expected include path exists with a valid cert
         import shutil
 
-        (temp_workspace / "sources" / "internal").mkdir(parents=True, exist_ok=True)
+        (temp_workspace / "cert_sources" / "internal").mkdir(parents=True, exist_ok=True)
         shutil.copyfile(
             str(sample_bundle_config.parent.parent.parent / "certs" / "sample.pem"),
-            str(temp_workspace / "sources" / "internal" / "sample.pem"),
+            str(temp_workspace / "cert_sources" / "internal" / "sample.pem"),
         )
 
         # Copy the sample bundle config into temp workspace
@@ -193,8 +193,8 @@ output_formats: [pem]
 
         monkeypatch.setattr(builder_mod, "ROOT", temp_workspace)
         monkeypatch.setattr(builder_mod, "CONFIG_DIR", temp_workspace / "config")
-        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "sources")
-        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "sources" / "staged")
+        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "cert_sources")
+        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "cert_sources" / "staged")
         monkeypatch.setattr(builder_mod, "DIST_DIR", temp_workspace / "dist")
 
         with cli_runner.isolated_filesystem(temp_workspace):
@@ -241,10 +241,10 @@ output_formats: [pem]
         # Ensure include source exists
         import shutil
 
-        (temp_workspace / "sources" / "internal").mkdir(parents=True, exist_ok=True)
+        (temp_workspace / "cert_sources" / "internal").mkdir(parents=True, exist_ok=True)
         shutil.copyfile(
             str(sample_bundle_config.parent.parent.parent / "certs" / "sample.pem"),
-            str(temp_workspace / "sources" / "internal" / "sample.pem"),
+            str(temp_workspace / "cert_sources" / "internal" / "sample.pem"),
         )
         # Bundle config
         (temp_workspace / "config" / "sources" / "test-bundle.yaml").write_text(
@@ -256,8 +256,8 @@ output_formats: [pem]
 
         monkeypatch.setattr(builder_mod, "ROOT", temp_workspace)
         monkeypatch.setattr(builder_mod, "CONFIG_DIR", temp_workspace / "config")
-        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "sources")
-        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "sources" / "staged")
+        monkeypatch.setattr(builder_mod, "SOURCES_DIR", temp_workspace / "cert_sources")
+        monkeypatch.setattr(builder_mod, "STAGED_DIR", temp_workspace / "cert_sources" / "staged")
         monkeypatch.setattr(builder_mod, "DIST_DIR", temp_workspace / "dist")
 
         with cli_runner.isolated_filesystem(temp_workspace):
