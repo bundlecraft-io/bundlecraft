@@ -1,4 +1,4 @@
-# bundlecraft Documentation
+# BundleCraft Documentation
 
 This folder contains the technical and conceptual documentation for the **bundlecraft** project.
 
