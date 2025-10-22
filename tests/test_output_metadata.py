@@ -351,7 +351,7 @@ repo:
 
         # Run build
         runner = CliRunner()
-        result = runner.invoke(build_main, ["--craft", "test", "--output-root", str(temp / "dist")])
+        result = runner.invoke(build_main, ["--env", "test", "--output-root", str(temp / "dist")])
 
         # Check that build succeeded
         assert result.exit_code == 0, f"Build failed: {result.output}"

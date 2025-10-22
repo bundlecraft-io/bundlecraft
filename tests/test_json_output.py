@@ -216,7 +216,7 @@ class TestBuildJsonOutput:
         result = cli_runner.invoke(
             build_main,
             [
-                "--craft",
+                "--env",
                 "nonexistent-craft",
                 "--dry-run",
                 "--json",
@@ -372,7 +372,7 @@ verify:
             result = cli_runner.invoke(
                 build_main,
                 [
-                    "--craft",
+                    "--env",
                     "test",
                     "--bundle",
                     "test-target",
@@ -414,8 +414,8 @@ verify:
         # Verify JSON structure
         assert output_data["command"] == "build"
         assert output_data["success"] is True
-        assert "targets" in output_data
-        assert len(output_data["targets"]) > 0
+        assert "bundles" in output_data
+        assert len(output_data["bundles"]) > 0
 
     def test_build_json_output_is_pure_json(self, temp_dir, sample_cert_pem, monkeypatch):
         """Test that entire stdout can be parsed as a single JSON object."""
@@ -472,7 +472,7 @@ verify:
         with cli_runner.isolated_filesystem(temp_dir):
             result = cli_runner.invoke(
                 build_main,
-                ["--craft", "test", "--bundle", "test-target", "--json"],
+                ["--env", "test", "--bundle", "test-target", "--json"],
                 catch_exceptions=False,
             )
 

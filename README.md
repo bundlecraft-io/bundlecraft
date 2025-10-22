@@ -8,7 +8,7 @@
 
 ---
 
-## Overview
+## ℹ️ Overview
 
 **BundleCraft** is a modern, configuration-as-code system for **fetching, building, verifying, and distributing multi-format certificate trust bundles** across environments. It securely sources certificate material from trusted remote origins or local files, then produces reproducible, auditable outputs for OS, Java, and application platforms.
 
@@ -50,7 +50,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 - **Problem:** "It works on my machine" but fails in CI. Different Python versions, missing tools, inconsistent outputs.
 - **Solution:** Configuration-as-code with deterministic builds. Same inputs = same outputs, every time. Perfect for GitOps workflows.
 
-### Key Outputs Each Build
+### 🔑 Key Outputs Each Build
 
 - Canonical **PEM** bundle (with annotated subjects, deduplication)
 - **PKCS#7 (.p7b)** - DER-encoded bundle
@@ -268,7 +268,7 @@ pip install -e .
 pip install -e ".[dev]"
 ```
 
-### Shell completion (optional)
+### 1.5 Shell completion (optional)
 
 BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags:
 
@@ -375,7 +375,7 @@ BundleCraft supports the following environment variables for configuration:
 - **SBOM generation:** Automatic Software Bill of Materials in CycloneDX format
 - **Signature verification:** Built-in verification for signed releases with keyring support
 
-### Signing Release Artifacts (optional)
+### ✍🏽 Signing Release Artifacts (optional)
 
 Sign all release artifacts with GPG:
 

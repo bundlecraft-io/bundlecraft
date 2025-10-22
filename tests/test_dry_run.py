@@ -86,7 +86,7 @@ class TestBuilderDryRun:
         result = cli_runner.invoke(
             build_main,
             [
-                "--craft",
+                "--env",
                 "test",
                 "--bundle",
                 "root-ca",
@@ -105,7 +105,7 @@ class TestBuilderDryRun:
         _ = cli_runner.invoke(
             build_main,
             [
-                "--craft",
+                "--env",
                 "test",
                 "--bundle",
                 "root-ca",
@@ -125,7 +125,7 @@ class TestBuilderDryRun:
         result = cli_runner.invoke(
             build_main,
             [
-                "--craft",
+                "--env",
                 "test",
                 "--bundle",
                 "root-ca",

@@ -2,10 +2,10 @@
 """
 trust_matrix.py
 
-Generate a trust matrix showing which crafts (rows) trust which bundles (columns),
-based on composition defined in config/crafts/*.yaml (or legacy config/envs/*.yaml).
+Generate a trust matrix showing which environments (rows) trust which bundles/sources (columns),
+based on composition defined in config/envs/*.yaml.
 
-Trust = union of all bundles referenced by any target in an environment's `targets.<name>.includes`.
+Trust = union of all sources referenced by any bundle in an environment's `bundles.<name>.include_sources`.
 
 Outputs:
   - table (unicode box table for terminals)
@@ -19,8 +19,7 @@ Usage:
   python scripts/trust_matrix.py --format json --output trust-matrix.json
 
 Notes:
-  - Back-compat: if an env file defines `bundle_targets` as a list, those will be treated as trusted bundles.
-  - Requires PyYAML.
+    - Requires PyYAML.
 """
 
 from __future__ import annotations
@@ -49,42 +48,34 @@ def load_yaml(path: Path) -> dict:
 def collect_env_trust(
     config_dir: Path,
 ) -> tuple[list[str], list[str], dict[str, set[str]], dict[str, dict[str, list[str]]]]:
-    crafts_dir = config_dir / "crafts"
     envs_dir = config_dir / "envs"
-    scan_dir = crafts_dir if crafts_dir.exists() else envs_dir
-    if not scan_dir.exists():
-        raise FileNotFoundError(f"Missing crafts/envs directory: {scan_dir}")
+    if not envs_dir.exists():
+        raise FileNotFoundError(f"Missing envs directory: {envs_dir}")
 
     env_to_bundles: dict[str, set[str]] = {}
     env_to_targets: dict[str, dict[str, list[str]]] = {}
 
-    for env_path in sorted(scan_dir.glob("*.yaml")):
+    for env_path in sorted(envs_dir.glob("*.yaml")):
         env_name = env_path.stem
         data = load_yaml(env_path)
-        bundles_for_env: set[str] = set()
-        targets_map: dict[str, list[str]] = {}
+        trusted_sources_for_env: set[str] = set()
+        bundles_map: dict[str, list[str]] = {}
 
-        # Composition-aware schema
-        targets = data.get("targets") or {}
-        if isinstance(targets, dict):
-            for tgt_name, tgt_cfg in targets.items():
-                includes = tgt_cfg.get("includes") if isinstance(tgt_cfg, dict) else None
-                if isinstance(includes, list):
-                    targets_map[tgt_name] = [str(x) for x in includes]
-                    bundles_for_env.update(str(x) for x in includes)
-                elif isinstance(includes, str):
-                    targets_map[tgt_name] = [includes]
-                    bundles_for_env.add(includes)
+        # New schema: bundles.<name>.include_sources
+        bundles = data.get("bundles") or {}
+        if isinstance(bundles, dict):
+            for b_name, b_cfg in bundles.items():
+                include_sources = b_cfg.get("include_sources") if isinstance(b_cfg, dict) else None
+                if isinstance(include_sources, list):
+                    bundles_map[b_name] = [str(x) for x in include_sources]
+                    trusted_sources_for_env.update(str(x) for x in include_sources)
+                elif isinstance(include_sources, str):
+                    bundles_map[b_name] = [include_sources]
+                    trusted_sources_for_env.add(include_sources)
 
-        # Back-compat: flat list of bundle targets
-        legacy = data.get("bundle_targets")
-        if isinstance(legacy, list):
-            for b in legacy:
-                bundles_for_env.add(str(b))
-
-        if bundles_for_env:
-            env_to_bundles[env_name] = bundles_for_env
-            env_to_targets[env_name] = targets_map
+        if trusted_sources_for_env:
+            env_to_bundles[env_name] = trusted_sources_for_env
+            env_to_targets[env_name] = bundles_map
 
     # All unique bundles as columns
     all_bundles: list[str] = sorted({b for s in env_to_bundles.values() for b in s})
@@ -97,7 +88,7 @@ def render_table(envs: list[str], bundles: list[str], env_to_bundles: dict[str, 
         return "(no data)"
 
     # Build rows
-    header = ["craft \\ bundle"] + bundles
+    header = ["environment \\ bundle"] + bundles
     rows: list[list[str]] = [header]
     for env in envs:
         row = [env]
@@ -167,7 +158,7 @@ def render_json(
         "environments": {
             env: {
                 "trusts": sorted(list(env_to_bundles.get(env, set()))),
-                "targets": env_to_targets.get(env, {}),
+                "bundles": env_to_targets.get(env, {}),
             }
             for env in envs
         },

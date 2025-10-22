@@ -68,7 +68,7 @@ output_formats: [pem]
     result = runner.invoke(
         build_main,
         [
-            "--craft",
+            "--env",
             "test",
             "--output-root",
             str(temp_workspace / "dist"),

@@ -154,14 +154,14 @@ class TestBuilder:
         craft_dir.mkdir(parents=True, exist_ok=True)
         (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)
         # Write a minimal craft config that composes the sample bundle twice
-        craft_yaml = craft_dir / "test.yaml"
-        craft_yaml.write_text(
+        env_yaml = craft_dir / "test.yaml"
+        env_yaml.write_text(
             """
-name: TestCraft
-description: Test craft for unit tests
+name: TestEnv
+description: Test environment for unit tests
 bundles:
   app-a:
-    include_bundles: [test-bundle]
+    include_sources: [test-bundle]
   app-b:
     include_sources: [test-bundle]
 output_formats: [pem]
@@ -194,40 +194,40 @@ output_formats: [pem]
             result = cli_runner.invoke(
                 build_main,
                 [
-                    "--craft",
+                    "--env",
                     "test",
                     "--output-root",
                     str(temp_workspace / "dist"),
                 ],
             )
-            # Should run and create outputs under dist/TestCraft/<target>
+            # Should run and create outputs under dist/TestEnv/<bundle>
             assert isinstance(result.exit_code, int)
-            craft_out = temp_workspace / "dist" / "TestCraft"
-            assert craft_out.exists(), f"Craft output missing: {craft_out}"
-            for t in ["app-a", "app-b"]:
-                tdir = craft_out / t
-                assert tdir.exists(), f"Target dir missing: {tdir}"
+            env_out = temp_workspace / "dist" / "TestEnv"
+            assert env_out.exists(), f"Environment output missing: {env_out}"
+            for bundle in ["app-a", "app-b"]:
+                bundle_dir = env_out / bundle
+                assert bundle_dir.exists(), f"Bundle dir missing: {bundle_dir}"
                 # Standardized basename
-                assert (tdir / "bundlecraft-ca-trust.pem").exists()
+                assert (bundle_dir / "bundlecraft-ca-trust.pem").exists()
 
     def test_build_targets_manifest_and_checksums(
         self, cli_runner, temp_workspace, sample_bundle_config, monkeypatch
     ):
-        """Ensure manifest.json and checksums.sha256 are emitted per target."""
-        # Prepare craft and bundle configurations
-        craft_dir = temp_workspace / "config" / "envs"
-        craft_dir.mkdir(parents=True, exist_ok=True)
+        """Ensure manifest.json and checksums.sha256 are emitted per bundle."""
+        # Prepare env and source configurations
+        env_dir = temp_workspace / "config" / "envs"
+        env_dir.mkdir(parents=True, exist_ok=True)
         (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)
-        craft_yaml = craft_dir / "test.yaml"
-        craft_yaml.write_text(
+        env_yaml = env_dir / "test.yaml"
+        env_yaml.write_text(
             """
-name: TestCraft
-description: Test craft for manifest and checksums test
+name: TestEnv
+description: Test environment for manifest and checksums test
 bundles:
   a:
     include_sources: [test-bundle]
   b:
-    include_bundles: [test-bundle]
+    include_sources: [test-bundle]
 output_formats: [pem]
             """.strip()
         )
@@ -257,16 +257,16 @@ output_formats: [pem]
             result = cli_runner.invoke(
                 build_main,
                 [
-                    "--craft",
+                    "--env",
                     "test",
                     "--output-root",
                     str(temp_workspace / "dist"),
                 ],
             )
             assert isinstance(result.exit_code, int)
-            craft_out = temp_workspace / "dist" / "TestCraft"
-            assert craft_out.exists()
-            for t in ["a", "b"]:
-                tdir = craft_out / t
-                assert (tdir / "manifest.json").exists()
-                assert (tdir / "checksums.sha256").exists()
+            env_out = temp_workspace / "dist" / "TestEnv"
+            assert env_out.exists()
+            for bundle in ["a", "b"]:
+                bundle_dir = env_out / bundle
+                assert (bundle_dir / "manifest.json").exists()
+                assert (bundle_dir / "checksums.sha256").exists()

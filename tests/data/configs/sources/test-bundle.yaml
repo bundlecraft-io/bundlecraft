@@ -1,5 +1,5 @@
 ---
-bundle_name: test-bundle
+source_name: test-bundle
 description: Test bundle for unit tests
 repo:
   - name: internal

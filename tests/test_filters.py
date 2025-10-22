@@ -55,27 +55,25 @@ class TestFilters:
         assert len(result) == 1
         assert sample_root_cert in result
 
-    @pytest.mark.skip(reason="SHA1 signing no longer supported by cryptography library")
-    def test_signature_algorithms_include(self, sample_sha256_cert, sample_sha1_cert):
-        """Test signature algorithm whitelist."""
-        pem_blocks = [sample_sha256_cert, sample_sha1_cert]
+    def test_signature_algorithms_include_sha256_only(self, sample_sha256_cert):
+        """Including sha256 should keep SHA256-signed certs."""
+        pem_blocks = [sample_sha256_cert]
 
         filters_cfg = {"signature_algorithms": {"include": ["sha256WithRSAEncryption", "sha256"]}}
         result = apply_filters(pem_blocks, filters_cfg)
 
-        # Should only keep SHA256 cert
+        # Should keep SHA256 cert
         assert len(result) == 1
         assert sample_sha256_cert in result
 
-    @pytest.mark.skip(reason="SHA1 signing no longer supported by cryptography library")
-    def test_signature_algorithms_exclude(self, sample_sha256_cert, sample_sha1_cert):
-        """Test signature algorithm blacklist."""
-        pem_blocks = [sample_sha256_cert, sample_sha1_cert]
+    def test_signature_algorithms_exclude_sha1_does_not_affect_sha256(self, sample_sha256_cert):
+        """Excluding sha1/md5 should not remove a SHA256-signed cert."""
+        pem_blocks = [sample_sha256_cert]
 
         filters_cfg = {"signature_algorithms": {"exclude": ["sha1", "md5"]}}
         result = apply_filters(pem_blocks, filters_cfg)
 
-        # Should exclude SHA1 cert
+        # SHA256 cert remains
         assert len(result) == 1
         assert sample_sha256_cert in result
 

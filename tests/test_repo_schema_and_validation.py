@@ -65,7 +65,7 @@ repo:
     result = cli_runner.invoke(
         build_main,
         [
-            "--craft",
+            "--env",
             "test",
             "--output-root",
             str(temp_workspace / "dist"),
@@ -130,7 +130,7 @@ fetch:
     result = cli_runner.invoke(
         build_main,
         [
-            "--craft",
+            "--env",
             "test",
             "--output-root",
             str(temp_workspace / "dist"),

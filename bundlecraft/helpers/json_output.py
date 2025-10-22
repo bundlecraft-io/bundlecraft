@@ -55,8 +55,8 @@ def create_base_response(success: bool, command: str, **kwargs) -> dict[str, Any
 
 def create_build_response(
     success: bool,
-    craft: str,
-    targets: list[dict[str, Any]],
+    environment: str,
+    bundles: list[dict[str, Any]],
     errors: list[str] | None = None,
     **kwargs,
 ) -> dict[str, Any]:
@@ -68,14 +68,14 @@ def create_build_response(
             "command": "build",
             "timestamp": str (ISO 8601),
             "version": str,
-            "craft": str,
-            "targets": [
+            "environment": str,
+            "bundles": [
                 {
                     "name": str,
                     "certificate_count": int,
                     "output_formats": [str],
                     "output_path": str,
-                    "bundles": [str],
+                    "sources": [str],
                     "verification": {
                         "passed": bool,
                         "errors": [str],
@@ -87,7 +87,7 @@ def create_build_response(
         }
     """
     response = create_base_response(
-        success=success, command="build", craft=craft, targets=targets, **kwargs
+        success=success, command="build", environment=environment, bundles=bundles, **kwargs
     )
     if errors:
         response["errors"] = errors
@@ -176,7 +176,7 @@ def create_convert_response(
 
 def create_fetch_response(
     success: bool,
-    bundle_name: str,
+    source_name: str,
     staging_path: str,
     fetched_sources: int = 0,
     local_sources: int = 0,
@@ -192,7 +192,7 @@ def create_fetch_response(
             "command": "fetch",
             "timestamp": str (ISO 8601),
             "version": str,
-            "bundle_name": str,
+            "source_name": str,
             "staging_path": str,
             "fetched_sources": int,
             "local_sources": int,
@@ -203,7 +203,7 @@ def create_fetch_response(
     response = create_base_response(
         success=success,
         command="fetch",
-        bundle_name=bundle_name,
+        source_name=source_name,
         staging_path=staging_path,
         fetched_sources=fetched_sources,
         local_sources=local_sources,

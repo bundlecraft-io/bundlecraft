@@ -634,8 +634,8 @@ def main(
         if not isinstance(fetch_cfg, list):
             raise click.ClickException("Config key 'fetch' must be a list of sources")
 
-        # Determine bundle identifier for staging root
-        source_name = cfg.get("source_name") or cfg.get("id") or source_config_file.stem
+        # Determine source identifier for staging root
+        source_name = cfg.get("source_name") or source_config_file.stem
 
         # Prepare staging dir: <output_dir>/<source_name>
         # If output_dir is relative, resolve it against workspace_root

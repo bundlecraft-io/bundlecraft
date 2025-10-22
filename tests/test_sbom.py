@@ -4,7 +4,6 @@ Tests for SBOM generation functionality in BundleCraft.
 """
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -63,7 +62,7 @@ class TestExtractCertificateMetadata:
     def test_extract_valid_certificate(self):
         """Test extracting metadata from a valid certificate."""
         metadata = _extract_certificate_metadata(SAMPLE_PEM)
-        
+
         assert "subject" in metadata
         assert "issuer" in metadata
         assert "serial" in metadata
@@ -72,7 +71,7 @@ class TestExtractCertificateMetadata:
         assert "fingerprint_sha256" in metadata
         assert "fingerprint_sha1" in metadata
         assert "error" not in metadata
-        
+
         # Verify subject contains expected values
         assert "Test Root CA" in metadata["subject"]
 
@@ -80,7 +79,7 @@ class TestExtractCertificateMetadata:
         """Test extracting metadata from invalid PEM."""
         invalid_pem = "This is not a valid certificate"
         metadata = _extract_certificate_metadata(invalid_pem)
-        
+
         assert metadata["subject"] == "(unparsable)"
         assert metadata["issuer"] == "(unparsable)"
         assert "error" in metadata
@@ -88,7 +87,7 @@ class TestExtractCertificateMetadata:
     def test_extract_empty_certificate(self):
         """Test extracting metadata from empty string."""
         metadata = _extract_certificate_metadata("")
-        
+
         assert metadata["subject"] == "(unparsable)"
         assert "error" in metadata
 
@@ -97,13 +96,13 @@ class TestGetToolingMetadata:
     def test_get_tooling_metadata(self):
         """Test getting tooling metadata."""
         metadata = _get_tooling_metadata()
-        
+
         assert "python_version" in metadata
         assert "python_implementation" in metadata
         assert "platform" in metadata
         assert "cryptography_version" in metadata
         assert "click_version" in metadata
-        
+
         # Verify versions are present
         assert metadata["python_version"]
         assert metadata["cryptography_version"] != "unknown"
@@ -113,23 +112,21 @@ class TestGenerateCycloneDxSbom:
     def test_generate_basic_sbom(self, temp_build_dir, sample_manifest):
         """Test generating a basic CycloneDX SBOM."""
         pem_blocks = [SAMPLE_PEM]
-        
-        sbom_path = generate_cyclonedx_sbom(
-            temp_build_dir, sample_manifest, pem_blocks
-        )
-        
+
+        sbom_path = generate_cyclonedx_sbom(temp_build_dir, sample_manifest, pem_blocks)
+
         assert sbom_path.exists()
         assert sbom_path.name == "sbom.json"
-        
+
         # Parse and verify SBOM structure
         sbom_data = json.loads(sbom_path.read_text())
-        
+
         assert "bomFormat" in sbom_data
         assert sbom_data["bomFormat"] == "CycloneDX"
         assert "specVersion" in sbom_data
         assert "metadata" in sbom_data
         assert "components" in sbom_data
-        
+
         # Verify metadata component
         assert "component" in sbom_data["metadata"]
         component = sbom_data["metadata"]["component"]
@@ -139,13 +136,11 @@ class TestGenerateCycloneDxSbom:
     def test_generate_sbom_with_multiple_certificates(self, temp_build_dir, sample_manifest):
         """Test generating SBOM with multiple certificates."""
         pem_blocks = [SAMPLE_PEM, SAMPLE_PEM, SAMPLE_PEM]
-        
-        sbom_path = generate_cyclonedx_sbom(
-            temp_build_dir, sample_manifest, pem_blocks
-        )
-        
+
+        sbom_path = generate_cyclonedx_sbom(temp_build_dir, sample_manifest, pem_blocks)
+
         sbom_data = json.loads(sbom_path.read_text())
-        
+
         # Should have at least 3 certificate components
         components = sbom_data.get("components", [])
         cert_components = [c for c in components if c["name"].startswith("certificate-")]
@@ -162,18 +157,16 @@ class TestGenerateCycloneDxSbom:
             }
         ]
         pem_blocks = [SAMPLE_PEM]
-        
-        sbom_path = generate_cyclonedx_sbom(
-            temp_build_dir, sample_manifest, pem_blocks
-        )
-        
+
+        sbom_path = generate_cyclonedx_sbom(temp_build_dir, sample_manifest, pem_blocks)
+
         sbom_data = json.loads(sbom_path.read_text())
-        
+
         # Verify provenance component is included
         components = sbom_data.get("components", [])
         provenance_components = [c for c in components if c["name"].startswith("provenance-")]
         assert len(provenance_components) > 0
-        
+
         # Verify external reference
         prov_comp = provenance_components[0]
         assert "externalReferences" in prov_comp
@@ -182,25 +175,23 @@ class TestGenerateCycloneDxSbom:
         """Test generating SBOM with custom output path."""
         custom_path = temp_build_dir / "custom-sbom.json"
         pem_blocks = [SAMPLE_PEM]
-        
+
         sbom_path = generate_cyclonedx_sbom(
             temp_build_dir, sample_manifest, pem_blocks, output_path=custom_path
         )
-        
+
         assert sbom_path == custom_path
         assert sbom_path.exists()
 
     def test_generate_sbom_empty_certificates(self, temp_build_dir, sample_manifest):
         """Test generating SBOM with no certificates."""
         pem_blocks = []
-        
-        sbom_path = generate_cyclonedx_sbom(
-            temp_build_dir, sample_manifest, pem_blocks
-        )
-        
+
+        sbom_path = generate_cyclonedx_sbom(temp_build_dir, sample_manifest, pem_blocks)
+
         assert sbom_path.exists()
         sbom_data = json.loads(sbom_path.read_text())
-        
+
         # SBOM should still be valid even with no certificates
         assert "bomFormat" in sbom_data
         assert sbom_data["bomFormat"] == "CycloneDX"
@@ -210,10 +201,10 @@ class TestGenerateSpdxSbom:
     def test_spdx_not_implemented(self, temp_build_dir, sample_manifest):
         """Test that SPDX format raises NotImplementedError."""
         pem_blocks = [SAMPLE_PEM]
-        
+
         with pytest.raises(NotImplementedError) as exc_info:
             generate_spdx_sbom(temp_build_dir, sample_manifest, pem_blocks)
-        
+
         assert "SPDX format support is planned for Phase 2" in str(exc_info.value)
         assert "CycloneDX" in str(exc_info.value)
 
@@ -222,13 +213,11 @@ class TestSbomIntegration:
     def test_sbom_includes_tooling_metadata(self, temp_build_dir, sample_manifest):
         """Test that SBOM includes tooling metadata as properties."""
         pem_blocks = [SAMPLE_PEM]
-        
-        sbom_path = generate_cyclonedx_sbom(
-            temp_build_dir, sample_manifest, pem_blocks
-        )
-        
+
+        sbom_path = generate_cyclonedx_sbom(temp_build_dir, sample_manifest, pem_blocks)
+
         sbom_data = json.loads(sbom_path.read_text())
-        
+
         # Check for tooling properties in main component
         component = sbom_data["metadata"]["component"]
         if "properties" in component:
@@ -239,20 +228,18 @@ class TestSbomIntegration:
     def test_sbom_includes_build_metadata(self, temp_build_dir, sample_manifest):
         """Test that SBOM includes build metadata as properties."""
         pem_blocks = [SAMPLE_PEM]
-        
-        sbom_path = generate_cyclonedx_sbom(
-            temp_build_dir, sample_manifest, pem_blocks
-        )
-        
+
+        sbom_path = generate_cyclonedx_sbom(temp_build_dir, sample_manifest, pem_blocks)
+
         sbom_data = json.loads(sbom_path.read_text())
-        
+
         # Check for build properties in main component
         component = sbom_data["metadata"]["component"]
         if "properties" in component:
             properties = component["properties"]
             build_properties = [p for p in properties if p["name"].startswith("build.")]
             assert len(build_properties) > 0
-            
+
             # Verify specific build properties
             prop_names = [p["name"] for p in build_properties]
             assert "build.craft" in prop_names

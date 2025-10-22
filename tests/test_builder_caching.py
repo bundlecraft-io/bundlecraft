@@ -65,7 +65,7 @@ output_formats: [pem, jks]
         result = cli_runner.invoke(
             build_main,
             [
-                "--craft",
+                "--env",
                 "test",
                 "--output-root",
                 str(temp_workspace / "dist"),
@@ -172,7 +172,7 @@ repo:
         result = cli_runner.invoke(
             build_main,
             [
-                "--craft",
+                "--env",
                 "test",
                 "--output-root",
                 str(temp_workspace / "dist"),

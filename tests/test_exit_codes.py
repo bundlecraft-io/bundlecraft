@@ -77,7 +77,8 @@ repos:
     repo_dir = tmp_path / "test-certs"
     repo_dir.mkdir()
     cert_file = repo_dir / "test.pem"
-    cert_file.write_text("""-----BEGIN CERTIFICATE-----
+    cert_file.write_text(
+        """-----BEGIN CERTIFICATE-----
 MIIBkTCB+wIJAKHHCgVZU1UXMA0GCSqGSIb3DQEBCwUAMBExDzANBgNVBAMMBnRl
 c3RDQTAeFw0yNDAxMDEwMDAwMDBaFw0zNDAxMDEwMDAwMDBaMBExDzANBgNVBAMM
 BnRlc3RDQTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEArKJi0kU5lFLYhKf6
@@ -88,7 +89,8 @@ Y8pTiLjQhXXc5kv5tLlC7Y3kRp9YQF3pQYH8p5V8hGLl0h3mFH8lQ8/w3mLG9Xh6
 O6lY9kU8xPmV5YPbYfUd1JHqYdQ0z8R5cH5vN5PpJ9R1L0vKvYq3pN5A9L5yQ+Hp
 ZG3L1YpQpZVLpLvFzQ5R2H9K5PqYvFmZ5KVHAA==
 -----END CERTIFICATE-----
-""")
+"""
+    )
     return config_file
 
 
@@ -130,7 +132,7 @@ class TestBuildCommandExitCodes:
         result = cli_runner.invoke(
             build_main,
             [
-                "--craft-config-file",
+                "--env-config-file",
                 str(tmp_path / "nonexistent.yaml"),
             ],
         )
@@ -144,7 +146,7 @@ class TestBuildCommandExitCodes:
         result = cli_runner.invoke(
             build_main,
             [
-                "--craft-config-file",
+                "--env-config-file",
                 str(invalid_config),
             ],
         )
@@ -185,7 +187,7 @@ class TestConverterCommandExitCodes:
 
     def test_convert_missing_input(self, cli_runner, tmp_path):
         """Test convert command with missing input file.
-        
+
         Note: Click validates --input with exists=True, so it exits with code 2
         before our code runs. This is acceptable as it's a usage error.
         """

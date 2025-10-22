@@ -29,13 +29,13 @@ import click
 import yaml
 
 from bundlecraft.helpers.atomic_build import AtomicBuildContext
-from bundlecraft.helpers.exit_codes import ExitCode
 from bundlecraft.helpers.config_schema import (
-    validate_bundle_config,
-    validate_craft_config,
     validate_defaults_config,
+    validate_env_config,
+    validate_source_config,
 )
 from bundlecraft.helpers.convert_utils import convert_to_formats
+from bundlecraft.helpers.exit_codes import ExitCode
 from bundlecraft.helpers.json_output import suppress_output
 from bundlecraft.helpers.template_utils import expand_output_metadata
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
@@ -96,11 +96,11 @@ def _stage_bundle_sources(
     else:
         fetch_logger.setLevel(logging.INFO)
 
-    bundle_cfg_path = CONFIG_DIR / "bundles" / f"{bundle_name}.yaml"
-    bundle_cfg = load_yaml(bundle_cfg_path, required=True, validate=validate_bundle_config)
+    source_cfg_path = CONFIG_DIR / "sources" / f"{bundle_name}.yaml"
+    source_cfg = load_yaml(source_cfg_path, required=True, validate=validate_source_config)
     # Validate local repo and fetch names
     try:
-        _validate_source_and_fetch_names(bundle_cfg)
+        _validate_source_and_fetch_names(source_cfg)
     except Exception as e:
         raise click.ClickException(str(e)) from e
 
@@ -126,10 +126,10 @@ def _stage_bundle_sources(
     # Stage local includes
     if verbose:
         click.echo(f"[Fetch] Staging local includes for bundle: {bundle_name}", err=True)
-    _stage_local_includes(bundle_cfg, staging_root, workspace_root, verbose)
+    _stage_local_includes(source_cfg, staging_root, workspace_root, verbose)
 
     # Stage remote fetches
-    fetch_cfg = bundle_cfg.get("fetch") or []
+    fetch_cfg = source_cfg.get("fetch") or []
     if fetch_cfg:
         if verbose:
             click.echo(
@@ -364,18 +364,17 @@ def _verify_certificates(
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
-    "--craft",
     "--env",
     "env",
     required=True,
-    help="Craft name (e.g., dev, prod). Alias: --env (legacy)",
+    help="Environment name (e.g., dev, prod)",
 )
 @click.option(
     "--bundle",
     required=False,
     help=(
-        "Target name to build (from craft 'targets'). If omitted, builds all targets in the craft. "
-        "For legacy behavior, provide a bundle name not present in targets to build that bundle directly."
+        "Bundle name to build (from environment 'bundles'). If omitted, builds all bundles in the environment. "
+        "For legacy behavior, provide a source name not present in bundles to build that source directly."
     ),
 )
 @click.option(
@@ -397,7 +396,7 @@ def _verify_certificates(
     "--output-root",
     type=str,
     default="dist",
-    help="Root directory for build outputs (default: ./dist). Outputs are written under dist/<craft-name>/<target-name>.",
+    help="Root directory for build outputs (default: ./dist). Outputs are written under dist/<env-name>/<bundle-name>.",
 )
 @click.option(
     "--verbose",
@@ -466,7 +465,7 @@ def main(
     """Build trust bundles by orchestrating: fetch → convert → verify.
 
     This command coordinates the three core BundleCraft stages:
-      1. FETCH: Stage certificate sources from bundle configs
+      1. FETCH: Stage certificate sources from source configs
       2. CONVERT: Aggregate and convert to requested output formats
       3. VERIFY: Validate certificates and produce reports
 
@@ -502,81 +501,69 @@ def main(
         load_yaml(CONFIG_DIR / "defaults.yaml", required=False, validate=validate_defaults_config)
         or {}
     )
-    craft_path = CONFIG_DIR / "crafts" / f"{env}.yaml"
-    legacy_env_path = CONFIG_DIR / "envs" / f"{env}.yaml"
-    cfg_path = craft_path if craft_path.exists() else legacy_env_path
+    env_path = CONFIG_DIR / "envs" / f"{env}.yaml"
 
-    if not cfg_path.exists():
-        error_msg = f"Craft config not found: {env}"
+    if not env_path.exists():
+        error_msg = f"Environment config not found: {env} (expected: {env_path})"
         if json_output:
             json_errors.append(error_msg)
             from bundlecraft.helpers.json_output import create_build_response, emit_json
 
             emit_json(
-                create_build_response(success=False, craft=env, targets=[], errors=json_errors)
+                create_build_response(
+                    success=False, environment=env, bundles=[], errors=json_errors
+                )
             )
         else:
             click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
         sys.exit(ExitCode.CONFIG_ERROR)
 
-    craft_cfg = load_yaml(cfg_path, required=True, validate=validate_craft_config)
-    env_cfg = merge_configs(defaults, craft_cfg)
+    env_cfg_raw = load_yaml(env_path, required=True, validate=validate_env_config)
+    env_cfg = merge_configs(defaults, env_cfg_raw)
 
-    # Normalize targets from craft config
-    raw_targets = env_cfg.get("targets") or {}
-    targets_map: dict[str, dict] = {}
-    if isinstance(raw_targets, list):
-        # Support list form: [{ target_name: str, include_bundles|includes|compose: [...] }]
-        for item in raw_targets:
-            if not isinstance(item, dict):
-                continue
-            tname = item.get("target_name") or item.get("name")
-            if not tname:
-                continue
-            includes = (
-                item.get("include_bundles") or item.get("includes") or item.get("compose") or []
-            )
-            targets_map[tname] = {"include_bundles": includes}
-    elif isinstance(raw_targets, dict):
-        for tname, entry in raw_targets.items():
+    # Normalize bundles from environment config
+    raw_bundles = env_cfg.get("bundles") or {}
+    bundles_map: dict[str, dict] = {}
+    if isinstance(raw_bundles, dict):
+        for bname, entry in raw_bundles.items():
             entry = entry or {}
-            includes = (
-                entry.get("include_bundles") or entry.get("includes") or entry.get("compose") or []
-            )
-            targets_map[tname] = {"include_bundles": includes}
+            sources = entry.get("include_sources") or []
+            bundles_map[bname] = {"include_sources": sources}
 
-    # Determine which target(s) to build
-    targets_to_build: list[tuple[str, list[str]]] = []  # (target_name, include_bundles)
+    # Determine which bundle(s) to build
+    bundles_to_build: list[tuple[str, list[str]]] = []  # (bundle_name, include_sources)
     if bundle:
-        if bundle in targets_map:
-            targets_to_build.append((bundle, list(targets_map[bundle]["include_bundles"])))
+        if bundle in bundles_map:
+            bundles_to_build.append((bundle, list(bundles_map[bundle]["include_sources"])))
         else:
-            # Legacy direct-bundle build as a single-target with same name
-            targets_to_build.append((bundle, [bundle]))
+            # Legacy direct-source build as a single-bundle with same name
+            bundles_to_build.append((bundle, [bundle]))
     else:
-        if targets_map:
-            for tname, entry in targets_map.items():
-                targets_to_build.append((tname, list(entry["include_bundles"])))
+        if bundles_map:
+            for bname, entry in bundles_map.items():
+                bundles_to_build.append((bname, list(entry["include_sources"])))
         else:
             if not json_output:
                 click.secho(
-                    "[ERROR] No targets found in craft config and no --bundle provided.",
+                    "[ERROR] No bundles found in environment config and no --bundle provided.",
                     fg="red",
                     err=True,
                 )
             else:
-                error_msg = "No targets found in craft config and no --bundle provided."
+                error_msg = "No bundles found in environment config and no --bundle provided."
                 json_errors.append(error_msg)
                 from bundlecraft.helpers.json_output import create_build_response, emit_json
 
                 emit_json(
-                    create_build_response(success=False, craft=env, targets=[], errors=json_errors)
+                    create_build_response(
+                        success=False, environment=env, bundles=[], errors=json_errors
+                    )
                 )
             sys.exit(ExitCode.CONFIG_ERROR)
 
-    # Precompute craft-safe path and output settings used during caching
-    craft_name_for_path = env_cfg.get("name") or env
-    safe_craft = str(craft_name_for_path).replace("/", "-").replace(" ", "-")
+    # Precompute environment-safe path and output settings used during caching
+    env_name_for_path = env_cfg.get("name") or env
+    safe_env = str(env_name_for_path).replace("/", "-").replace(" ", "-")
 
     # Settings from craft (needed for cache conversion)
     pem_cfg = env_cfg.get("pem") or {}
@@ -589,25 +576,25 @@ def main(
     # =========================================================================
     staging_map: dict[str, list[Path]] = {}
 
-    # Collect unique bundle names across targets
-    unique_bundles: list[str] = []
-    for _, include_bundles in targets_to_build:
-        for b in include_bundles:
-            if b not in unique_bundles:
-                unique_bundles.append(b)
+    # Collect unique source names across bundles
+    unique_sources: list[str] = []
+    for _, include_sources in bundles_to_build:
+        for s in include_sources:
+            if s not in unique_sources:
+                unique_sources.append(s)
 
-    bundle_cache_root = ROOT / "build_cache" / safe_craft
+    bundle_cache_root = ROOT / "build_cache" / safe_env
     bundle_cache_root.mkdir(parents=True, exist_ok=True)
     bundle_cache_dirs: dict[str, Path] = {}
 
     if not skip_fetch:
         if not json_output:
             click.secho(
-                f"\n[STAGE 1/3] FETCH - Staging and caching {len(unique_bundles)} unique bundle(s)",
+                f"\n[STAGE 1/3] FETCH - Staging and caching {len(unique_sources)} unique bundle(s)",
                 fg="blue",
                 bold=True,
             )
-        for bname in unique_bundles:
+        for bname in unique_sources:
             try:
                 staging_dir = _stage_bundle_sources(
                     bname, env, ROOT, verbose=verbose, dry_run=dry_run, json_output=json_output
@@ -726,16 +713,16 @@ def main(
             click.secho(
                 "\n[STAGE 1/3] FETCH - Skipped (using existing staged sources)", fg="yellow"
             )
-        for bname in unique_bundles:
+        for bname in unique_sources:
             cache_dir = bundle_cache_root / bname
             bundle_cache_dirs[bname] = cache_dir
 
     # Map targets to their bundle staging/cache dirs
-    for target_name, include_bundles in targets_to_build:
-        per_target = []
-        for bname in include_bundles:
-            per_target.append(bundle_cache_dirs.get(bname, STAGED_DIR / env / bname))
-        staging_map[target_name] = per_target
+    for bundle_name, include_sources in bundles_to_build:
+        per_bundle = []
+        for bname in include_sources:
+            per_bundle.append(bundle_cache_dirs.get(bname, STAGED_DIR / env / bname))
+        staging_map[bundle_name] = per_bundle
 
     # =========================================================================
     # STAGE 2: CONVERT
@@ -744,8 +731,8 @@ def main(
         click.secho(
             "\n[STAGE 2/3] CONVERT - Aggregating and converting formats", fg="blue", bold=True
         )
-    craft_name_for_path = env_cfg.get("name") or env
-    safe_craft = str(craft_name_for_path).replace("/", "-").replace(" ", "-")
+    env_name_for_path = env_cfg.get("name") or env
+    safe_env = str(env_name_for_path).replace("/", "-").replace(" ", "-")
 
     # Settings from craft
     pem_cfg = env_cfg.get("pem") or {}
@@ -753,12 +740,12 @@ def main(
     output_formats = env_cfg.get("output_formats") or ["pem"]
     fmt_overrides = env_cfg.get("format_overrides") or {}
 
-    per_target_results: dict[str, dict] = {}
+    per_bundle_results: dict[str, dict] = {}
     import shutil
 
     # Process each target atomically
-    for target_name, bundle_dirs in staging_map.items():
-        final_build_root = (Path(output_root) / safe_craft / target_name).resolve()
+    for bundle_name, bundle_dirs in staging_map.items():
+        final_build_root = (Path(output_root) / safe_env / bundle_name).resolve()
 
         # Use atomic build context for each target
         with AtomicBuildContext(
@@ -777,10 +764,10 @@ def main(
                     except ValueError:
                         display_path = final_build_root
                     click.secho(
-                        f"  [{target_name}] [dry-run] Would copy cached bundle to: {display_path}",
+                        f"  [{bundle_name}] [dry-run] Would copy cached bundle to: {display_path}",
                         fg="yellow",
                     )
-                    per_target_results[target_name] = {
+                    per_bundle_results[bundle_name] = {
                         "build_root": final_build_root,
                         "pem_blocks": ["# dry-run placeholder"],
                         "output_formats": output_formats,
@@ -803,11 +790,11 @@ def main(
                         display_path = final_build_root
                     if not json_output:
                         click.secho(
-                            f"  [{target_name}] ✓ Copied cached bundle '{bdir.name}' to {display_path}",
+                            f"  [{bundle_name}] ✓ Copied cached bundle '{bdir.name}' to {display_path}",
                             fg="green",
                         )
                 pem_blocks = _read_pem_chunks([cache_pem])
-                per_target_results[target_name] = {
+                per_bundle_results[bundle_name] = {
                     "build_root": final_build_root,
                     "pem_blocks": pem_blocks,
                     "output_formats": output_formats,
@@ -823,7 +810,7 @@ def main(
                         tar_path = _create_deterministic_tar(build_root, "package")
                         if verbose:
                             click.echo(
-                                f"  [{target_name}] ✓ Created deterministic package: {tar_path.name}",
+                                f"  [{bundle_name}] ✓ Created deterministic package: {tar_path.name}",
                                 err=True,
                             )
 
@@ -831,7 +818,7 @@ def main(
                     manifest_obj = {
                         "craft": env_cfg.get("name") or env,
                         "environment": env,  # retained for compatibility
-                        "target": target_name,
+                        "target": bundle_name,
                         "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime(
                             "%Y-%m-%dT%H:%M:%SZ"
                         ),
@@ -877,7 +864,7 @@ def main(
                     )
                     if verbose:
                         click.echo(
-                            f"  [{target_name}] ✓ Wrote manifest: {manifest_path.name}",
+                            f"  [{bundle_name}] ✓ Wrote manifest: {manifest_path.name}",
                             err=True,
                         )
 
@@ -890,7 +877,7 @@ def main(
                     checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
                     if verbose:
                         click.echo(
-                            f"  [{target_name}] ✓ Wrote checksums: {checksum_path.name}",
+                            f"  [{bundle_name}] ✓ Wrote checksums: {checksum_path.name}",
                             err=True,
                         )
 
@@ -915,7 +902,7 @@ def main(
 
             if not merged_blocks:
                 click.secho(
-                    f"  [ERROR] [{target_name}] No valid PEM certificates parsed for merged target.",
+                    f"  [ERROR] [{bundle_name}] No valid PEM certificates parsed for merged target.",
                     fg="red",
                     err=True,
                 )
@@ -933,7 +920,7 @@ def main(
                     display_path = final_build_root
                 if not json_output:
                     click.secho(
-                        f"  [{target_name}] ✓ Wrote merged canonical PEM: {display_path}/bundlecraft-ca-trust.pem",
+                        f"  [{bundle_name}] ✓ Wrote merged canonical PEM: {display_path}/bundlecraft-ca-trust.pem",
                         fg="green",
                     )
 
@@ -964,11 +951,11 @@ def main(
                     )
                 if not dry_run and not json_output:
                     click.secho(
-                        f"  [{target_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
+                        f"  [{bundle_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
                         fg="green",
                     )
 
-            per_target_results[target_name] = {
+            per_bundle_results[bundle_name] = {
                 "build_root": final_build_root,
                 "pem_blocks": merged_blocks,
                 "output_formats": output_formats,
@@ -986,7 +973,7 @@ def main(
                     tar_path = _create_deterministic_tar(build_root, "package")
                     if verbose:
                         click.echo(
-                            f"  [{target_name}] ✓ Created deterministic package: {tar_path.name}",
+                            f"  [{bundle_name}] ✓ Created deterministic package: {tar_path.name}",
                             err=True,
                         )
 
@@ -994,7 +981,7 @@ def main(
                 manifest_obj = {
                     "craft": env_cfg.get("name") or env,
                     "environment": env,  # retained for compatibility
-                    "target": target_name,
+                    "target": bundle_name,
                     "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime(
                         "%Y-%m-%dT%H:%M:%SZ"
                     ),
@@ -1040,7 +1027,7 @@ def main(
                 )
                 if verbose:
                     click.echo(
-                        f"  [{target_name}] ✓ Wrote manifest: {manifest_path.name}",
+                        f"  [{bundle_name}] ✓ Wrote manifest: {manifest_path.name}",
                         err=True,
                     )
 
@@ -1053,7 +1040,7 @@ def main(
                 checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
                 if verbose:
                     click.echo(
-                        f"  [{target_name}] ✓ Wrote checksums: {checksum_path.name}",
+                        f"  [{bundle_name}] ✓ Wrote checksums: {checksum_path.name}",
                         err=True,
                     )
 
@@ -1073,33 +1060,33 @@ def main(
         warn_days = (
             verify_cfg.get("warn_days_before_expiry", 30) if isinstance(verify_cfg, dict) else 30
         )
-        for target_name, result in per_target_results.items():
+        for bundle_name, result in per_bundle_results.items():
             pem_blocks = result["pem_blocks"]
             if dry_run:
                 click.secho(
-                    f"  [{target_name}] [dry-run] Would verify {len(pem_blocks)} certificate(s)",
+                    f"  [{bundle_name}] [dry-run] Would verify {len(pem_blocks)} certificate(s)",
                     fg="yellow",
                 )
                 click.secho(
-                    f"  [{target_name}] [dry-run] Would check for expiry (fail_on_expired={fail_on_expired}, warn_days={warn_days})",
+                    f"  [{bundle_name}] [dry-run] Would check for expiry (fail_on_expired={fail_on_expired}, warn_days={warn_days})",
                     fg="yellow",
                 )
                 continue
             errs, warns = _verify_certificates(pem_blocks, fail_on_expired, warn_days)
-            verify_results[target_name] = {
+            verify_results[bundle_name] = {
                 "passed": len(errs) == 0,
                 "errors": errs,
                 "warnings": warns,
             }
             if not json_output:
                 for e in errs:
-                    click.secho(f"  [{target_name}] [ERROR] {e}", fg="red")
+                    click.secho(f"  [{bundle_name}] [ERROR] {e}", fg="red")
                 for w in warns:
-                    click.secho(f"  [{target_name}] [WARN] {w}", fg="yellow")
+                    click.secho(f"  [{bundle_name}] [WARN] {w}", fg="yellow")
             if errs:
                 if not json_output:
                     click.secho(
-                        f"  [{target_name}] [SUMMARY] {len(errs)} expired/invalid certificate(s)",
+                        f"  [{bundle_name}] [SUMMARY] {len(errs)} expired/invalid certificate(s)",
                         fg="red",
                     )
                 if fail_on_expired:
@@ -1116,12 +1103,12 @@ def main(
             if not json_output:
                 if warns:
                     click.secho(
-                        f"  [{target_name}] [SUMMARY] {len(warns)} certificate(s) expiring within {warn_days} days",
+                        f"  [{bundle_name}] [SUMMARY] {len(warns)} certificate(s) expiring within {warn_days} days",
                         fg="yellow",
                     )
                 if not errs and not warns:
                     click.secho(
-                        f"  [{target_name}] ✓ All certificates are valid and healthy", fg="green"
+                        f"  [{bundle_name}] ✓ All certificates are valid and healthy", fg="green"
                     )
     else:
         if not json_output:
@@ -1135,7 +1122,7 @@ def main(
             click.secho("\nFinalizing build artifacts...", fg="blue")
 
         # Build manifest and checksums per target
-        for target_name, result in per_target_results.items():
+        for bundle_name, result in per_bundle_results.items():
             build_root = result["build_root"]
             pem_blocks = result["pem_blocks"]
             output_formats = result["output_formats"]
@@ -1152,7 +1139,7 @@ def main(
                         display_path = tar_path
                     if not json_output:
                         click.secho(
-                            f"  [{target_name}] ✓ Created deterministic package: {display_path}",
+                            f"  [{bundle_name}] ✓ Created deterministic package: {display_path}",
                             fg="green",
                         )
 
@@ -1161,7 +1148,7 @@ def main(
             manifest_obj = {
                 "craft": env_cfg.get("name") or env,
                 "environment": env,  # retained for compatibility
-                "target": target_name,
+                "target": bundle_name,
                 "timestamp_utc": timestamp_utc,
                 "certificate_count": len(pem_blocks),
                 "output_formats": output_formats,
@@ -1202,7 +1189,7 @@ def main(
             if output_metadata_cfg:
                 expanded_metadata = expand_output_metadata(
                     output_metadata_cfg,
-                    bundle=target_name,
+                    bundle=bundle_name,
                     env=env,
                     timestamp_utc=timestamp_utc,
                 )
@@ -1226,7 +1213,7 @@ def main(
                 display_path = manifest_path
             if not json_output:
                 click.secho(
-                    f"  [{target_name}] ✓ Wrote manifest: {display_path}",
+                    f"  [{bundle_name}] ✓ Wrote manifest: {display_path}",
                     fg="green",
                 )
 
@@ -1238,7 +1225,7 @@ def main(
                     encoding="utf-8",
                 )
                 click.secho(
-                    f"  [{target_name}] ✓ Wrote metadata sidecar: {sidecar_path.relative_to(ROOT)}",
+                    f"  [{bundle_name}] ✓ Wrote metadata sidecar: {sidecar_path.relative_to(ROOT)}",
                     fg="green",
                 )
 
@@ -1248,7 +1235,7 @@ def main(
             checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
             if not json_output:
                 click.secho(
-                    f"  [{target_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}",
+                    f"  [{bundle_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}",
                     fg="green",
                 )
 
@@ -1263,7 +1250,7 @@ def main(
         package_enabled = env_cfg.get("package", True)
 
         # Build manifest and checksums per target
-        for target_name, result in per_target_results.items():
+        for bundle_name, result in per_bundle_results.items():
             build_root = result["build_root"]
             pem_blocks = result["pem_blocks"]
             output_formats = result["output_formats"]
@@ -1280,7 +1267,7 @@ def main(
                         display_path = tar_path
                     if not json_output:
                         click.secho(
-                            f"  [{target_name}] ✓ Created deterministic package: {display_path}",
+                            f"  [{bundle_name}] ✓ Created deterministic package: {display_path}",
                             fg="green",
                         )
 
@@ -1288,7 +1275,7 @@ def main(
             manifest_obj = {
                 "craft": env_cfg.get("name") or env,
                 "environment": env,  # retained for compatibility
-                "target": target_name,
+                "target": bundle_name,
                 "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "certificate_count": len(pem_blocks),
                 "output_formats": output_formats,
@@ -1327,7 +1314,7 @@ def main(
             if output_metadata_cfg:
                 expanded_metadata = expand_output_metadata(
                     output_metadata_cfg,
-                    bundle=target_name,
+                    bundle=bundle_name,
                     env=env,
                     timestamp_utc=manifest_obj["timestamp_utc"],
                 )
@@ -1345,7 +1332,7 @@ def main(
             except ValueError:
                 display_path = manifest_path
             if not json_output:
-                click.secho(f"  [{target_name}] ✓ Wrote manifest: {display_path}", fg="green")
+                click.secho(f"  [{bundle_name}] ✓ Wrote manifest: {display_path}", fg="green")
 
             # Write checksums file with all files including manifest
             all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
@@ -1359,7 +1346,7 @@ def main(
                 display_path = checksum_path
             if not json_output:
                 click.secho(
-                    f"  [{target_name}] ✓ Wrote checksums: {display_path}",
+                    f"  [{bundle_name}] ✓ Wrote checksums: {display_path}",
                     fg="green",
                 )
 
@@ -1376,13 +1363,13 @@ def main(
                         display_path = sbom_path
                     if not json_output:
                         click.secho(
-                            f"  [{target_name}] ✓ Generated SBOM: {display_path}",
+                            f"  [{bundle_name}] ✓ Generated SBOM: {display_path}",
                             fg="green",
                         )
                 except Exception as e:
                     if not json_output:
                         click.secho(
-                            f"  [{target_name}] [WARN] SBOM generation failed: {e}",
+                            f"  [{bundle_name}] [WARN] SBOM generation failed: {e}",
                             fg="yellow",
                         )
 
@@ -1427,14 +1414,14 @@ def main(
                             display_path = sig_path
                         if not json_output:
                             click.secho(
-                                f"  [{target_name}] ✓ Signed: {display_path}",
+                                f"  [{bundle_name}] ✓ Signed: {display_path}",
                                 fg="green",
                             )
                         signed_count += 1
                     except Exception as e:
                         if not json_output:
                             click.secho(
-                                f"  [{target_name}] [ERROR] Failed to sign {file_to_sign.name}: {e}",
+                                f"  [{bundle_name}] [ERROR] Failed to sign {file_to_sign.name}: {e}",
                                 fg="red",
                                 err=True,
                             )
@@ -1442,7 +1429,7 @@ def main(
 
                 if not json_output:
                     click.secho(
-                        f"  [{target_name}] ✓ Signed {signed_count} artifact(s)",
+                        f"  [{bundle_name}] ✓ Signed {signed_count} artifact(s)",
                         fg="green",
                     )
 
@@ -1450,33 +1437,33 @@ def main(
         if not json_output:
             click.secho(
                 "\n✅ [DRY RUN] Build simulation complete for target(s): "
-                + ", ".join(per_target_results.keys()),
+                + ", ".join(per_bundle_results.keys()),
                 fg="yellow",
                 bold=True,
             )
     else:
         if not json_output:
             click.secho(
-                "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
+                "\n✅ Build complete for target(s): " + ", ".join(per_bundle_results.keys()),
                 fg="bright_green",
                 bold=True,
             )
 
     # Collect target information for JSON output
-    for target_name, result in per_target_results.items():
+    for bundle_name, result in per_bundle_results.items():
         build_root = result["build_root"]
         pem_blocks = result["pem_blocks"]
         output_formats = result["output_formats"]
 
         # Get bundles for this target
         target_bundles = []
-        for tname, include_bundles in targets_to_build:
-            if tname == target_name:
-                target_bundles = include_bundles
+        for tname, include_sources in bundles_to_build:
+            if tname == bundle_name:
+                target_bundles = include_sources
                 break
 
         target_info = {
-            "name": target_name,
+            "name": bundle_name,
             "certificate_count": len(pem_blocks),
             "output_formats": output_formats,
             "output_path": str(build_root.relative_to(ROOT)) if not dry_run else str(build_root),
@@ -1484,8 +1471,8 @@ def main(
         }
 
         # Add verification results if available
-        if target_name in verify_results:
-            target_info["verification"] = verify_results[target_name]
+        if bundle_name in verify_results:
+            target_info["verification"] = verify_results[bundle_name]
 
         json_targets.append(target_info)
 
@@ -1496,8 +1483,8 @@ def main(
         fail_on_expired = (
             verify_cfg.get("fail_on_expired", True) if isinstance(verify_cfg, dict) else True
         )
-        for target_name in verify_results:
-            if verify_results[target_name]["errors"] and fail_on_expired:
+        for bundle_name in verify_results:
+            if verify_results[bundle_name]["errors"] and fail_on_expired:
                 verification_failed = True
                 break
 
@@ -1508,8 +1495,8 @@ def main(
         emit_json(
             create_build_response(
                 success=not verification_failed and not json_errors,
-                craft=env_cfg.get("name") or env,
-                targets=json_targets,
+                environment=env_cfg.get("name") or env,
+                bundles=json_targets,
                 errors=json_errors if json_errors else None,
                 dry_run=dry_run,
             )
@@ -1521,13 +1508,13 @@ def main(
         if dry_run:
             click.secho(
                 "\n✅ [DRY RUN] Build simulation complete for target(s): "
-                + ", ".join(per_target_results.keys()),
+                + ", ".join(per_bundle_results.keys()),
                 fg="yellow",
                 bold=True,
             )
         else:
             click.secho(
-                "\n✅ Build complete for target(s): " + ", ".join(per_target_results.keys()),
+                "\n✅ Build complete for target(s): " + ", ".join(per_bundle_results.keys()),
                 fg="bright_green",
                 bold=True,
             )

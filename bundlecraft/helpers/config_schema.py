@@ -4,8 +4,8 @@ config_schema.py
 Pydantic v2 schema models for validating BundleCraft configuration files.
 
 Provides comprehensive validation for:
-- Bundle configs (config/bundles/*.yaml)
-- Craft configs (config/crafts/*.yaml)
+- Source configs (config/sources/*.yaml) - Certificate sources
+- Environment configs (config/envs/*.yaml) - Build environments
 - Defaults config (config/defaults.yaml)
 
 Features:
@@ -294,21 +294,20 @@ class OutputMetadata(BaseModel):
     )
 
 
-class TargetEntry(BaseModel):
-    """Target entry in craft config."""
+class BundleEntry(BaseModel):
+    """Bundle entry in environment config."""
 
-    includes: list[str] | None = Field(None, alias="includes")
-    include_bundles: list[str] | None = Field(None, alias="include_bundles")
-    compose: list[str] | None = Field(None, alias="compose")
+    include_sources: list[str] = Field(
+        ..., description="List of source names to include in this bundle"
+    )
 
-    @model_validator(mode="after")
-    def ensure_at_least_one_include(self) -> TargetEntry:
-        """Ensure at least one include list is provided."""
-        if not self.includes and not self.include_bundles and not self.compose:
-            raise ValueError(
-                "At least one of 'includes', 'include_bundles', or 'compose' must be provided"
-            )
-        return self
+    @field_validator("include_sources")
+    @classmethod
+    def validate_include_sources(cls, v: list[str]) -> list[str]:
+        """Ensure include_sources is not empty."""
+        if not v:
+            raise ValueError("include_sources must contain at least one source name")
+        return v
 
 
 # =====================================================================
@@ -316,29 +315,29 @@ class TargetEntry(BaseModel):
 # =====================================================================
 
 
-class BundleConfig(BaseModel):
-    """Schema for bundle configuration files (config/bundles/*.yaml)."""
+class SourceConfig(BaseModel):
+    """Schema for source configuration files (config/sources/*.yaml)."""
 
-    bundle_name: str = Field(min_length=1, description="Unique bundle identifier")
+    source_name: str = Field(min_length=1, description="Unique source identifier")
     description: str = Field(min_length=1, description="Human-readable description")
     repo: list[RepoEntry] = Field(default_factory=list, description="Local repository sources")
     fetch: list[FetchEntry] = Field(default_factory=list, description="Remote fetch sources")
     metadata: MetadataModel = Field(default_factory=MetadataModel)
 
-    @field_validator("bundle_name")
+    @field_validator("source_name")
     @classmethod
-    def validate_bundle_name(cls, v: str) -> str:
-        """Ensure bundle_name is not a reserved keyword."""
+    def validate_source_name(cls, v: str) -> str:
+        """Ensure source_name is not a reserved keyword."""
         reserved = {"include", "exclude", "fetch", "repo"}
         if v.lower() in reserved:
-            raise ValueError(f"'{v}' is a reserved bundle name")
+            raise ValueError(f"'{v}' is a reserved source name")
         return v
 
     @model_validator(mode="after")
-    def validate_repo_and_fetch(self) -> BundleConfig:
+    def validate_repo_and_fetch(self) -> SourceConfig:
         """Ensure at least one source is defined and no duplicate names."""
         if not self.repo and not self.fetch:
-            raise ValueError("Bundle must have at least one 'repo' or 'fetch' entry")
+            raise ValueError("Source must have at least one 'repo' or 'fetch' entry")
 
         # Check for duplicate repo names
         repo_names = [r.name for r in self.repo]
@@ -363,13 +362,13 @@ class BundleConfig(BaseModel):
         return self
 
 
-class CraftConfig(BaseModel):
-    """Schema for craft configuration files (config/crafts/*.yaml)."""
+class EnvConfig(BaseModel):
+    """Schema for environment configuration files (config/envs/*.yaml)."""
 
-    name: str = Field(min_length=1, description="Craft display name")
+    name: str = Field(min_length=1, description="Environment display name")
     description: str = Field(min_length=1, description="Human-readable description")
-    targets: dict[str, TargetEntry] | list[dict[str, Any]] = Field(
-        description="Build targets with bundle composition"
+    bundles: dict[str, BundleEntry] = Field(
+        ..., description="Build bundles with source composition"
     )
     output_formats: list[OutputFormat | str] = Field(
         default_factory=lambda: ["pem"], description="Output format list"
@@ -399,21 +398,10 @@ class CraftConfig(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_targets(self) -> CraftConfig:
-        """Validate targets structure and check for duplicates."""
-        if isinstance(self.targets, dict):
-            if not self.targets:
-                raise ValueError("Craft must have at least one target defined")
-            # Check for duplicate target names (already handled by dict keys)
-        elif isinstance(self.targets, list):
-            if not self.targets:
-                raise ValueError("Craft must have at least one target defined")
-            target_names = [
-                t.get("target_name") or t.get("name") for t in self.targets if isinstance(t, dict)
-            ]
-            if len(target_names) != len(set(target_names)):
-                duplicates = [name for name in target_names if target_names.count(name) > 1]
-                raise ValueError(f"Duplicate target names found: {', '.join(set(duplicates))}")
+    def validate_bundles(self) -> EnvConfig:
+        """Validate bundles structure and check for duplicates."""
+        if not self.bundles:
+            raise ValueError("Environment must have at least one bundle defined")
         return self
 
 
@@ -452,41 +440,41 @@ class DefaultsConfig(BaseModel):
 # =====================================================================
 
 
-def validate_bundle_config(data: dict[str, Any], config_path: str = "") -> BundleConfig:
-    """Validate bundle configuration data against schema.
+def validate_source_config(data: dict[str, Any], config_path: str = "") -> SourceConfig:
+    """Validate source configuration data against schema.
 
     Args:
         data: Raw configuration dictionary
         config_path: Path to config file (for error messages)
 
     Returns:
-        Validated BundleConfig instance
+        Validated SourceConfig instance
 
     Raises:
         ValueError: If validation fails with detailed error message
     """
     try:
-        return BundleConfig(**data)
+        return SourceConfig(**data)
     except Exception as e:
         path_info = f" for {config_path}" if config_path else ""
         raise ValueError(f"Config validation failed{path_info}: \n{e}") from e
 
 
-def validate_craft_config(data: dict[str, Any], config_path: str = "") -> CraftConfig:
-    """Validate craft configuration data against schema.
+def validate_env_config(data: dict[str, Any], config_path: str = "") -> EnvConfig:
+    """Validate environment configuration data against schema.
 
     Args:
         data: Raw configuration dictionary
         config_path: Path to config file (for error messages)
 
     Returns:
-        Validated CraftConfig instance
+        Validated EnvConfig instance
 
     Raises:
         ValueError: If validation fails with detailed error message
     """
     try:
-        return CraftConfig(**data)
+        return EnvConfig(**data)
     except Exception as e:
         path_info = f" for {config_path}" if config_path else ""
         raise ValueError(f"Config validation failed{path_info}: \n{e}") from e

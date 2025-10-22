@@ -180,62 +180,68 @@ class TestCraftConfigValidation:
     """Test craft configuration validation."""
 
     def test_missing_name(self):
-        """Craft config must have name field."""
-        data = {"description": "Test craft", "targets": {"internal": {"includes": ["test"]}}}
+        """Environment config must have name field."""
+        data = {
+            "description": "Test environment",
+            "bundles": {"internal": {"include_sources": ["test"]}},
+        }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
             validate_env_config(data)
         assert "name" in str(exc_info.value).lower()
 
     def test_missing_description(self):
-        """Craft config must have description field."""
-        data = {"name": "Test", "targets": {"internal": {"includes": ["test"]}}}
+        """Environment config must have description field."""
+        data = {"name": "Test", "bundles": {"internal": {"include_sources": ["test"]}}}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
             validate_env_config(data)
         assert "description" in str(exc_info.value).lower()
 
     def test_empty_targets(self):
-        """Craft must have at least one target."""
-        data = {"name": "Test", "description": "Test craft", "targets": {}}
+        """Environment must have at least one bundle."""
+        data = {"name": "Test", "description": "Test environment", "bundles": {}}
         with pytest.raises((ValidationError, ValueError)) as exc_info:
             validate_env_config(data)
-        assert "at least one target" in str(exc_info.value).lower()
+        assert (
+            "at least one" in str(exc_info.value).lower()
+            or "bundles" in str(exc_info.value).lower()
+        )
 
     def test_invalid_output_format(self):
         """Output formats must be valid format names."""
         data = {
             "name": "Test",
             "description": "Test",
-            "targets": {"internal": {"includes": ["test"]}},
+            "bundles": {"internal": {"include_sources": ["test"]}},
             "output_formats": ["pem", "invalid_format"],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
             validate_env_config(data)
         assert "invalid" in str(exc_info.value).lower() or "format" in str(exc_info.value).lower()
 
-    def test_duplicate_target_names_list(self):
-        """List-form targets must have unique names."""
+    def test_bundles_must_be_dict(self):
+        """Bundles field must be a dictionary, not a list."""
         data = {
             "name": "Test",
             "description": "Test",
-            "targets": [
-                {"target_name": "duplicate", "includes": ["test1"]},
-                {"target_name": "duplicate", "includes": ["test2"]},
+            "bundles": [
+                {"bundle_name": "bundle1", "include_sources": ["test1"]},
+                {"bundle_name": "bundle2", "include_sources": ["test2"]},
             ],
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
             validate_env_config(data)
-        assert "duplicate" in str(exc_info.value).lower()
+        assert "dict" in str(exc_info.value).lower()
 
     def test_target_missing_includes(self):
-        """Target must have at least one include field."""
+        """Bundle must have include_sources field."""
         data = {
             "name": "Test",
             "description": "Test",
-            "targets": {"internal": {}},
+            "bundles": {"internal": {}},
         }
         with pytest.raises((ValidationError, ValueError)) as exc_info:
             validate_env_config(data)
-        assert "at least one" in str(exc_info.value).lower()
+        assert "include_sources" in str(exc_info.value).lower()
 
 
 class TestDefaultsConfigValidation:
@@ -298,11 +304,11 @@ class TestValidConfigsPass:
         assert config.source_name == "mozilla"
 
     def test_valid_craft_config(self):
-        """Valid craft config should pass."""
+        """Valid environment config should pass."""
         data = {
             "name": "Development",
             "description": "Dev environment",
-            "targets": {"internal": {"includes": ["internal"]}},
+            "bundles": {"internal": {"include_sources": ["internal"]}},
             "output_formats": ["pem", "jks"],
         }
         config = validate_env_config(data)

@@ -77,7 +77,7 @@ verify:
             result1 = runner.invoke(
                 build_main,
                 [
-                    "--craft",
+                    "--env",
                     "test",
                     "--bundle",
                     "test-target",
@@ -99,7 +99,7 @@ verify:
             result2 = runner.invoke(
                 build_main,
                 [
-                    "--craft",
+                    "--env",
                     "test",
                     "--bundle",
                     "test-target",
@@ -183,7 +183,7 @@ verify:
             result = runner.invoke(
                 build_main,
                 [
-                    "--craft",
+                    "--env",
                     "test",
                     "--bundle",
                     "test-target",
