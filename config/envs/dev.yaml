@@ -10,7 +10,7 @@ kind: EnvConfig
 # Environment configs define HOW to build and WHERE to distribute.
 # Controls output formats, verification, secrets, and deployment targets.
 # =====================================================================
-name: Development
+name: development
 description: Development environment for testing and local builds
 # ---------------------------------------------------------------------
 # Bundle Composition

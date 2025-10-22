@@ -14,7 +14,7 @@ kind: EnvConfig
 # Philosophy: Source configs define WHAT/WHERE (sources),
 #            Environment configs define HOW/WHERE (build & deploy).
 # =====================================================================
-name: Example Environment
+name: example-env
 description: >
   Comprehensive example showing all environment configuration options.
   Demonstrates build settings, format overrides, verification policies,
