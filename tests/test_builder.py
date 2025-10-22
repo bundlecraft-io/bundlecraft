@@ -148,12 +148,12 @@ class TestBuilder:
     def test_build_targets_output_structure(
         self, cli_runner, temp_workspace, sample_bundle_config, monkeypatch
     ):
-        """Ensure build writes to dist/<craft-name>/<target-name> with standard filenames."""
+        """Ensure build writes to dist/<env-name>/<target-name> with standard filenames."""
         # Craft config with two simple targets referencing the sample bundle file name
         craft_dir = temp_workspace / "config" / "envs"
         craft_dir.mkdir(parents=True, exist_ok=True)
         (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)
-        # Write a minimal craft config that composes the sample bundle twice
+        # Write a minimal env config that composes the sample bundle twice
         env_yaml = craft_dir / "test.yaml"
         env_yaml.write_text(
             """

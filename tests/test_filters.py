@@ -151,9 +151,9 @@ class TestConfigMerge:
     def test_merge_configs_simple(self):
         """Test basic config merging."""
         defaults = {"verify": {"fail_on_expired": True}, "package": False}
-        craft = {"package": True}
+        env = {"package": True}
 
-        result = merge_configs(defaults, craft)
+        result = merge_configs(defaults, env)
 
         assert result["package"] is True
         assert result["verify"]["fail_on_expired"] is True
@@ -166,31 +166,31 @@ class TestConfigMerge:
                 "root_certs_only": True,
             }
         }
-        craft = {
+        env = {
             "filters": {
                 "root_certs_only": False,  # Override
                 "ca_certs_only": True,  # Add new
             }
         }
 
-        result = merge_configs(defaults, craft)
+        result = merge_configs(defaults, env)
 
         assert result["filters"]["unique_by_fingerprint"] is True
         assert result["filters"]["root_certs_only"] is False
         assert result["filters"]["ca_certs_only"] is True
 
     def test_merge_configs_craft_overrides(self):
-        """Test that craft config overrides defaults."""
+        """Test that env config overrides defaults."""
         defaults = {
             "output_formats": ["pem"],
             "verify": {"warn_days_before_expiry": 30},
         }
-        craft = {
+        env = {
             "output_formats": ["pem", "jks", "p12"],
             "verify": {"warn_days_before_expiry": 60},
         }
 
-        result = merge_configs(defaults, craft)
+        result = merge_configs(defaults, env)
 
         assert result["output_formats"] == ["pem", "jks", "p12"]
         assert result["verify"]["warn_days_before_expiry"] == 60
@@ -198,18 +198,18 @@ class TestConfigMerge:
     def test_merge_configs_empty_defaults(self):
         """Test merging with empty defaults."""
         defaults = {}
-        craft = {"package": True, "verify": {"fail_on_expired": True}}
+        env = {"package": True, "verify": {"fail_on_expired": True}}
 
-        result = merge_configs(defaults, craft)
+        result = merge_configs(defaults, env)
 
-        assert result == craft
+        assert result == env
 
     def test_merge_configs_empty_craft(self):
-        """Test merging with empty craft config."""
+        """Test merging with empty env config."""
         defaults = {"package": False, "verify": {"fail_on_expired": True}}
-        craft = {}
+        env = {}
 
-        result = merge_configs(defaults, craft)
+        result = merge_configs(defaults, env)
 
         assert result == defaults
 

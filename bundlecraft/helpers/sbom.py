@@ -132,16 +132,16 @@ def generate_cyclonedx_sbom(
         output_path = build_dir / "sbom.json"
 
     # Create the main BOM component (the trust bundle itself)
-    craft = manifest.get("craft", "unknown")
+    env = manifest.get("env", "unknown")
     target = manifest.get("target", "unknown")
     timestamp = manifest.get("timestamp_utc", dt.datetime.now(dt.timezone.utc).isoformat())
 
     # Create main component for the trust bundle
     main_component = Component(
-        name=f"bundlecraft-ca-trust-{craft}-{target}",
+        name=f"bundlecraft-ca-trust-{env}-{target}",
         version=timestamp,
         type=ComponentType.DATA,
-        description=f"BundleCraft CA Trust Bundle: {craft}/{target}",
+        description=f"BundleCraft CA Trust Bundle: {env}/{target}",
     )
 
     # Create BOM
@@ -227,7 +227,7 @@ def generate_cyclonedx_sbom(
         main_component.properties.add(Property(name=f"tool.{key}", value=str(value)))
 
     # Add build metadata
-    main_component.properties.add(Property(name="build.craft", value=craft))
+    main_component.properties.add(Property(name="build.env", value=env))
     main_component.properties.add(Property(name="build.target", value=target))
     main_component.properties.add(Property(name="build.timestamp", value=timestamp))
     main_component.properties.add(

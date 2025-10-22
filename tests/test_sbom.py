@@ -50,7 +50,7 @@ def temp_build_dir(tmp_path):
 def sample_manifest():
     """Create a sample build manifest."""
     return {
-        "craft": "test-craft",
+        "env": "test-env",
         "target": "test-bundle",
         "timestamp_utc": "2025-01-15T12:00:00Z",
         "certificate_count": 1,
@@ -242,6 +242,6 @@ class TestSbomIntegration:
 
             # Verify specific build properties
             prop_names = [p["name"] for p in build_properties]
-            assert "build.craft" in prop_names
+            assert "build.env" in prop_names
             assert "build.target" in prop_names
             assert "build.certificate_count" in prop_names

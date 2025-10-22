@@ -3,7 +3,7 @@
 This document defines the configuration schema for BundleCraft, clearly separating concerns between:
 
 - **Bundle configs** (`config/sources/*.yaml`) - Certificate sourcing and gathering
-- **Craft configs** (`config/envs/*.yaml`) - Build, output, and deployment configuration
+- **Environment configs** (`config/envs/*.yaml`) - Build, output, and deployment configuration
 - **Defaults** (`config/defaults.yaml`) - Global fallback settings
 
 ---
@@ -216,7 +216,7 @@ metadata:
 
 ## 2) Environment Configuration: `config/envs/<env>.yaml`
 
-Defines build behavior and deployment configuration for a craft.
+Defines build behavior and deployment configuration for an env.
 
 ### Bundle Composition
 
@@ -237,7 +237,7 @@ output_formats:  # Which formats to produce
   - jks   # Java KeyStore
   - p12   # PKCS#12
 
-# Outputs are written by default to: dist/<craft-name>/<target-name>/
+# Outputs are written by default to: dist/<env-name>/<bundle-name>/
 package: true  # Create .tar.gz of outputs
 ```
 
@@ -309,8 +309,8 @@ output_metadata:
 
 **Template Variables:**
 
-- `{{bundle}}` - Target name (e.g., "internal-prod")
-- `{{env}}` - Craft/environment name (e.g., "production")
+- `{{bundle}}` - Bundle name (e.g., "internal-prod")
+- `{{env}}` - Environment name (e.g., "production")
 - `{{timestamp}}` - ISO 8601 timestamp in UTC (e.g., "2025-10-21T12:00:00Z")
 - `{{date}}` - Date in YYYY-MM-DD format (e.g., "2025-10-21")
 - `{{git_commit}}` - Git commit hash (short form, 7 chars, or "unknown")
@@ -324,7 +324,7 @@ output_metadata:
 
 ```json
 {
-  "craft": "Production",
+  "env": "Production",
   "target": "internal-prod",
   "timestamp_utc": "2025-10-21T12:00:00Z",
   "output_metadata": {
@@ -413,7 +413,7 @@ output_metadata:
 ```yaml
 ---
 name: Production
-description: Production craft with full certificate suite
+description: Production env with full certificate suite
 
 bundles:
   internal-prod:
@@ -539,15 +539,15 @@ metadata:
 
 ## Configuration Precedence
 
-**For build settings:** `built-in defaults` → `config/defaults.yaml` → `config/envs/<craft>.yaml`
+**For build settings:** `built-in defaults` → `config/defaults.yaml` → `config/envs/<env>.yaml`
 
-**For sources:** Only `config/sources/<bundle>.yaml` is consulted (no merging with craft)
+**For sources:** Only `config/sources/<source>.yaml` is consulted (no merging with env)
 
 **For composed bundles:**
 
-- Craft defines `targets.<name>.include_sources: [bundle1, bundle2]`
+- Env defines `targets.<name>.include_sources: [bundle1, bundle2]`
 - Builder loads each source config and merges their `include` + `exclude` lists
-- Craft config controls ALL build behavior (formats, verification, etc.)
+- Env config controls ALL build behavior (formats, verification, etc.)
 
 ---
 
@@ -632,7 +632,7 @@ For step-by-step guidance on interpreting and fixing validation errors (plus pyt
 
 **Environment Configs:**
 
-- `name` (string, non-empty) - Display name for the craft
+- `name` (string, non-empty) - Display name for the env
 - `description` (string, non-empty) - Human-readable purpose/context
 - `targets` (dict or list, non-empty) - At least one build target required
 
@@ -864,7 +864,7 @@ metadata:
 - **Framework:** Pydantic v2 with `ConfigDict` and field validators
 - **Validation Points:**
   - Bundle configs: validated in `builder.py` and `fetch.py`
-  - Craft configs: validated in `builder.py`
+  - Env configs: validated in `builder.py`
   - Defaults config: validated in `builder.py`
 - **Error Handling:** All validation errors are caught and re-raised as `ValueError` with full Pydantic error details
 - **Extra Fields:** Allowed via `ConfigDict(extra="allow")` for forward compatibility

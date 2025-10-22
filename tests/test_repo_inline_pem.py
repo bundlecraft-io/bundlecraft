@@ -14,7 +14,7 @@ def test_inline_pem_in_repo_include(temp_workspace, monkeypatch):
     (craft_dir / "test.yaml").write_text(
         """
 name: TestCraft
-description: Test craft for inline PEM validation
+description: Test env for inline PEM validation
 bundles:
   only:
     include_sources: [inline-bundle]

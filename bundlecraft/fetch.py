@@ -597,7 +597,7 @@ def main(
 ):
     """Fetch and stage certificate inputs declared in a bundle config.
 
-    This command operates entirely on a single bundle config file and does not consult craft/env configs.
+    This command operates entirely on a single bundle config file and does not consult env/env configs.
 
         Steps:
       1) Create the staging directory (--output-dir)

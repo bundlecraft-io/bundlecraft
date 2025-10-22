@@ -177,7 +177,7 @@ class TestBundleConfigValidation:
 
 
 class TestCraftConfigValidation:
-    """Test craft configuration validation."""
+    """Test env configuration validation."""
 
     def test_missing_name(self):
         """Environment config must have name field."""

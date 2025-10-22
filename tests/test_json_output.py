@@ -212,12 +212,12 @@ class TestBuildJsonOutput:
     """Test JSON output for the build command."""
 
     def test_build_json_missing_craft(self, cli_runner, tmp_path):
-        """Test build command JSON output with missing craft config."""
+        """Test build command JSON output with missing env config."""
         result = cli_runner.invoke(
             build_main,
             [
                 "--env",
-                "nonexistent-craft",
+                "nonexistent-env",
                 "--dry-run",
                 "--json",
             ],
@@ -352,10 +352,10 @@ repo:
 """
         (config_dir / "sources" / "test-bundle.yaml").write_text(bundle_config)
 
-        # Create minimal craft config with packaging enabled
+        # Create minimal env config with packaging enabled
         craft_config = """---
 name: Test
-description: Test craft
+description: Test env
 bundles:
   test-target:
     include_sources: [test-bundle]
@@ -457,7 +457,7 @@ repo:
 
         craft_config = """---
 name: Test
-description: Test craft
+description: Test env
 bundles:
   test-target:
     include_sources: [test-bundle]

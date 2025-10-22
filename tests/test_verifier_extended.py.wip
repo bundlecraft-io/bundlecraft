@@ -36,7 +36,7 @@ class TestVerifierDirectoryMode:
 
         # Write manifest
         manifest = {
-            "craft": "test",
+            "env": "test",
             "target": "test-target",
             "certificate_count": 1,
             "output_formats": ["pem"],
@@ -96,7 +96,7 @@ class TestVerifierManifest:
 
         # Create manifest
         manifest = {
-            "craft": "test-craft",
+            "env": "test-env",
             "target": "test-target",
             "certificate_count": 5,
             "output_formats": ["pem", "jks"],
@@ -110,7 +110,7 @@ class TestVerifierManifest:
         )
 
         assert result.exit_code == 0
-        assert "test-craft" in result.output or "test-target" in result.output
+        assert "test-env" in result.output or "test-target" in result.output
 
     def test_verify_manifest_missing(self, temp_workspace):
         """Test behavior when manifest.json is missing."""

@@ -19,7 +19,7 @@ def test_bundle_cached_once_and_reused(
     cli_runner, temp_workspace, sample_bundle_config, monkeypatch
 ):
     """Ensure a bundle referenced by multiple targets is only staged/converted once."""
-    # Prepare craft with two targets that both reference the same bundle
+    # Prepare env with two targets that both reference the same bundle
     craft_dir = temp_workspace / "config" / "envs"
     craft_dir.mkdir(parents=True, exist_ok=True)
     (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)
@@ -28,7 +28,7 @@ def test_bundle_cached_once_and_reused(
     craft_yaml.write_text(
         """
 name: TestCraft
-description: Test craft for caching test
+description: Test env for caching test
 bundles:
   target-a:
     include_sources: [test-bundle]
@@ -105,7 +105,7 @@ def test_multi_bundle_target_merges_cached_pems(
     cli_runner, temp_workspace, sample_bundle_config, monkeypatch
 ):
     """Ensure targets with multiple bundles merge cached canonical PEMs."""
-    # Prepare craft with one target that references two bundles
+    # Prepare env with one target that references two bundles
     craft_dir = temp_workspace / "config" / "envs"
     craft_dir.mkdir(parents=True, exist_ok=True)
     (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)
@@ -114,7 +114,7 @@ def test_multi_bundle_target_merges_cached_pems(
     craft_yaml.write_text(
         """
 name: TestCraft
-description: Test craft for multi-bundle merging
+description: Test env for multi-bundle merging
 bundles:
   merged-target:
     include_sources: [bundle-a, bundle-b]

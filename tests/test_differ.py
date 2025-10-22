@@ -72,7 +72,7 @@ def bundle_dir_1(tmp_path, sample_cert_1):
 
     # Create manifest
     manifest = {
-        "craft": "Test",
+        "env": "Test",
         "target": "test-bundle",
         "timestamp_utc": "2025-01-01T00:00:00Z",
         "certificate_count": 1,
@@ -96,7 +96,7 @@ def bundle_dir_2(tmp_path, sample_cert_2):
 
     # Create manifest
     manifest = {
-        "craft": "Test",
+        "env": "Test",
         "target": "test-bundle",
         "timestamp_utc": "2025-01-01T12:00:00Z",
         "certificate_count": 1,
@@ -120,7 +120,7 @@ def bundle_dir_both(tmp_path, sample_cert_1, sample_cert_2):
 
     # Create manifest
     manifest = {
-        "craft": "Test",
+        "env": "Test",
         "target": "test-bundle",
         "timestamp_utc": "2025-01-01T12:00:00Z",
         "certificate_count": 2,
@@ -179,9 +179,9 @@ class TestCompareBundles:
         result = compare_bundles(bundle_dir_1, bundle_dir_2)
 
         assert result["from"]["manifest"] is not None
-        assert result["from"]["manifest"]["craft"] == "Test"
+        assert result["from"]["manifest"]["env"] == "Test"
         assert result["to"]["manifest"] is not None
-        assert result["to"]["manifest"]["craft"] == "Test"
+        assert result["to"]["manifest"]["env"] == "Test"
 
 
 class TestFormatting:

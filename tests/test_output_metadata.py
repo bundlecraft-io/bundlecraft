@@ -262,12 +262,12 @@ class TestOutputMetadataInBuild:
         (temp / "config" / "sources").mkdir(parents=True, exist_ok=True)
         (temp / "sources" / "internal").mkdir(parents=True, exist_ok=True)
 
-        # Create craft config with output_metadata
+        # Create env config with output_metadata
         craft_yaml = temp / "config" / "envs" / "test.yaml"
         craft_yaml.write_text(
             """
 name: TestCraft
-description: Test craft
+description: Test env
 bundles:
   test-target:
     include_sources: [test-bundle]

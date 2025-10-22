@@ -3,7 +3,7 @@
 # Global defaults configuration for BundleCraft
 # Location: config/defaults.yaml
 #
-# Acts as the baseline applied before merging craft and bundle
+# Acts as the baseline applied before merging env and bundle
 # configurations. Provides safe, predictable defaults for verification,
 # filtering, PEM formatting, and output behavior.
 # =====================================================================
@@ -53,10 +53,10 @@ metadata:
   maintainer: pki-team@bundlecraft.io  # Default contact for repository maintainers
   policy_version: 1.0  # Schema version tracking for config evolution
 # ---------------------------------------------------------------------
-# Craft composition guidance (craft files)
+# Craft composition guidance (env files)
 #
 # Crafts can declare composed target bundles that merge one or more
-# base bundle configurations. Example in config/crafts/example-craft.yaml:
+# base bundle configurations. Example in config/crafts/example-env.yaml:
 #
 # targets:
 #   internal-dev:
@@ -65,5 +65,5 @@ metadata:
 #     includes: [mozilla]
 #
 # Then build with:
-#   bundlecraft build --craft dev --bundle internal-dev
+#   bundlecraft build --env dev --bundle internal-dev
 # ---------------------------------------------------------------------

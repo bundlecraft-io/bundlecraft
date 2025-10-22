@@ -75,7 +75,7 @@ We adopt a multi-channel approach, ranked by recommendation:
     - GitHub Action: bundlecraft/action that wraps the OCI image
     - Homebrew/Nix shells (community-supported) that either call the image or install the pipx package
 
-Template repository remains part of onboarding: directory layout, example crafts/bundles, and a CI workflow calling the OCI image or Action.
+Template repository remains part of onboarding: directory layout, example envs/bundles, and a CI workflow calling the OCI image or Action.
 
 ---
 

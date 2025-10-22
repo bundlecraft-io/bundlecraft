@@ -5,7 +5,7 @@ Helper functions for expanding template variables in output metadata.
 
 Supported template variables:
 - {{bundle}} - Bundle/target name
-- {{env}} - Environment/craft name
+- {{env}} - Environment/env name
 - {{timestamp}} - ISO 8601 timestamp (UTC)
 - {{date}} - Date in YYYY-MM-DD format
 - {{git_commit}} - Git commit hash (short form)
@@ -51,7 +51,7 @@ def expand_template_variables(
     Args:
         template: String with template variables (e.g., "{{bundle}}-{{env}}")
         bundle: Bundle/target name
-        env: Environment/craft name
+        env: Environment/env name
         timestamp_utc: Optional ISO 8601 timestamp (UTC), generated if not provided
 
     Returns:
@@ -108,7 +108,7 @@ def expand_metadata_dict(
     Args:
         metadata: Dictionary with template variables in values
         bundle: Bundle/target name
-        env: Environment/craft name
+        env: Environment/env name
         timestamp_utc: Optional ISO 8601 timestamp (UTC)
 
     Returns:
@@ -131,7 +131,7 @@ def expand_output_metadata(
     Args:
         output_metadata: Output metadata dict with 'annotations' and 'labels' keys
         bundle: Bundle/target name
-        env: Environment/craft name
+        env: Environment/env name
         timestamp_utc: Optional ISO 8601 timestamp (UTC)
 
     Returns:

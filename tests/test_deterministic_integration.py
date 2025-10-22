@@ -56,10 +56,10 @@ repo:
 """
         (config_dir / "sources" / "test-bundle.yaml").write_text(bundle_config)
 
-        # Create minimal craft config with packaging enabled
+        # Create minimal env config with packaging enabled
         craft_config = """---
 name: Test
-description: Test craft
+description: Test env
 bundles:
   test-target:
     include_sources: [test-bundle]
@@ -162,10 +162,10 @@ repo:
 """
         (config_dir / "sources" / "test-bundle.yaml").write_text(bundle_config)
 
-        # Create minimal craft config with packaging enabled
+        # Create minimal env config with packaging enabled
         craft_config = """---
 name: Test
-description: Test craft
+description: Test env
 bundles:
   test-target:
     include_sources: [test-bundle]

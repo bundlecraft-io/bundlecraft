@@ -13,7 +13,7 @@ def cli_runner():
 
 def test_repo_schema_staging(cli_runner, temp_workspace, sample_bundle_config, monkeypatch):
     """Ensure named repos are staged under their own subdirectories."""
-    # Create craft and bundle config using repo schema
+    # Create env and bundle config using repo schema
     craft_dir = temp_workspace / "config" / "envs"
     bundles_dir = temp_workspace / "config" / "sources"
     craft_dir.mkdir(parents=True, exist_ok=True)
@@ -22,7 +22,7 @@ def test_repo_schema_staging(cli_runner, temp_workspace, sample_bundle_config, m
     (craft_dir / "test.yaml").write_text(
         """
 name: TestCraft
-description: Test craft for repo schema validation
+description: Test env for repo schema validation
 bundles:
   only:
     include_sources: [repo-bundle]
@@ -92,7 +92,7 @@ def test_duplicate_name_validation(cli_runner, temp_workspace, monkeypatch):
     (craft_dir / "test.yaml").write_text(
         """
 name: TestCraft
-description: Test craft for duplicate name validation
+description: Test env for duplicate name validation
 bundles:
   only:
     include_sources: [dup]

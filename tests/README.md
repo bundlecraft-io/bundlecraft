@@ -59,7 +59,7 @@ tests/
 │   │   └── sample.pem      # Valid test certificate
 │   └── configs/            # Test configuration YAML files
 │       ├── bundles/        # Bundle configuration examples
-│       └── crafts/         # Craft configuration examples
+│       └── envs/         # Craft configuration examples
 ├── test_builder.py         # Tests for bundle building (bundlecraft build)
 ├── test_cli.py             # Tests for main CLI interface
 ├── test_commands.py        # Tests for all CLI commands
@@ -440,7 +440,7 @@ def test_with_workspace(self, temp_workspace):
     # Provides:
     # - sources/internal/
     # - config/bundles/
-    # - config/crafts/
+    # - config/envs/
     # - build/
     # Plus copies of test data from tests/data/
     config = temp_workspace / "config" / "bundles" / "test.yaml"

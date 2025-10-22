@@ -72,10 +72,10 @@ def list_files(folder: Path, suffixes: tuple[str, ...]) -> list[Path]:
     return out
 
 
-def merge_configs(defaults: dict[str, Any], craft: dict[str, Any]) -> dict[str, Any]:
-    """Merge craft config over defaults with deep merge for nested dicts.
+def merge_configs(defaults: dict[str, Any], env: dict[str, Any]) -> dict[str, Any]:
+    """Merge env config over defaults with deep merge for nested dicts.
 
-    Precedence: defaults < craft
+    Precedence: defaults < env
     """
     import copy
 
@@ -91,7 +91,7 @@ def merge_configs(defaults: dict[str, Any], craft: dict[str, Any]) -> dict[str, 
                 result[key] = copy.deepcopy(value)
         return result
 
-    return deep_merge(merged, craft)
+    return deep_merge(merged, env)
 
 
 def apply_filters(pem_blocks: list[str], filters_cfg: dict[str, Any]) -> list[str]:

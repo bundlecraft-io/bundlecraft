@@ -185,7 +185,7 @@ def format_human_readable(diff_result: dict[str, any]) -> str:
     lines.append(f"FROM: {diff_result['from']['path']}")
     if diff_result["from"]["manifest"]:
         fm = diff_result["from"]["manifest"]
-        lines.append(f"  Craft: {fm.get('craft', 'N/A')}")
+        lines.append(f"  Craft: {fm.get('env', 'N/A')}")
         lines.append(f"  Target: {fm.get('target', 'N/A')}")
         lines.append(f"  Timestamp: {fm.get('timestamp_utc', 'N/A')}")
     lines.append(f"  Certificates: {diff_result['from']['certificate_count']}")
@@ -194,7 +194,7 @@ def format_human_readable(diff_result: dict[str, any]) -> str:
     lines.append(f"TO: {diff_result['to']['path']}")
     if diff_result["to"]["manifest"]:
         tm = diff_result["to"]["manifest"]
-        lines.append(f"  Craft: {tm.get('craft', 'N/A')}")
+        lines.append(f"  Craft: {tm.get('env', 'N/A')}")
         lines.append(f"  Target: {tm.get('target', 'N/A')}")
         lines.append(f"  Timestamp: {tm.get('timestamp_utc', 'N/A')}")
     lines.append(f"  Certificates: {diff_result['to']['certificate_count']}")
