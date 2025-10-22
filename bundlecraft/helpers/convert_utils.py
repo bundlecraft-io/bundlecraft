@@ -14,7 +14,7 @@ Supports (inputs → outputs):
 
 Strategy:
   1) Normalize any input into a canonical PEM bundle (certificates only).
-  2) Reuse existing writers to emit target formats from that PEM bundle.
+  2) Reuse existing writers to emit bundle formats from that PEM bundle.
   3) Private keys are ignored and excluded from all operations.
 
 Requires:
@@ -44,7 +44,7 @@ def convert_to_formats(
     dry_run: bool = False,
 ):
     """
-    Convert a canonical PEM bundle into one or more target formats.
+    Convert a canonical PEM bundle into one or more bundle formats.
 
     Args:
         pem_path (Path): Input PEM file path

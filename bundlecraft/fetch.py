@@ -291,8 +291,8 @@ def run_fetch(
     # Load config
     logger.info(f"Loading config for env={env}, bundle={bundle}")
     cfg_path = (
-        (config_dir / "crafts" / f"{env}.yaml")
-        if (config_dir / "crafts" / f"{env}.yaml").exists()
+        (config_dir / "envs" / f"{env}.yaml")
+        if (config_dir / "envs" / f"{env}.yaml").exists()
         else (config_dir / "envs" / f"{env}.yaml")
     )
     _ = load_yaml(cfg_path, required=True)

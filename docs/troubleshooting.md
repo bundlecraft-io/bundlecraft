@@ -76,7 +76,7 @@ fetch.0.url
   - The line like `fetch.0.url` means: in the `fetch` list, the first element (index 0), field `url`.
   - Other examples:
     - `repo.1.include.0` → repo[1] include list, first item
-    - `targets` → the whole targets structure is invalid or empty
+    - `bundles` → the whole bundles structure is invalid or empty
     - `metadata.policy_version` → wrong type/value under metadata
 
 - Apply the fix (common cases)
@@ -93,10 +93,10 @@ fetch.0.url
     - Symptom: `Duplicate repo names found: X` or `'<name>' is a reserved name`
     - Fix: Make names unique and avoid reserved: `include`, `exclude`, `fetch`, `repo`.
 
-  - Empty/invalid targets in env
-    - Symptom: `Craft must have at least one target defined` or
-      `At least one of 'includes', 'include_bundles', or 'compose' must be provided`
-    - Fix: Add at least one include list to each target.
+  - Empty/invalid bundles in env
+    - Symptom: `Env must have at least one bundle defined` or
+      `At least one of 'include_sources' must be provided`
+    - Fix: Add at least one include_sources list to each bundle.
 
   - Inline include mappings
     - Symptom: `Include dict must have either 'inline' or 'path' key`

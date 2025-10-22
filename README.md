@@ -138,9 +138,9 @@ Bundle content definition (certificate sources to include/exclude)
 
 ---
 
-### ⚙️ Target/Bundle Composition in Environment Config Files
+### ⚙️ Bundle Composition in Environment Config Files
 
-Environments can define composed target bundles that merge one or more base sources.
+Environments can define composed bundles that merge one or more base sources.
 
 In `config/envs/dev.yaml`:
 
@@ -164,7 +164,7 @@ bundlecraft build --env dev --bundle mozilla
 
 Outputs:
 
-- `dist/dev/internal-dev/` contains both internal and mozilla certs (target name)
+- `dist/dev/internal-dev/` contains both internal and mozilla certs (bundle name)
 - `dist/dev/mozilla/` contains only mozilla certs
 
 ---
@@ -420,7 +420,7 @@ For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/R
 
 ## 📐 Trust Matrix (Environments × Bundles)
 
-The release pipeline now publishes a trust matrix that shows which envs (rows) trust which sources/bundles (columns), derived from `config/envs/*.yaml` composition (`targets.<name>.includes`).
+The release pipeline now publishes a trust matrix that shows which envs (rows) trust which sources/bundles (columns), derived from `config/envs/*.yaml` composition (`bundles.<name>.include_sources`).
 
 Artifacts attached to releases:
 
@@ -442,8 +442,8 @@ python scripts/trust_matrix.py --config-dir config --format json --output trust-
 
 Notes:
 
-- Trust for an environment is the union of all bundles included by its targets
-- Legacy `bundle_bundles: [...]` is also supported and treated as trusted bundles
+- Trust for an environment is the union of all sources included by its bundles
+- Legacy bundle composition is also supported
 
 ---
 
@@ -455,18 +455,39 @@ The included workflows automate builds and fetch tests:
 - [test-bundlecraft-fetch.yaml](.github/workflows/test-bundlecraft-fetch.yaml): Fetch test suite (Vault, HTTP, API)
 
 - Discover → Build → Collect → Verify → Publish
-- Build per-env “bundles” declared in `config/envs/<env>.yaml` under `bundles:` (composition-aware)
-- For each target, the job runs `bundlecraft build` and respects `build_path` via `--output-root`
-- Uploads artifacts per target using the naming `trust-store-<env>-<target>`
+- Build per-env "bundles" declared in `config/envs/<env>.yaml` under `bundles:` (composition-aware)
+- For each bundle, the job runs `bundlecraft build` and respects `build_path` via `--output-root`
+- Uploads artifacts per bundle using the naming `trust-store-<env>-<bundle>`
 - Optionally signs and publishes a release tarball
 - Concurrency: only one pipeline per branch at a time
 
 Notes
 
-- Prefer declaring composed targets in env files (for example: `internal-dev` includes `[internal, mozilla]`).
+- Prefer declaring composed bundles in env files (for example: `internal-dev` includes `[internal, mozilla]`).
 - If you want bundles to build offline, pre-stage with `bundlecraft fetch` in a connected job, then run build with `--skip-fetch`.
 
-Test server used in CI:
+---
+
+## 🏭 CI/CD Pipeline
+
+The included workflows automate builds and fetch tests:
+
+- [bundlecraft.yaml](.github/workflows/bundlecraft.yaml): Build/verify/publish
+- [test-bundlecraft-fetch.yaml](.github/workflows/test-bundlecraft-fetch.yaml): Fetch test suite (Vault, HTTP, API)
+
+- Discover → Build → Collect → Verify → Publish
+- Build per-env "bundles" declared in `config/envs/<env>.yaml` under `bundles:` (composition-aware)
+- For each bundle, the job runs `bundlecraft build` and respects `build_path` via `--output-root`
+- Uploads artifacts per bundle using the naming `trust-store-<env>-<bundle>`
+- Optionally signs and publishes a release tarball
+- Concurrency: only one pipeline per branch at a time
+
+Notes
+
+- Prefer declaring composed bundles in env files (for example: `internal-dev` includes `[internal, mozilla]`).
+- If you want bundles to build offline, pre-stage with `bundlecraft fetch` in a connected job, then run build with `--skip-fetch`.
+
+The workflow prints a selection summary (selected, available, filtered, bundle count)
 
 - HTTP and API fetch tests start `scripts/test-server-local.py` on port 8443, then trust the ephemeral CA at `<data_dir>/server.crt`.
 - The script prints the data dir path and stores it at `/tmp/test-server-local-latest` to make CI trust setup easy.
@@ -480,7 +501,7 @@ When triggering manually, you can optionally filter environments:
 
 - Input: environments (comma-separated), e.g. `dev,qa`
 - Default: empty = build all environments
-- The workflow prints a selection summary (selected, available, filtered, target count)
+- The workflow prints a selection summary (selected, available, filtered, bundle count)
 - Validation: unknown environments or an empty result after filtering will fail fast with a clear error
 
 ---

@@ -61,7 +61,7 @@ repo:
 name: Test
 description: Test env
 bundles:
-  test-target:
+  test-bundle:
     include_sources: [test-bundle]
 output_formats:
   - pem
@@ -80,7 +80,7 @@ verify:
                     "--env",
                     "test",
                     "--bundle",
-                    "test-target",
+                    "test-bundle",
                     "--output-root",
                     str(output1),
                 ],
@@ -102,7 +102,7 @@ verify:
                     "--env",
                     "test",
                     "--bundle",
-                    "test-target",
+                    "test-bundle",
                     "--output-root",
                     str(output2),
                 ],
@@ -113,8 +113,8 @@ verify:
             pytest.skip(f"Build 2 failed: {result2.output}")
 
         # Compare package.tar.gz files
-        pkg1 = output1 / "Test" / "test-target" / "package.tar.gz"
-        pkg2 = output2 / "Test" / "test-target" / "package.tar.gz"
+        pkg1 = output1 / "Test" / "test-bundle" / "package.tar.gz"
+        pkg2 = output2 / "Test" / "test-bundle" / "package.tar.gz"
 
         if not pkg1.exists() or not pkg2.exists():
             pytest.skip("Package files not created")
@@ -167,7 +167,7 @@ repo:
 name: Test
 description: Test env
 bundles:
-  test-target:
+  test-bundle:
     include_sources: [test-bundle]
 output_formats:
   - pem
@@ -186,7 +186,7 @@ verify:
                     "--env",
                     "test",
                     "--bundle",
-                    "test-target",
+                    "test-bundle",
                     "--output-root",
                     str(output),
                 ],
@@ -197,7 +197,7 @@ verify:
             pytest.skip(f"Build failed: {result.output}")
 
         # Check checksums file
-        checksums_path = output / "Test" / "test-target" / "checksums.sha256"
+        checksums_path = output / "Test" / "test-bundle" / "checksums.sha256"
         if not checksums_path.exists():
             pytest.skip("Checksums file not created")
 

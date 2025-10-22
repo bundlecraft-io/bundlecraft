@@ -73,7 +73,7 @@ def bundle_dir_1(tmp_path, sample_cert_1):
     # Create manifest
     manifest = {
         "env": "Test",
-        "target": "test-bundle",
+        "bundle": "test-bundle",
         "timestamp_utc": "2025-01-01T00:00:00Z",
         "certificate_count": 1,
         "output_formats": ["pem"],
@@ -97,7 +97,7 @@ def bundle_dir_2(tmp_path, sample_cert_2):
     # Create manifest
     manifest = {
         "env": "Test",
-        "target": "test-bundle",
+        "bundle": "test-bundle",
         "timestamp_utc": "2025-01-01T12:00:00Z",
         "certificate_count": 1,
         "output_formats": ["pem"],
@@ -121,7 +121,7 @@ def bundle_dir_both(tmp_path, sample_cert_1, sample_cert_2):
     # Create manifest
     manifest = {
         "env": "Test",
-        "target": "test-bundle",
+        "bundle": "test-bundle",
         "timestamp_utc": "2025-01-01T12:00:00Z",
         "certificate_count": 2,
         "output_formats": ["pem"],

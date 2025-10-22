@@ -6,8 +6,8 @@ Quick catalog:
 
 | Script | Purpose |
 |---|---|
-| `detect_env_targets.py` | Discover env targets from `config/envs/*.yaml` |
-| `trust_matrix.py` | Build a Craft × Bundle trust matrix from env configs (table/markdown/csv/json) |
+| `detect_env_targets.py` | Discover env bundles from `config/envs/*.yaml` and emit a JSON matrix for CI |
+| `trust_matrix.py` | Build a trust matrix from env configs (table/markdown/csv/json) |
 | `generate_test_cas.py` | Generate self-signed test CA certificates with automatic private key disposal (TESTING ONLY) |
 | `test-server-local.py` | Local HTTPS test server for CI and development with Swagger UI |
 | `vault-local.py` | Spin up a local HashiCorp Vault dev instance for testing the Vault fetcher |
@@ -204,8 +204,8 @@ Example output:
 
 ```json
 [
-  {"env": "prod", "target": "internal", "output_root": "dist"},
-  {"env": "prod", "target": "mozilla",  "output_root": "dist"}
+  {"env": "prod", "bundle": "internal", "output_root": "dist"},
+  {"env": "prod", "bundle": "mozilla",  "output_root": "dist"}
 ]
 ```
 
@@ -214,7 +214,7 @@ Notes:
 
 ## 📐 trust_matrix.py
 
-Generate a trust matrix showing which envs (rows) trust which bundles (columns), based on `targets.<name>.includes` in `config/envs/*.yaml`.
+Generate a trust matrix showing which envs (rows) trust which bundles (columns), based on `bundles.<name>.include_sources` in `config/envs/*.yaml`.
 
 # Scripts
 
@@ -415,18 +415,18 @@ Quick catalog:
 
 | Script | Purpose |
 |---|---|
-| `detect_env_targets.py` | Discover env targets from `config/envs/*.yaml` (or legacy `config/envs/*.yaml`) and emit a JSON matrix for CI |
-| `trust_matrix.py` | Build a Craft × Bundle trust matrix from env configs (table/markdown/csv/json) |
+| `detect_env_targets.py` | Discover env bundles from `config/envs/*.yaml` and emit a JSON matrix for CI |
+| `trust_matrix.py` | Build a trust matrix from env configs (table/markdown/csv/json) |
 | `vault-local.sh` | Spin up a local HashiCorp Vault dev instance for testing the Vault fetcher |
 
 ---
 
 ## 🔎 detect_env_targets.py
 
-Parse `config/envs/*.yaml` (or legacy `config/envs/*.yaml`) and output a JSON array describing the CI build matrix.
+Parse `config/envs/*.yaml` and output a JSON array describing the CI build matrix.
 
-- Reads env files for `targets: <name>.includes: [...]`
-- Emits objects: `{ "env": "<env>", "target": "<target>", "output_root": "<build_path or dist>" }`
+- Reads env files for `bundles: <name>.include_sources: [...]`
+- Emits objects: `{ "env": "<env>", "bundle": "<bundle>", "output_root": "<build_path or dist>" }`
 - Used by GitHub Actions to build per env/bundle
 
 Usage:
@@ -440,8 +440,8 @@ Example output:
 
 ```json
 [
-  {"env": "prod", "target": "internal", "output_root": "dist"},
-  {"env": "prod", "target": "mozilla",  "output_root": "dist"}
+  {"env": "prod", "bundle": "internal", "output_root": "dist"},
+  {"env": "prod", "bundle": "mozilla",  "output_root": "dist"}
 ]
 ```
 

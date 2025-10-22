@@ -53,16 +53,16 @@ metadata:
   maintainer: pki-team@bundlecraft.io  # Default contact for repository maintainers
   policy_version: 1.0  # Schema version tracking for config evolution
 # ---------------------------------------------------------------------
-# Craft composition guidance (env files)
+# Bundle composition guidance (env files)
 #
-# Crafts can declare composed target bundles that merge one or more
-# base bundle configurations. Example in config/crafts/example-env.yaml:
+# Envs can declare composed bundles that merge one or more
+# base source configurations. Example in config/envs/example-env.yaml:
 #
-# targets:
+# bundles:
 #   internal-dev:
-#     includes: [internal, mozilla]
+#     include_sources: [internal, mozilla]
 #   mozilla:
-#     includes: [mozilla]
+#     include_sources: [mozilla]
 #
 # Then build with:
 #   bundlecraft build --env dev --bundle internal-dev

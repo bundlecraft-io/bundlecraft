@@ -39,13 +39,13 @@ The `build` command produces the following JSON structure:
   "timestamp": "2025-10-21T12:00:00+00:00",
   "version": "0.1.0",
   "env": string,
-  "targets": [
+  "bundles": [
     {
       "name": string,
       "certificate_count": integer,
       "output_formats": [string],
       "output_path": string,
-      "bundles": [string],
+      "sources": [string],
       "verification": {
         "passed": boolean,
         "errors": [string],
@@ -61,12 +61,12 @@ The `build` command produces the following JSON structure:
 #### Build Fields
 
 - **env**: `string` - Name of the env/environment used for the build
-- **targets**: `array` - List of targets that were built
-  - **name**: `string` - Name of the target
+- **bundles**: `array` - List of bundles that were built
+  - **name**: `string` - Name of the bundle
   - **certificate_count**: `integer` - Number of certificates in the bundle
   - **output_formats**: `array of string` - List of output formats generated (e.g., ["pem", "jks", "p12"])
   - **output_path**: `string` - Path to the output directory
-  - **bundles**: `array of string` - List of bundle names included in this target
+  - **sources**: `array of string` - List of source names included in this bundle
   - **verification**: `object` - Verification results (if verification was performed)
     - **passed**: `boolean` - Whether verification passed
     - **errors**: `array of string` - List of verification errors
@@ -88,13 +88,13 @@ bundlecraft build --env prod --bundle mozilla --json
   "timestamp": "2025-10-21T12:00:00+00:00",
   "version": "0.1.0",
   "env": "prod",
-  "targets": [
+  "bundles": [
     {
       "name": "mozilla",
       "certificate_count": 137,
       "output_formats": ["pem", "jks", "p12"],
       "output_path": "dist/prod/mozilla",
-      "bundles": ["mozilla"],
+      "sources": ["mozilla"],
       "verification": {
         "passed": true,
         "errors": [],
@@ -113,8 +113,8 @@ bundlecraft build --env prod --bundle mozilla --json
   "timestamp": "2025-10-21T12:00:00+00:00",
   "version": "0.1.0",
   "env": "prod",
-  "targets": [],
-  "errors": ["Craft config not found: prod"]
+  "bundles": [],
+  "errors": ["Env config not found: prod"]
 }
 ```
 
@@ -336,7 +336,7 @@ output=$(bundlecraft build --env prod --bundle mozilla --json)
 # Check if successful
 if echo "$output" | jq -e '.success' > /dev/null; then
   echo "Build succeeded"
-  cert_count=$(echo "$output" | jq -r '.targets[0].certificate_count')
+  cert_count=$(echo "$output" | jq -r '.bundles[0].certificate_count')
   echo "Built $cert_count certificates"
 else
   echo "Build failed"
@@ -364,10 +364,10 @@ data = json.loads(result.stdout)
 
 if data["success"]:
     print(f"Build succeeded")
-    for target in data["targets"]:
-        print(f"  Target: {target['name']}")
-        print(f"  Certificates: {target['certificate_count']}")
-        print(f"  Formats: {', '.join(target['output_formats'])}")
+    for bundle in data["bundles"]:
+        print(f"  Bundle: {bundle['name']}")
+        print(f"  Certificates: {bundle['certificate_count']}")
+        print(f"  Formats: {', '.join(bundle['output_formats'])}")
 else:
     print("Build failed:")
     for error in data.get("errors", []):
@@ -383,7 +383,7 @@ else:
   run: |
     bundlecraft build --env prod --bundle mozilla --json > build-output.json
     echo "success=$(jq -r '.success' build-output.json)" >> $GITHUB_OUTPUT
-    echo "cert_count=$(jq -r '.targets[0].certificate_count' build-output.json)" >> $GITHUB_OUTPUT
+    echo "cert_count=$(jq -r '.bundles[0].certificate_count' build-output.json)" >> $GITHUB_OUTPUT
 
 - name: Check build result
   if: steps.build.outputs.success != 'true'
@@ -419,18 +419,18 @@ from jsonschema import validate
 
 build_schema = {
     "type": "object",
-    "required": ["success", "command", "timestamp", "version", "env", "targets"],
+    "required": ["success", "command", "timestamp", "version", "env", "bundles"],
     "properties": {
         "success": {"type": "boolean"},
         "command": {"type": "string", "const": "build"},
         "timestamp": {"type": "string"},
         "version": {"type": "string"},
         "env": {"type": "string"},
-        "targets": {
+        "bundles": {
             "type": "array",
             "items": {
                 "type": "object",
-                "required": ["name", "certificate_count", "output_formats", "output_path", "bundles"],
+                "required": ["name", "certificate_count", "output_formats", "output_path", "sources"],
                 "properties": {
                     "name": {"type": "string"},
                     "certificate_count": {"type": "integer"},

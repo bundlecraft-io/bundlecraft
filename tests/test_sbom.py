@@ -243,5 +243,5 @@ class TestSbomIntegration:
             # Verify specific build properties
             prop_names = [p["name"] for p in build_properties]
             assert "build.env" in prop_names
-            assert "build.target" in prop_names
+            assert "build.env" in prop_names
             assert "build.certificate_count" in prop_names

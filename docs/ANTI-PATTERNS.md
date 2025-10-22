@@ -88,6 +88,6 @@ Follow these quick checks to ensure your BundleCraft configuration remains align
 - [ ] Every source config change (new sources, modified fetch URLs) is peer-reviewed via pull request.
 - [ ] CI workflows validate fetch source integrity (SHA-256 matches, TLS pins) before accepting downloaded content.
 - [ ] Build diffs are reviewed between releases to ensure no unapproved trust anchors or expired certificates are introduced.
-- [ ] Craft configs specify explicit target compositions (`targets.<name>.includes`) to prevent unintended bundle merging.
+- [ ] Env configs specify explicit bundle compositions (`bundles.<name>.include_sources`) to prevent unintended bundle merging.
 
 These checks collectively help maintain **deterministic trust**, **configuration transparency**, and **policy consistency** - the core principles of BundleCraft's security model.

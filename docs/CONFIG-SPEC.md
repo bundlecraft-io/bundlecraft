@@ -34,7 +34,7 @@ This document defines the configuration schema for BundleCraft, clearly separati
 - Verification and filtering policies
 - Format-specific secrets (passwords via env vars)
 - Distribution targets and CI/CD tags
-- Bundle composition (`targets.<name>.includes`)
+- Bundle composition (`bundles.<name>.include_sources`)
 
 **Forbidden:** Certificate sources, fetch entries, include/exclude paths
 
@@ -325,7 +325,7 @@ output_metadata:
 ```json
 {
   "env": "Production",
-  "target": "internal-prod",
+  "bundle": "internal-prod",
   "timestamp_utc": "2025-10-21T12:00:00Z",
   "output_metadata": {
     "annotations": {
@@ -545,7 +545,7 @@ metadata:
 
 **For composed bundles:**
 
-- Env defines `targets.<name>.include_sources: [bundle1, bundle2]`
+- Env defines `bundles.<name>.include_sources: [bundle1, bundle2]`
 - Builder loads each source config and merges their `include` + `exclude` lists
 - Env config controls ALL build behavior (formats, verification, etc.)
 
@@ -634,7 +634,7 @@ For step-by-step guidance on interpreting and fixing validation errors (plus pyt
 
 - `name` (string, non-empty) - Display name for the env
 - `description` (string, non-empty) - Human-readable purpose/context
-- `targets` (dict or list, non-empty) - At least one build target required
+- `bundles` (dict or list, non-empty) - At least one build bundle required
 
 **Defaults Config:**
 
@@ -680,10 +680,10 @@ For step-by-step guidance on interpreting and fixing validation errors (plus pyt
 - `fetch[].type: vault` → requires both `mount` and `path` fields
 - `fetch[].type: api` → requires `endpoint` field
 
-**Target Requirements:**
+**Bundle Requirements:**
 
-- Each target in `targets` must have at least one of: `includes`, `include_bundles`, or `compose`
-- Empty targets trigger: `"At least one of 'includes', 'include_bundles', or 'compose' must be provided"`
+- Each bundle in `bundles` must have at least one of: `include_sources`
+- Empty bundles trigger: `"At least one of 'include_sources' must be provided"`
 
 **Inline PEM Entries:**
 

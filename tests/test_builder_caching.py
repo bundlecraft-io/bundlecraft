@@ -30,9 +30,9 @@ def test_bundle_cached_once_and_reused(
 name: TestCraft
 description: Test env for caching test
 bundles:
-  target-a:
+  bundle-a:
     include_sources: [test-bundle]
-  target-b:
+  bundle-b:
     include_sources: [test-bundle]
 output_formats: [pem, jks]
         """.strip()
@@ -83,8 +83,8 @@ output_formats: [pem, jks]
         craft_out = temp_workspace / "dist" / "TestCraft"
         assert craft_out.exists()
 
-        target_a = craft_out / "target-a"
-        target_b = craft_out / "target-b"
+        target_a = craft_out / "bundle-a"
+        target_b = craft_out / "bundle-b"
         assert target_a.exists(), "Target A should exist"
         assert target_b.exists(), "Target B should exist"
 
@@ -105,7 +105,7 @@ def test_multi_bundle_target_merges_cached_pems(
     cli_runner, temp_workspace, sample_bundle_config, monkeypatch
 ):
     """Ensure targets with multiple bundles merge cached canonical PEMs."""
-    # Prepare env with one target that references two bundles
+    # Prepare env with one bundle that references two bundles
     craft_dir = temp_workspace / "config" / "envs"
     craft_dir.mkdir(parents=True, exist_ok=True)
     (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)
@@ -116,7 +116,7 @@ def test_multi_bundle_target_merges_cached_pems(
 name: TestCraft
 description: Test env for multi-bundle merging
 bundles:
-  merged-target:
+  merged-bundle:
     include_sources: [bundle-a, bundle-b]
 output_formats: [pem]
 filters:
@@ -185,12 +185,12 @@ repo:
         assert (cache_root / "bundle-a" / "bundlecraft-ca-trust.pem").exists()
         assert (cache_root / "bundle-b" / "bundlecraft-ca-trust.pem").exists()
 
-        # Verify merged target exists with deduplicated content
-        target_dir = temp_workspace / "dist" / "TestCraft" / "merged-target"
+        # Verify merged bundle exists with deduplicated content
+        target_dir = temp_workspace / "dist" / "TestCraft" / "merged-bundle"
         assert target_dir.exists()
         assert (target_dir / "bundlecraft-ca-trust.pem").exists()
 
-        # Count certificates in merged target (should be deduplicated)
+        # Count certificates in merged bundle (should be deduplicated)
         merged_pem = (target_dir / "bundlecraft-ca-trust.pem").read_text()
         cert_count = merged_pem.count("-----BEGIN CERTIFICATE-----")
 

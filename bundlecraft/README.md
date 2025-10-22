@@ -394,7 +394,7 @@ Human-readable format includes:
 - Summary of changes (added, removed, unchanged counts)
 - Full details of added certificates (subject, fingerprint, issuer, validity period)
 - Full details of removed certificates
-- Manifest metadata from both bundles (e, target, timestamp)
+- Manifest metadata from both bundles (env, bundle, timestamp)
 
 JSON format provides structured data suitable for:
 

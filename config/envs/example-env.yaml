@@ -44,7 +44,7 @@ output_formats:
 # Create .tar.gz archives of build output
 package: true
 
-# Override default output path (default: dist/<env>/<target>/)
+# Override default output path (default: dist/<env>/<bundle>/)
 build_path: dist/example/
 # ---------------------------------------------------------------------
 # Verification & Validation

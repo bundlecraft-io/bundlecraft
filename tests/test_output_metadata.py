@@ -269,7 +269,7 @@ class TestOutputMetadataInBuild:
 name: TestCraft
 description: Test env
 bundles:
-  test-target:
+  test-bundle:
     include_sources: [test-bundle]
 output_formats: [pem]
 output_metadata:
@@ -357,7 +357,7 @@ repo:
         assert result.exit_code == 0, f"Build failed: {result.output}"
 
         # Check manifest.json exists
-        manifest_path = temp / "dist" / "TestCraft" / "test-target" / "manifest.json"
+        manifest_path = temp / "dist" / "TestCraft" / "test-bundle" / "manifest.json"
         assert manifest_path.exists(), "manifest.json not created"
 
         # Load and validate manifest
@@ -369,16 +369,16 @@ repo:
         annotations = manifest["output_metadata"]["annotations"]
         assert "build-timestamp" in annotations
         assert "bundle-version" in annotations
-        assert annotations["bundle-version"] == "test-target-test"
+        assert annotations["bundle-version"] == "test-bundle-test"
 
         # Check labels
         assert "labels" in manifest["output_metadata"]
         labels = manifest["output_metadata"]["labels"]
         assert labels["environment"] == "test"
-        assert labels["bundle-id"] == "test-target"
+        assert labels["bundle-id"] == "test-bundle"
 
         # Check that metadata.yaml sidecar exists
-        metadata_yaml_path = temp / "dist" / "TestCraft" / "test-target" / "metadata.yaml"
+        metadata_yaml_path = temp / "dist" / "TestCraft" / "test-bundle" / "metadata.yaml"
         assert metadata_yaml_path.exists(), "metadata.yaml sidecar not created"
 
         # Validate YAML sidecar content

@@ -357,7 +357,7 @@ repo:
 name: Test
 description: Test env
 bundles:
-  test-target:
+  test-bundle:
     include_sources: [test-bundle]
 output_formats:
   - pem
@@ -375,7 +375,7 @@ verify:
                     "--env",
                     "test",
                     "--bundle",
-                    "test-target",
+                    "test-bundle",
                     "--json",
                 ],
                 catch_exceptions=False,
@@ -459,7 +459,7 @@ repo:
 name: Test
 description: Test env
 bundles:
-  test-target:
+  test-bundle:
     include_sources: [test-bundle]
 output_formats:
   - pem
@@ -472,7 +472,7 @@ verify:
         with cli_runner.isolated_filesystem(temp_dir):
             result = cli_runner.invoke(
                 build_main,
-                ["--env", "test", "--bundle", "test-target", "--json"],
+                ["--env", "test", "--bundle", "test-bundle", "--json"],
                 catch_exceptions=False,
             )
 

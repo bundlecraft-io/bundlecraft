@@ -74,7 +74,7 @@ jobs:
           echo -n "Available environments: "
           paste -sd ', ' "$ALL_ENVS_FILE" || echo '(none)'
           echo "Filtered environments: ${FILTERED_ENVS:-'(none)'}"
-          echo "Targets count: ${TARGETS_COUNT}"
+          echo "Bundles count: ${TARGETS_COUNT}"
           echo '::endgroup::'
           if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
             {
@@ -84,10 +84,10 @@ jobs:
               echo -n "- Available environments: "
               paste -sd ', ' "$ALL_ENVS_FILE" || echo '(none)'
               echo "- Filtered environments: ${FILTERED_ENVS:-'(none)'}"
-              echo "- Targets count: ${TARGETS_COUNT}"
+              echo "- Bundles count: ${TARGETS_COUNT}"
               if [ "$TARGETS_COUNT" -gt 0 ]; then
                 echo
-                echo '### Targets'
+                echo '### Bundles'
                 echo "$FILTERED_JSON" | jq -r '.[] | "- \(.env)/\(.bundle)"'
               fi
             } >> "$GITHUB_STEP_SUMMARY"
@@ -208,8 +208,8 @@ jobs:
           echo "Created tarball and checksum:"
           sha256sum bundlecraft-trust.tar.gz
           echo "=== Creating per-env-bundle tarballs (flat contents) ==="
-          mapfile -t TARGETS < <(find bundlecraft -mindepth 2 -maxdepth 2 -type d | sort)
-          for dir in "${TARGETS[@]}"; do
+          mapfile -t BUNDLES < <(find bundlecraft -mindepth 2 -maxdepth 2 -type d | sort)
+          for dir in "${BUNDLES[@]}"; do
             env="$(echo "$dir" | awk -F/ '{print $2}')"
             bundle="$(echo "$dir" | awk -F/ '{print $3}')"
             name="bundlecraft-trust-env-${env}-bundle-${bundle}.tar.gz"

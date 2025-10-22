@@ -66,7 +66,7 @@ class DistributionTargetType(str, Enum):
 
 
 class MetadataModel(BaseModel):
-    """Metadata section for bundles/crafts."""
+    """Metadata section for bundles/envs."""
 
     model_config = ConfigDict(extra="allow")  # Allow additional metadata fields
 

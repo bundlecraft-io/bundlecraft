@@ -169,7 +169,7 @@ BundleCraft automatically generates a CycloneDX JSON SBOM for every build, provi
 - Certificate metadata (serial, issuer, subject, fingerprints, validity dates)
 - Fetch provenance (source URLs, verification hashes)
 - Tooling metadata (Python version, cryptography version, dependencies)
-- Build metadata (env, target, timestamp, certificate count)
+- Build metadata (env, bundle, timestamp, certificate count)
 
 ### SBOM Generation
 
@@ -207,7 +207,7 @@ dist/Production/mozilla/
       "description": "BundleCraft CA Trust Bundle: Production/mozilla",
       "properties": [
         { "name": "build.env", "value": "Production" },
-        { "name": "build.target", "value": "mozilla" },
+        { "name": "build.bundle", "value": "mozilla" },
         { "name": "build.timestamp", "value": "2025-01-15T10:30:45Z" },
         { "name": "build.certificate_count", "value": "138" },
         { "name": "tool.python_version", "value": "3.12.3" },

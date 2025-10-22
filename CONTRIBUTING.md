@@ -198,7 +198,7 @@ bundlecraft/
 #### Configuration
 
 - `config/defaults.yaml` – Global defaults for all envs/sources
-- `config/envs/*.yaml` – Environment definitions (targets, filters, verify policies)
+- `config/envs/*.yaml` – Environment definitions (bundles, filters, verify policies)
 - `config/sources/*.yaml` – Bundle definitions (sources, fetch specs)
 
 ---
