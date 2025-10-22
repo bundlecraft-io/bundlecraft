@@ -892,7 +892,7 @@ filters:
 
 #### Error: Numeric policy_version
 
-```
+```text
 # This is automatically handled - no error!
 # The validator converts numeric versions to strings:
 metadata:
