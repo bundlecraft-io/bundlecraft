@@ -53,8 +53,8 @@ jobs:
       - name: Verify Vault fetch outputs
         run: |
           echo "Checking staged outputs:"
-          test -f sources/staged/ci-vault-test/fetch/from_vault/from_vault.pem || { echo "❌ Missing from_vault.pem"; exit 1; }
-          test -f sources/staged/ci-vault-test/fetch/from_vault/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
+          test -f cert_sources/staged/ci-vault-test/fetch/from_vault/from_vault.pem || { echo "❌ Missing from_vault.pem"; exit 1; }
+          test -f cert_sources/staged/ci-vault-test/fetch/from_vault/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
           echo "✅ Vault fetch successful"
       - name: Upload Vault job artifacts
         if: always()
@@ -62,7 +62,7 @@ jobs:
         with:
           name: vault-fetch-artifacts
           path: |
-            sources/staged/ci-vault-test/**
+            cert_sources/staged/ci-vault-test/**
             local_vault/**
             local_vault_artifacts/**
             ci-test-vault.yaml
@@ -114,8 +114,8 @@ jobs:
       - name: Verify HTTP fetch outputs
         run: |
           echo "Checking staged outputs:"
-          test -f sources/staged/ci-http-test/fetch/from_https/from_https.pem || { echo "❌ Missing from_https.pem"; exit 1; }
-          test -f sources/staged/ci-http-test/fetch/from_https/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
+          test -f cert_sources/staged/ci-http-test/fetch/from_https/from_https.pem || { echo "❌ Missing from_https.pem"; exit 1; }
+          test -f cert_sources/staged/ci-http-test/fetch/from_https/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
           echo "✅ HTTP fetch with pinning successful"
       - name: HTTP job summary
         run: |
@@ -128,7 +128,7 @@ jobs:
         with:
           name: http-fetch-artifacts
           path: |
-            sources/staged/ci-http-test/**
+            cert_sources/staged/ci-http-test/**
             ci-http-test/**
             ci-test-http.yaml
       - name: Cleanup
@@ -197,8 +197,8 @@ jobs:
       - name: Verify API fetch outputs
         run: |-
           echo "Checking staged outputs:"
-          test -f sources/staged/ci-api-test/fetch/from_keyfactor_mock/from_keyfactor_mock.pem || { echo "❌ Missing from_keyfactor_mock.pem"; exit 1; }
-          test -f sources/staged/ci-api-test/fetch/from_keyfactor_mock/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
+          test -f cert_sources/staged/ci-api-test/fetch/from_keyfactor_mock/from_keyfactor_mock.pem || { echo "❌ Missing from_keyfactor_mock.pem"; exit 1; }
+          test -f cert_sources/staged/ci-api-test/fetch/from_keyfactor_mock/provenance.fetch.json || { echo "❌ Missing provenance"; exit 1; }
           echo "✅ API fetch (Keyfactor mock) successful"
       - name: API job summary
         run: |
@@ -211,7 +211,7 @@ jobs:
         with:
           name: api-fetch-artifacts
           path: |
-            sources/staged/ci-api-test/**
+            cert_sources/staged/ci-api-test/**
             ci-api-test/**
             ci-test-api.yaml
       - name: Cleanup

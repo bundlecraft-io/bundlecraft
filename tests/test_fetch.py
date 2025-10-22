@@ -30,14 +30,14 @@ class TestFetch:
         # Create a bundle config with includes only (no fetch section)
         bundle_dir = temp_workspace / "config" / "sources"
         bundle_dir.mkdir(parents=True, exist_ok=True)
-        # Ensure sample exists at sources/sample.pem (conftest copies certs there)
+        # Ensure sample exists at cert_sources/sample.pem (conftest copies certs there)
         bundle_yaml = """
 source_name: test-bundle
 description: Test bundle with no fetch section
 repo:
   - name: local
     include:
-      - sources/sample.pem
+      - cert_sources/sample.pem
     exclude: []
         """
         cfg_path = bundle_dir / "test-bundle.yaml"
@@ -294,7 +294,7 @@ fetch:
             ],
         )
         assert result.exit_code == 0
-        # Default output directory changed from sources/fetched to sources/staged
+        # Default output directory changed from cert_sources/fetched to cert_sources/staged
         staged = temp_workspace / "sources" / "staged"
         assert (staged / "test-bundle" / "fetch" / "from_vault").exists()
         pems = list((staged / "test-bundle" / "fetch" / "from_vault").glob("*.pem"))

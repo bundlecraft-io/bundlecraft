@@ -11,6 +11,7 @@ The `scripts/generate_test_cas.py` tool generates self-signed root CAs and subor
 BundleCraft is a **certificate trust management** system-it processes and distributes public trust anchors, never private keys. However, development and testing require test certificate chains.
 
 This tool bridges that gap by:
+
 - Generating test certificates on-demand
 - **Immediately destroying all private key material** after certificate generation
 - Preventing key export through intentional design constraints
@@ -28,6 +29,7 @@ This tool bridges that gap by:
 ### Why No Private Key Export?
 
 This aligns with BundleCraft's core principle: we manage **trust**, not **keys**. By preventing key export:
+
 - Users cannot accidentally use test CAs for real systems
 - Tool cannot be repurposed as a general CA infrastructure
 - Development stays focused on trust bundle workflows
@@ -35,6 +37,7 @@ This aligns with BundleCraft's core principle: we manage **trust**, not **keys**
 ### Memory Clearing
 
 Private keys are disposed via:
+
 1. Export key to PEM bytes (to get memory reference)
 2. Zero all bytes in a mutable bytearray
 3. Delete all references
@@ -64,6 +67,7 @@ python scripts/generate_test_cas.py \
 ```
 
 Output:
+
 - `generated-test-cas/dev/internal/root/dev-root.pem`
 - `generated-test-cas/dev/internal/tier1/dev-root-sub1.pem`
 - `generated-test-cas/dev/internal/tier2/dev-root-sub2.pem`
@@ -126,7 +130,7 @@ python scripts/generate_test_cas.py \
 
 ### With env/boundary labels
 
-```
+```text
 generated-test-cas/
 └── <env>/
     └── <boundary>/
@@ -140,7 +144,7 @@ generated-test-cas/
 
 ### Without labels (simple root)
 
-```
+```text
 generated-test-cas/
 └── root/
     └── <name>.pem
@@ -151,7 +155,7 @@ generated-test-cas/
 ### Use in Source Configs
 
 ```yaml
-# config/sources/test-bundle.yaml
+# config/cert_sources/test-bundle.yaml
 bundle_name: test-internal
 description: Test bundle with generated CAs
 repo:

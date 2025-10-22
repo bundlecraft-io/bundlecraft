@@ -2,7 +2,7 @@
 
 This document defines the configuration schema for BundleCraft, clearly separating concerns between:
 
-- **Bundle configs** (`config/sources/*.yaml`) - Certificate sourcing and gathering
+- **Bundle configs** (`config/cert_sources/*.yaml`) - Certificate sourcing and gathering
 - **Environment configs** (`config/envs/*.yaml`) - Build, output, and deployment configuration
 - **Defaults** (`config/defaults.yaml`) - Global fallback settings
 
@@ -40,7 +40,7 @@ This document defines the configuration schema for BundleCraft, clearly separati
 
 ---
 
-## 1) Source Configuration: `config/sources/<bundle>.yaml`
+## 1) Source Configuration: `config/cert_sources/<bundle>.yaml`
 
 Top-level fields (Kubernetes-style identifiers are optional but recommended):
 
@@ -67,8 +67,8 @@ You can declare local certificate sources in two ways. The new preferred schema 
     - name: roots
       include:  # "include" items support both path and inline entries
         # 1) Path entries (string or {path: ...})
-        - sources/internal/roots/
-        - { path: sources/internal/rootCA.pem }
+        - cert_sources/internal/roots/
+        - { path: cert_sources/internal/rootCA.pem }
         # 2) Inline PEM entries ({inline: <PEM>, name?: <filename>})
         # When "name" is omitted, a filename like inline-1.pem is generated.
         - name: special-inline.pem
@@ -77,11 +77,11 @@ You can declare local certificate sources in two ways. The new preferred schema 
             ...PEM-CONTENT-ELIDED...
             -----END CERTIFICATE-----
       exclude:  # optional exclusions within this repo
-        - sources/internal/roots/deprecated.pem
+        - cert_sources/internal/roots/deprecated.pem
 
     - name: partners
       include:
-        - sources/partners/
+        - cert_sources/partners/
   ```yaml
 
   Include item forms supported:
@@ -94,19 +94,19 @@ You can declare local certificate sources in two ways. The new preferred schema 
   - Indentation is handled automatically; trailing whitespace is trimmed.
   - If `name` is omitted, files are created as `inline-<N>.pem` within the repo folder.
 
-  Staging layout (repos): `sources/staged/<source_name>/<name>/...`
+  Staging layout (repos): `cert_sources/staged/<source_name>/<name>/...`
 
 - Legacy: flat `include`/`exclude` keys at the top level
 
   ```yaml
   include:
-    - sources/internal/rootCA.pem
-    - sources/partners/
+    - cert_sources/internal/rootCA.pem
+    - cert_sources/partners/
   exclude:
-    - sources/partners/deprecated.pem
+    - cert_sources/partners/deprecated.pem
   ```yaml
 
-  Staging layout (legacy include): `sources/staged/<source_name>/include/...`
+  Staging layout (legacy include): `cert_sources/staged/<source_name>/include/...`
 
 Validation rules for names:
 
@@ -122,8 +122,8 @@ Repo with both path and inline entries:
 repo:
   - name: roots
     include:
-      - sources/internal/roots/
-      - { path: sources/internal/rootCA.pem }
+      - cert_sources/internal/roots/
+      - { path: cert_sources/internal/rootCA.pem }
       - name: special-inline.pem
         inline: |
           -----BEGIN CERTIFICATE-----
@@ -135,8 +135,8 @@ Legacy form (paths only):
 
 ```yaml
 include:
-  - sources/internal/roots/
-  - sources/internal/rootCA.pem
+  - cert_sources/internal/roots/
+  - cert_sources/internal/rootCA.pem
 ```yaml
 
 ### Fetch Definitions
@@ -159,7 +159,7 @@ fetch:
     endpoint: https://api.partner.com/pki/roots
     token_ref: PARTNER_API_TOKEN
     verify:
-      ca_file: sources/partner-ca.pem
+      ca_file: cert_sources/partner-ca.pem
       tls_fingerprint_sha256: <cert_pin>
     # Example: Slower API needs longer timeout
     timeout: 120
@@ -209,8 +209,8 @@ bundle_name: internal
 description: Trust bundle for internal PKI services (root + issuing CAs)
 
 include:
-  - sources/internal/rootCA.pem
-  - sources/internal/issuingCA1.pem
+  - cert_sources/internal/rootCA.pem
+  - cert_sources/internal/issuingCA1.pem
 
 exclude: []
 
@@ -558,7 +558,7 @@ metadata:
 
 **For build settings:** `built-in defaults` → `config/defaults.yaml` → `config/envs/<env>.yaml`
 
-**For sources:** Only `config/sources/<source>.yaml` is consulted (no merging with env)
+**For sources:** Only `config/cert_sources/<source>.yaml` is consulted (no merging with env)
 
 **For composed bundles:**
 
@@ -613,10 +613,10 @@ bundlecraft build --env prod --bundle internal-prod --force
 ### Fetch
 
 ```bash
-bundlecraft fetch --source-config-file config/sources/mozilla.yaml --workspace-root .
+bundlecraft fetch --source-config-file config/cert_sources/mozilla.yaml --workspace-root .
 ```
 
-- Loads `config/sources/mozilla.yaml` and stages into `sources/staged/<source_name>/`
+- Loads `config/cert_sources/mozilla.yaml` and stages into `cert_sources/staged/<source_name>/`
   - Remote entries are under `fetch/<name>/`; local repos are `<repo_name>/`, legacy include under `include/`
 - Note: `bundlecraft build` performs fetch automatically unless `--skip-fetch` is used
 
@@ -626,7 +626,7 @@ bundlecraft fetch --source-config-file config/sources/mozilla.yaml --workspace-r
 bundlecraft build --env prod --bundle internal-prod --skip-fetch
 ```
 
-- Uses existing staged sources at `sources/staged/*` and does not perform network fetches
+- Uses existing staged sources at `cert_sources/staged/*` and does not perform network fetches
 
 ---
 
@@ -829,9 +829,9 @@ bundle_name: mozilla-fetch  # Changed from 'fetch'
 ```yaml
 repo:
   - name: internal-roots
-    include: [sources/internal/roots/]
+    include: [cert_sources/internal/roots/]
   - name: internal-intermediates  # Changed from 'internal'
-    include: [sources/internal/intermediate/]
+    include: [cert_sources/internal/intermediate/]
 ```
 
 ---
@@ -848,7 +848,7 @@ repo:
 ```yaml
 repo:
   - name: local
-    include: [sources/internal/]
+    include: [cert_sources/internal/]
 ```
 
 ---

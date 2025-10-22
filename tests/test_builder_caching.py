@@ -141,7 +141,7 @@ description: Test bundle A
 repo:
   - name: internal
     include:
-      - sources/internal/sample.pem
+      - cert_sources/internal/sample.pem
         """.strip()
     )
 
@@ -153,7 +153,7 @@ description: Test bundle B
 repo:
   - name: internal
     include:
-      - sources/internal/sample.pem
+      - cert_sources/internal/sample.pem
         """.strip()
     )
 

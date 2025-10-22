@@ -4,7 +4,7 @@ fetch.py
 First stage of the BundleCraft pipeline: securely fetch and stage certificate sources.
 
 Design choices per ADR-0002 and user guidance:
- - No persistent caching; fetched artifacts are staged under sources/staged/<source_name>/fetch/<name>/
+ - No persistent caching; fetched artifacts are staged under cert_sources/staged/<source_name>/fetch/<name>/
  - Staging directory is cleaned at the start of each fetch run
  - Only trusted origins: HTTPS/file URLs supported; optional content SHA256 pinning
  - Staged files are treated the same as local sources by the build stage
@@ -570,7 +570,7 @@ def _fetch_each_to_named_dirs(
     "--output-dir",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
     default=Path("sources") / "staged",
-    help="Output directory for staged certificates (default: ./sources/staged)",
+    help="Output directory for staged certificates (default: ./cert_sources/staged)",
 )
 @click.option("--verbose", is_flag=True, help="Show extra debug output for fetch operations")
 @click.option(

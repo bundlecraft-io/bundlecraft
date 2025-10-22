@@ -28,7 +28,7 @@ class TestFetchJsonOutput:
 source_name: test-bundle
 description: Test bundle for JSON output
 include:
-  - sources/mozilla
+  - cert_sources/mozilla
 fetch:
   - name: test-source
     type: url
@@ -348,7 +348,7 @@ description: Test bundle
 repo:
   - name: test-bundle
     include:
-      - sources/internal/test-bundle
+      - cert_sources/internal/test-bundle
 """
         (config_dir / "sources" / "test-bundle.yaml").write_text(bundle_config)
 
@@ -451,7 +451,7 @@ description: Test bundle
 repo:
   - name: test-bundle
     include:
-      - sources/internal/test-bundle
+      - cert_sources/internal/test-bundle
 """
         (config_dir / "sources" / "test-bundle.yaml").write_text(bundle_config)
 

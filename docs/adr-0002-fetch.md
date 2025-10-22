@@ -17,14 +17,14 @@ BundleCraft currently operates as a **three-stage pipeline**:
 | **verify**  | Validate contents and health of the bundle      | Built PEMs           | Verified manifest            |
 | **convert** | Produce alternate formats for consumption       | Verified bundle      | `.p12`, `.jks`, `.p7b`, etc. |
 
-This model assumes all certificates already exist in the repository under `sources/`.
+This model assumes all certificates already exist in the repository under `cert_sources/`.
 While this keeps builds reproducible, it limits agility:
 
 * Public roots (Mozilla, Microsoft, Apple) evolve frequently.
 * Enterprise intermediates (Keyfactor, Vault) can be maintained elsewhere.
 * Cloud PKIs (AWS PCA, Azure CA, Google CAS) publish endpoints with current roots.
 
-Manually refreshing these into `sources/` risks drift and stale trust anchors.
+Manually refreshing these into `cert_sources/` risks drift and stale trust anchors.
 
 ---
 
@@ -48,7 +48,7 @@ fetch  →  build  →  verify  →  convert
 | ----------------------------- | --------------------------------------------------------------------------------------------- |
 | **Declarative configuration** | Define remote sources (URL, API, Vault path, collection ID) within bundle or env YAML.        |
 | **Trusted origins only**      | Each source must specify an approved scheme, expected fingerprint/CA pin, or checksum policy. |
-| **Staging & provenance**      | Downloaded certs are staged under `sources/staged/<source_name>/fetch/<name>/` with metadata (origin URL, SHA256, timestamp). Local includes are staged under `sources/staged/<source_name>/<repo_name>/` (or `include/` for legacy). No persistent cache; directory cleaned each run. |
+| **Staging & provenance**      | Downloaded certs are staged under `cert_sources/staged/<source_name>/fetch/<name>/` with metadata (origin URL, SHA256, timestamp). Local includes are staged under `cert_sources/staged/<source_name>/<repo_name>/` (or `include/` for legacy). No persistent cache; directory cleaned each run. |
 | **Reproducibility**           | Build logs include exact hashes and timestamps so the same inputs can be re-fetched later.    |
 | **Offline/air-gapped**        | Offline-friendly flow: pre-stage fetch inputs and run `bundlecraft build --skip-fetch`; builds proceed only with committed or pre-staged artifacts. |
 
@@ -80,7 +80,7 @@ fetch:
 
 1. **Pre-build phase:**
    The `fetch` module runs explicitly (via `bundlecraft fetch`) or as part of `bundlecraft build` unless fetch is skipped.
-   It downloads, validates, and stores certs under `sources/staged/<source_name>/fetch/<name>/`. The staging directory is cleaned each run; there is no persistent cache.
+   It downloads, validates, and stores certs under `cert_sources/staged/<source_name>/fetch/<name>/`. The staging directory is cleaned each run; there is no persistent cache.
 
 2. **Build phase:**
    The `build` module treats fetched files as normal inputs alongside any repository-resident certs.
@@ -191,7 +191,7 @@ fetch:
 ## 11️⃣ Next Steps
 
 1. Implement `bundlecraft/fetch.py` with URL/API/Vault fetchers, TLS options, and SHA pinning.
-2. Define `fetch:` schema additions in `config/sources/*.yaml`.
+2. Define `fetch:` schema additions in `config/cert_sources/*.yaml`.
 3. Update manifest spec to include:
 
    ```json

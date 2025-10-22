@@ -41,7 +41,7 @@ This guide covers common issues, root causes, and quick fixes when using the Fet
 ## Build issues
 
 - Empty or missing outputs
-  - Check inputs in `sources/` and `sources/staged/<source_name>/`
+  - Check inputs in `cert_sources/` and `cert_sources/staged/<source_name>/`
   - Ensure include paths in the source config are correct.
 
 - Unexpected duplicates or missing certs
@@ -59,7 +59,7 @@ When a config file doesn't meet the schema, BundleCraft shows a Pydantic error w
 ### What the error looks like
 
 ```text
-[ERROR] Fetch failed: Config validation failed for /path/to/config/sources/test-bundle.yaml:
+[ERROR] Fetch failed: Config validation failed for /path/to/config/cert_sources/test-bundle.yaml:
 1 validation error for BundleConfig
 fetch.0.url
   Value error, Only HTTPS URLs are allowed for security. Use https:// or file:// schemes.
@@ -116,7 +116,7 @@ python3 - <<'PY'
 from pathlib import Path
 from bundlecraft.helpers.utils import load_yaml
 from bundlecraft.helpers.config_schema import validate_bundle_config
-load_yaml(Path('config/sources/example-bundle.yaml'), validate=validate_bundle_config)
+load_yaml(Path('config/cert_sources/example-bundle.yaml'), validate=validate_bundle_config)
 print('OK')
 PY
 
@@ -161,8 +161,8 @@ python3 -m pytest tests/test_config_validation.py::TestBundleConfigValidation::t
 - Pin content via verify.sha256 where feasible (e.g., Mozilla public bundle)
 - Use verify.ca_file and optionally verify.tls_fingerprint_sha256 for API/services
 - Keep tokens in env vars (KEYFACTOR_TOKEN, VAULT_TOKEN), not YAML
-- Treat sources/fetched as ephemeral; do not rely on it as a cache
-- Treat sources/staged as ephemeral; do not rely on it as a cache
+- Treat cert_sources/fetched as ephemeral; do not rely on it as a cache
+- Treat cert_sources/staged as ephemeral; do not rely on it as a cache
 - Embed provenance: keep provenance.fetch.json with builds for audit trails
 
 ---

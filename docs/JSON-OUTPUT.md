@@ -77,6 +77,7 @@ The `build` command produces the following JSON structure:
 #### Build Examples
 
 **Successful build:**
+
 ```bash
 bundlecraft build --env prod --bundle mozilla --json
 ```
@@ -106,6 +107,7 @@ bundlecraft build --env prod --bundle mozilla --json
 ```
 
 **Build with errors:**
+
 ```json
 {
   "success": false,
@@ -151,6 +153,7 @@ The `verify` command produces the following JSON structure:
 #### Verify Examples
 
 **Successful verification:**
+
 ```bash
 bundlecraft verify --target dist/prod/mozilla --json
 ```
@@ -169,6 +172,7 @@ bundlecraft verify --target dist/prod/mozilla --json
 ```
 
 **Verification with errors:**
+
 ```json
 {
   "success": false,
@@ -219,6 +223,7 @@ The `convert` command produces the following JSON structure:
 #### Convert Examples
 
 **Successful conversion:**
+
 ```bash
 bundlecraft convert --input bundle.pem --output-dir dist --output-format jks --json
 ```
@@ -237,6 +242,7 @@ bundlecraft convert --input bundle.pem --output-dir dist --output-format jks --j
 ```
 
 **Conversion with errors:**
+
 ```json
 {
   "success": false,
@@ -284,8 +290,9 @@ The `fetch` command produces the following JSON structure:
 #### Fetch Examples
 
 **Successful fetch:**
+
 ```bash
-bundlecraft fetch --source-config-file config/sources/mozilla.yaml --json
+bundlecraft fetch --source-config-file config/cert_sources/mozilla.yaml --json
 ```
 
 ```json
@@ -295,7 +302,7 @@ bundlecraft fetch --source-config-file config/sources/mozilla.yaml --json
   "timestamp": "2025-10-21T12:00:00+00:00",
   "version": "0.1.0",
   "bundle_name": "mozilla",
-  "staging_path": "/path/to/sources/staged/mozilla",
+  "staging_path": "/path/to/cert_sources/staged/mozilla",
   "fetched_sources": 1,
   "local_sources": 0,
   "total_files": 1
@@ -303,6 +310,7 @@ bundlecraft fetch --source-config-file config/sources/mozilla.yaml --json
 ```
 
 **Fetch with errors:**
+
 ```json
 {
   "success": false,
@@ -318,6 +326,7 @@ bundlecraft fetch --source-config-file config/sources/mozilla.yaml --json
 ## Error Handling
 
 When a command fails, the JSON response will:
+
 1. Set `success` to `false`
 2. Include an `errors` array with one or more error messages
 3. Still include all command-specific fields (some may be empty or have default values)
@@ -402,6 +411,7 @@ else:
 ## Schema Stability
 
 The JSON schemas documented here are considered stable and will follow semantic versioning:
+
 - **Patch versions** (0.1.x): No schema changes
 - **Minor versions** (0.x.0): Additive changes only (new optional fields)
 - **Major versions** (x.0.0): Breaking changes allowed (field removal, type changes, etc.)

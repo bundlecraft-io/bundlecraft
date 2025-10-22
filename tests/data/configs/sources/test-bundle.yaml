@@ -3,7 +3,7 @@ source_name: test-bundle
 description: Test bundle for unit tests
 repo:
   - name: internal
-    include: [sources/internal/sample.pem]
+    include: [cert_sources/internal/sample.pem]
 output_formats: [pem, jks, p7b, p12]
 pem:
   include_subject_comments: true

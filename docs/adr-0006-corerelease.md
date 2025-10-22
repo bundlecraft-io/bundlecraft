@@ -100,7 +100,7 @@ docker run --rm -v $(pwd)/config:/config ghcr.io/bundlecraft-io/bundlecraft:late
 **Build:**
 
 * Use `hatchling` with version from git tags (`hatch-vcs`)
-* `MANIFEST.in` excludes: `config/`, `build_cache/`, `sources/`, `tests/`, `*.jks`, `*.pem`
+* `MANIFEST.in` excludes: `config/`, `build_cache/`, `cert_sources/`, `tests/`, `*.jks`, `*.pem`
 * `pyproject.toml` defines entry point for CLI
 
 **Release:**

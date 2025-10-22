@@ -4,7 +4,7 @@ config_schema.py
 Pydantic v2 schema models for validating BundleCraft configuration files.
 
 Provides comprehensive validation for:
-- Source configs (config/sources/*.yaml) - Certificate sources
+- Source configs (config/cert_sources/*.yaml) - Certificate sources
 - Environment configs (config/envs/*.yaml) - Build environments
 - Defaults config (config/defaults.yaml)
 
@@ -317,7 +317,7 @@ class BundleEntry(BaseModel):
 
 
 class SourceConfig(BaseModel):
-    """Schema for source configuration files (config/sources/*.yaml)."""
+    """Schema for source configuration files (config/cert_sources/*.yaml)."""
 
     apiVersion: str | None = Field(
         default=None, description="Schema API version (e.g., bundlecraft.io/v1alpha1)"

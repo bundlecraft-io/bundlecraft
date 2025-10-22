@@ -65,8 +65,8 @@ This installs:
 #### Prepare Certificate Source Configurations
 
 - Bring your own certs, or use `scripts/generate_test_cas.py` to generate some **TEST** CA certificates.
-- Place PEM files in appropriate folders under `sources/`
-- Update `config/sources/` YAMLs to specify what certificates each source will be comprised of
+- Place PEM files in appropriate folders under `cert_sources/`
+- Update `config/cert_sources/` YAMLs to specify what certificates each source will be comprised of
 - Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault, etc..)
 
 #### Prepare Certificate Environment Configurations
@@ -150,8 +150,8 @@ bundlecraft/
 ├── config/                # Configuration files
 │   ├── defaults.yaml      # Global defaults
 │   ├── envs/              # Environment definitions
-│   └── sources/           # Cert sources definitions
-├── sources/               # Certificate sources
+│   └── cert_sources/           # Cert sources definitions
+├── cert_sources/               # Certificate sources
 │   ├── internal/          # Committed certificates
 │   └── staged/            # Fetched certificates (ephemeral)
 ├── dist/                  # Build outputs (gitignored)
@@ -199,7 +199,7 @@ bundlecraft/
 
 - `config/defaults.yaml` – Global defaults for all envs/sources
 - `config/envs/*.yaml` – Environment definitions (bundles, filters, verify policies)
-- `config/sources/*.yaml` – Bundle definitions (sources, fetch specs)
+- `config/cert_sources/*.yaml` – Bundle definitions (sources, fetch specs)
 
 ---
 
@@ -214,10 +214,10 @@ Once you have bundle and environment configs, test the CLI directly:
 bundlecraft build --env dev
 
 # Individual stages
-bundlecraft fetch --source-config-file config/sources/internal.yaml
+bundlecraft fetch --source-config-file config/cert_sources/internal.yaml
 bundlecraft convert --input dist/dev/internal/bundlecraft-ca-trust.pem --output-dir dist/dev/internal
 bundlecraft verify --target dist/dev/internal --verify-all
-bundlecraft diff --from sources/staged/internal/rootCA.pem --to dist/dev/internal/bundlecraft-ca-trust.pem
+bundlecraft diff --from cert_sources/staged/internal/rootCA.pem --to dist/dev/internal/bundlecraft-ca-trust.pem
 ```
 
 Get help on any command:
@@ -300,7 +300,7 @@ We keep things simple and consistent:
 - Support optional CA pinning (`verify.ca_file`)
 - Support optional TLS fingerprint pinning (`verify.tls_fingerprint_sha256`)
 - Support optional content hash pinning (`verify.sha256`)
-- No persistent caches; staging is cleaned per run (`sources/staged/<source_name>/`)
+- No persistent caches; staging is cleaned per run (`cert_sources/staged/<source_name>/`)
 - Update `docs/adr-0002-fetch.md` and `docs/troubleshooting.md` for behavior changes
 
 ---
@@ -345,7 +345,7 @@ See `docs/adr-0006-corerelease.md` for the full distribution strategy.
 
 ## 🌐 Notes on the Fetch Layer
 
-- Fetch is staging-only: do not introduce persistent caches; use `sources/staged/<source_name>/` which is cleaned per run.
+- Fetch is staging-only: do not introduce persistent caches; use `cert_sources/staged/<source_name>/` which is cleaned per run.
 - Security controls to uphold:
   - HTTPS only for remote endpoints (URLs/APIs)
   - Optional custom CA (`verify.ca_file`), optional TLS leaf fingerprint pin (`verify.tls_fingerprint_sha256`)
@@ -368,7 +368,7 @@ Handy commands for common tasks:
 | Run tests            | `pytest -v`                                                   |
 | Build bundle         | `bundlecraft build --env dev --bundle internal`             |
 | Verify bundle        | `bundlecraft verify --target dist/dev/internal --verify-all`  |
-| Fetch remote sources | `bundlecraft fetch --source-config-file config/sources/*.yaml` |
+| Fetch remote sources | `bundlecraft fetch --source-config-file config/cert_sources/*.yaml` |
 | Build Python package | `python -m build`                                             |
 | Validate package     | `twine check dist/*`                                          |
 

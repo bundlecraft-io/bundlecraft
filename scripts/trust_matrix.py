@@ -3,7 +3,7 @@
 trust_matrix.py
 
 Generate a trust matrix showing which environments (rows, using config 'name') build which bundles (columns),
-and which sources are trusted in each bundle, based on config/envs/*.yaml and config/sources/*.yaml.
+and which sources are trusted in each bundle, based on config/envs/*.yaml and config/cert_sources/*.yaml.
 
 Outputs:
     - table (unicode box table for terminals): environments × bundles

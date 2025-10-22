@@ -288,7 +288,7 @@ class TestValidConfigsPass:
         data = {
             "source_name": "test",
             "description": "Test bundle",
-            "repo": [{"name": "internal", "include": ["sources/internal/rootCA.pem"]}],
+            "repo": [{"name": "internal", "include": ["cert_sources/internal/rootCA.pem"]}],
         }
         config = validate_source_config(data)
         assert config.source_name == "test"

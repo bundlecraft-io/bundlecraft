@@ -44,10 +44,10 @@ description: Bundle using named repos
 repo:
   - name: roots
     include:
-      - sources/internal/sample.pem
+      - cert_sources/internal/sample.pem
   - name: extras
     include:
-      - sources/internal/sample.pem
+      - cert_sources/internal/sample.pem
         """.strip()
     )
 
@@ -76,7 +76,7 @@ repo:
     # Verify staging layout contains both repo names under build_cache
     cache_root = temp_workspace / "build_cache" / "TestCraft" / "repo-bundle"
     assert cache_root.exists()
-    # build_cache stores canonical outputs, but staging happens under sources/staged/<source_name>/<repo>
+    # build_cache stores canonical outputs, but staging happens under cert_sources/staged/<source_name>/<repo>
     staged_repo_root = temp_workspace / "sources" / "staged" / "repo-bundle"
     assert (staged_repo_root / "roots").exists()
     assert (staged_repo_root / "extras").exists()
@@ -108,7 +108,7 @@ description: Duplicate name test
 repo:
   - name: conflict
     include:
-      - sources/internal/
+      - cert_sources/internal/
 fetch:
   - name: conflict
     type: url

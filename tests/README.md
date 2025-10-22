@@ -1,6 +1,6 @@
 # Testing BundleCraft
 
-This document provides comprehensive guidance for running, understanding, and maintaining the BundleCraft test suite. **No prior pytest experience required!**
+This document provides comprehensive guidance for running, understanding, and maintaining the BundleCraft test suite.
 
 ---
 
@@ -438,7 +438,7 @@ Creates a complete workspace with standard directory structure and test data.
 ```python
 def test_with_workspace(self, temp_workspace):
     # Provides:
-    # - sources/internal/
+    # - cert_sources/internal/
     # - config/bundles/
     # - config/envs/
     # - build/

@@ -11,7 +11,7 @@
 
 BundleCraft is a framework/utility for building, verifying, and packaging **CA trust bundles** from organization-specific sources and policies. Historically we have distributed the code as a Git repo to be cloned and run in CI. We’re evaluating a **major change** to how BundleCraft is offered, maintained, and used:
 
-* Ship BundleCraft as a **containerized CLI** (OCI-compliant image) that teams run locally and in CI by mounting their own `config/`, `sources/`, and `build/` dirs.
+* Ship BundleCraft as a **containerized CLI** (OCI-compliant image) that teams run locally and in CI by mounting their own `config/`, `cert_sources/`, and `build/` dirs.
 * Provide a **GitHub template repository** to jump-start projects (directory layout, sample configs, a working CI workflow that runs the image).
 * Explicitly **avoid** distribution via public or private PyPI.
 
@@ -132,7 +132,7 @@ podman run --rm \
 
 **Key properties:**
 
-* **Inputs mounted** (`config/`, `sources/`) are org-owned; the image contains only the **engine**.
+* **Inputs mounted** (`config/`, `cert_sources/`) are org-owned; the image contains only the **engine**.
 * **Outputs** (`build/`) are written to the host volume for release/upload.
 * **No embedded CAs** in the image.
 * **SemVer** versioning; consumers may **pin by digest** for immutability.
@@ -157,7 +157,7 @@ podman run --rm \
 4. **Publish** images to GHCR; document mirroring to other registries.
 5. **Provide a template repo** that:
 
-   * Demonstrates the directory layout (`config/`, `sources/`, `build/`)
+   * Demonstrates the directory layout (`config/`, `cert_sources/`, `build/`)
    * Includes a CI workflow that pulls the image and runs a sample build
    * Shows how to verify the image signature and SBOM
 6. **Docs:** Update README/SECURITY/RELEASE to reflect image-based usage; add `podman` examples first, mention `docker` only as compatible.
@@ -218,7 +218,7 @@ podman run --rm \
 **We will proceed with Option D (Hybrid):**
 
 * **Primary distribution:** **OCI-compliant container image** published to **GHCR**, signed with **cosign**, with **SBOM** and **provenance** attached.
-* **Adoption accelerator:** A **GitHub template repository** that mounts org-specific `config/` and `sources/` and runs the image in CI.
+* **Adoption accelerator:** A **GitHub template repository** that mounts org-specific `config/` and `cert_sources/` and runs the image in CI.
 * **Explicit non-decision:** **Do not** publish BundleCraft to PyPI.
 
 **Rationale:** This path offers the strongest **security posture**, **reproducibility**, **supply-chain integrity**, and **portability** while keeping configs/certificates under each organization’s control. It aligns with modern **OCI tooling** and avoids Docker-specific assumptions, satisfying both security and developer-experience needs.

@@ -83,11 +83,11 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 ## 📁 Repository Structure
 
 ```shell
-├── sources/                # Certificate sources (roots, intermediates, vendor, etc.)
+├── cert_sources/                # Certificate sources (roots, intermediates, vendor, etc.)
 ├── config/                 # YAML configuration (defaults, envs, sources)
 │   ├── defaults.yaml
 │   ├── envs/
-│   └── sources/
+│   └── cert_sources/
 ├── bundlecraft/            # Python scripts for build, verify, convert, helpers
 ├── dist/                   # Generated outputs (per env/bundle)
 ├── docs/                   # Project documentation
@@ -119,15 +119,15 @@ BundleCraft provides the building blocks for trust bundle creation, while your C
 2. **Environments** (`config/envs/<env>.yaml`):
   Contextual overrides (paths, secrets, output formats, targets)
 
-3. **Sources** (`config/sources/<source>.yaml`):
+3. **Sources** (`config/cert_sources/<source>.yaml`):
 Bundle content definition (certificate sources to include/exclude)
 
-- **Fetch** (`fetch:` in `<source>`): Securely fetch and stage certificates under `sources/staged/<source_name>/fetch/<name>/`. Local includes are staged under `sources/staged/<source_name>/<repo_name>/` (or `include/` for legacy). Staging is cleaned each run; no persistent cache.
+- **Fetch** (`fetch:` in `<source>`): Securely fetch and stage certificates under `cert_sources/staged/<source_name>/fetch/<name>/`. Local includes are staged under `cert_sources/staged/<source_name>/<repo_name>/` (or `include/` for legacy). Staging is cleaned each run; no persistent cache.
 
 **Flow:**
 
 - Merge config layers: defaults ← env ← bundle
-- If `fetch:` is present, securely stage remote sources under `sources/staged/<source_name>/fetch/<name>/` with provenance
+- If `fetch:` is present, securely stage remote sources under `cert_sources/staged/<source_name>/fetch/<name>/` with provenance
 - Deduplicate, verify, and annotate certs
 - Generate canonical PEM bundle
 - Convert to JKS, P7B, P12
@@ -171,7 +171,7 @@ Outputs:
 
 ## 📦 Configuration Deep Dive
 
-### Source Config (`config/sources/*.yaml`)
+### Source Config (`config/cert_sources/*.yaml`)
 
 These configuration files are your **trusted certificate sources.**
 
@@ -193,8 +193,8 @@ repo:
   - name: internal
     include:
       # Path entries (string or {path: ...})
-      - sources/internal/rootCA.pem
-      - { path: sources/internal/issuingCA1.pem }
+      - cert_sources/internal/rootCA.pem
+      - { path: cert_sources/internal/issuingCA1.pem }
       # Inline PEM entry (optional name; if omitted, a name is generated)
       - name: special-inline.pem
         inline: |
@@ -220,7 +220,7 @@ Defines **how** bundles are built in a specific context, including secrets, outp
 
 These configuration files are your **customized certificate trust bundles.**
 
-It defines how BundleCraft (based on the certificate source configurations from `config/sources/`) will build, merge, package, and prepare your trust bundle files for distribution. These are essentially your environment specific configuration files.
+It defines how BundleCraft (based on the certificate source configurations from `config/cert_sources/`) will build, merge, package, and prepare your trust bundle files for distribution. These are essentially your environment specific configuration files.
 
 Additional build filters, verification guardrails, packaging settings, and formatting options can be specified here.
 
@@ -313,8 +313,8 @@ eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 
 ### 2. Prepare Certificate Sources
 
-- Place PEM files in appropriate folders under `sources/`
-- Update `config/sources/` YAMLs to specify which sources to include/exclude
+- Place PEM files in appropriate folders under `cert_sources/`
+- Update `config/cert_sources/` YAMLs to specify which sources to include/exclude
 - Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault)
 
 ### 3. Fetch and Build
@@ -357,13 +357,13 @@ bundlecraft verify --target dist/prod/internal-prod --verbose --verify-all
 
 ```bash
 # Convert DER to PEM
-bundlecraft convert --input sources/internal/rootCA.der --output-dir ./ --output-format pem
+bundlecraft convert --input cert_sources/internal/rootCA.der --output-dir ./ --output-format pem
 
 # Convert to P7B
-bundlecraft convert --input sources/internal/rootCA.pem --output-dir ./ --output-format p7b
+bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --output-format p7b
 
 # Convert to ZIP (tarball of PEMs)
-bundlecraft convert --input sources/internal/rootCA.pem --output-dir ./ --output-format zip
+bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --output-format zip
 ```
 
 - Produces artifact in the output directory as `bundlecraft-ca-trust.{format}`
@@ -439,7 +439,7 @@ For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/R
 
 ## 📐 Trust Matrix (Environments × Bundles)
 
-The release pipeline now publishes a trust matrix that shows which envs (rows) trust which sources/bundles (columns), derived from `config/envs/*.yaml` composition (`bundles.<name>.include_sources`).
+The release pipeline now publishes a trust matrix that shows which envs (rows) trust which cert_sources/bundles (columns), derived from `config/envs/*.yaml` composition (`bundles.<name>.include_sources`).
 
 Artifacts attached to releases:
 
@@ -656,7 +656,7 @@ Best config practices
 - For APIs/services, prefer TLS CA pinning and optionally leaf fingerprint pinning during rollout windows
 - Keep tokens in env vars (`*_TOKEN`) and never in YAML
 - Commit sample configs but not secrets; use CI secret stores for tokens
-- Treat `sources/staged/` as ephemeral; do not rely on it as a cache
+- Treat `cert_sources/staged/` as ephemeral; do not rely on it as a cache
 
 - Chain validation (issuer/subject path building)
 - Test suite + CI templates
@@ -720,7 +720,7 @@ All BundleCraft commands support `--json` flag for CI/CD automation and scriptin
 bundlecraft build --env prod --bundle mozilla --json | jq .
 
 # Parse specific fields in scripts
-SUCCESS=$(bundlecraft fetch --source-config-file config/sources/mozilla.yaml --json | jq -r '.success')
+SUCCESS=$(bundlecraft fetch --source-config-file config/cert_sources/mozilla.yaml --json | jq -r '.success')
 if [ "$SUCCESS" = "true" ]; then
   echo "Fetch succeeded"
 fi
@@ -743,7 +743,7 @@ bundlecraft verify --target dist/prod/mozilla --json | jq -r '.verified_files'
 
 - `config/defaults.yaml` - Global baseline settings
 - `config/envs/*.yaml` - Craft-specific configs (dev, qa, prod)
-- `config/sources/*.yaml` - Bundle definitions (what certs to include)
+- `config/cert_sources/*.yaml` - Bundle definitions (what certs to include)
 
 ### Output Artifacts
 

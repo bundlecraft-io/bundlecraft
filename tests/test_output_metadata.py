@@ -290,7 +290,7 @@ source_name: test-bundle
 description: Test bundle
 repo:
   - name: internal
-    include: [sources/internal/]
+    include: [cert_sources/internal/]
 """.strip()
         )
 

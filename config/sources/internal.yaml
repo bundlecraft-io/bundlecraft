@@ -5,7 +5,9 @@ source_name: internal
 description: Trust bundle for internal PKI services (root + issuing CAs)
 repo:
   - name: internal
-    include: [sources/internal/rootCA.pem, sources/internal/issuingCA1.pem]
+    include:
+      - cert_sources/internal/rootCA.pem
+      - cert_sources/internal/issuingCA1.pem
 metadata:
   owner: pki-team@bundlecraft.io
   purpose: Internal service authentication and TLS

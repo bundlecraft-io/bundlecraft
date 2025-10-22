@@ -36,7 +36,7 @@ package: true  # Create .tar.gz archives
 # Verification & Filtering
 # ---------------------------------------------------------------------
 # Build-time verification and filtering guardrails.
-# Source definitions (WHAT/WHERE to gather) live in config/sources/*.yaml.
+# Source definitions (WHAT/WHERE to gather) live in config/cert_sources/*.yaml.
 # Environment controls HOW to build and distribute only.
 verify:
   fail_on_expired: true  # Abort on expired certificates

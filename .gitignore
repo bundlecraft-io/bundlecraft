@@ -3,8 +3,8 @@
 ########################################
 
 # Staged fetch directory (ephemeral)
-sources/fetched/
-sources/staged/
+cert_sources/fetched/
+cert_sources/staged/
 build*
 
 # Personal/local test folders
