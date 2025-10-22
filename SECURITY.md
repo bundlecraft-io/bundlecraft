@@ -5,7 +5,7 @@
 **BundleCraft** is a framework and build automation toolkit for securely fetching, producing, and verifying PKI trust bundles.
 It provides deterministic, auditable mechanisms to stage certificate inputs from trusted remote origins (or local files) and generate trust artifacts (PEM, P7B, JKS, P12, etc.).
 
-BundleCraft **does not** distribute, embed, or endorse any certificate authority (CA) certificates.
+BundleCraft does not distribute, embed, or endorse any certificate authority (CA) certificates.
 All trust inputs are user-configured and staged via the Fetch layer or provided locally, with trust controls (CA pinning, TLS fingerprint pinning, optional `sha256` content pins) fully under operator control.
 
 The security model of BundleCraft focuses on the *integrity, reproducibility, and transparency* of trust store builds - not the issuance, endorsement, or global distribution of CA material.
@@ -25,40 +25,51 @@ The security model of BundleCraft focuses on the *integrity, reproducibility, an
 ## Threat Model
 
 ### 1. Code Integrity
+
 **Risk:** Unauthorized code modification (e.g., compromised repository or release pipeline).
 **Controls:**
-- GPG-signed Git tags and release artifacts.
+
+- GPG-signed release artifacts (optional but available).
+- GPG-signed Git tags recommended for version releases.
 - Immutable CI/CD release workflows.
 - Checksums generated per build (`checksums.sha256`).
 - Optional user-side signature verification with published keys.
 
 ### 2. Supply Chain Attacks
+
 **Risk:** Malicious dependency or injected helper module.
 **Controls:**
-- Pinning of dependencies in `pyproject.toml`.
+
+- Minimum version constraints for dependencies in `pyproject.toml`; lock files recommended for production deployments.
 - No dynamic runtime dependency fetching.
-- Security scanning of dependencies before each release.
+- Dependency vulnerability scanning via automated tools (recommended: Dependabot, pip-audit).
 
 ### 3. Input Tampering
+
 **Risk:** A compromised or unverified certificate source.
 **Controls:**
+
 - Declarative Fetch configuration for secure HTTPS/API/Vault sourcing (no implicit downloads).
 - TLS CA verification, optional TLS leaf fingerprint pinning, and optional `sha256` content pinning.
 - SHA256-based deduplication and canonicalization of all input PEMs.
 - Build fails or warns on expired or malformed certificates.
 - Manifest (`manifest.json`) includes full source list and hashes.
- - Staging-only model: fetched artifacts are ephemeral and cleaned per run; no persistent cache.
+- Staging-only model: fetched artifacts are ephemeral and cleaned per run; no persistent cache.
 
 ### 4. Build Environment Compromise
+
 **Risk:** Build runs in an untrusted environment or manipulated workspace.
 **Controls:**
+
 - Supports fully offline build mode (no network calls) and explicit fetch step with provenance recording.
 - Environment paths and temp directories explicitly defined.
 - All writes are scoped under the build root (`dist/`).
 
 ### 5. Artifact Integrity
+
 **Risk:** Tampering of produced trust bundles after build.
 **Controls:**
+
 - SHA256 checksum file (`checksums.sha256`).
 - Optional GPG signing of bundles during CI/CD.
 - End-users can re-run `bundlecraft verify` for local verification.
@@ -68,6 +79,7 @@ The security model of BundleCraft focuses on the *integrity, reproducibility, an
 ## Out of Scope
 
 BundleCraft does **not**:
+
 - Distribute or include CA certificates within the source code, packages, or releases.
 - Act as a certificate repository, distribution channel, or root program.
 - Perform or automate certificate issuance, revocation, or validation against CRLs/OCSP.
@@ -83,13 +95,12 @@ The project’s scope ends at **secure trust store generation** and **artifact v
 We welcome responsible disclosure of any security issues found in BundleCraft.
 
 **To report a vulnerability:**
-1. Email the maintainers at: **security@bundlecraft.io** (or your designated address).
+
+1. Email the maintainers at: **<security@bundlecraft.io>**
 2. Include:
    - A clear description of the issue and potential impact.
    - Steps to reproduce (if applicable).
    - Any mitigation or workaround suggestions.
-
-We aim to acknowledge all reports within **5 business days** and provide a fix or update within **30 days**, depending on severity.
 
 ---
 
@@ -105,9 +116,9 @@ We aim to acknowledge all reports within **5 business days** and provide a fix o
 
 Developers and contributors are expected to:
 
-- Sign commits with verified GPG keys.
+- Sign commits with verified GPG keys (encouraged).
 - Follow dependency scanning and linting rules defined in CI workflows.
-- Avoid introducing runtime network calls or package downloads.
+- Avoid introducing runtime network calls or package downloads outside the explicit Fetch layer.
 - Treat all external configuration and source data as untrusted input.
 - Keep development environments patched and isolated.
 
@@ -117,7 +128,9 @@ Developers and contributors are expected to:
 
 - Uses the Python `cryptography` library with FIPS-compliant primitives (when available).
 - All timestamps use timezone-aware UTC.
-- SHA256 is used for integrity verification; SHA1 and MD5 are strictly prohibited.
+- SHA256 is used for integrity verification and content addressing.
+- SHA1 is used only for JKS alias generation and legacy certificate fingerprint display (not for security verification).
+- MD5 is prohibited.
 - No private keys are handled, stored, or transmitted by BundleCraft.
 
 ---
@@ -125,6 +138,7 @@ Developers and contributors are expected to:
 ## Security Review and Audit
 
 BundleCraft’s codebase is periodically reviewed for:
+
 - Hardcoded credentials or secrets.
 - Unsafe file handling or path traversal.
 - Dependency vulnerabilities (via Dependabot or equivalent).
@@ -136,9 +150,25 @@ Formal third-party audits may be commissioned before major version releases.
 
 ## Contact
 
-- **Primary Contact:** `security@bundlecraft.io`
-- **PGP Key:** (to be published)
+- **Primary Contact:** <security@bundlecraft.io>
+- **PGP Key:** [`docs/public-gpg-key.asc`](docs/public-gpg-key.asc)
 - **Project Website:** [https://github.com/bundlecraft](https://github.com/bundlecraft)
+
+### Verifying Signed Releases
+
+```bash
+# Import the GPG key
+curl -sL https://raw.githubusercontent.com/bundlecraft-io/bundlecraft/main/docs/public-gpg-key.asc | gpg --import
+
+# Verify a signed checksum file
+gpg --verify dist/checksums.sha256.asc dist/checksums.sha256
+```
+
+For key fingerprint verification and additional keyserver locations, see [`docs/public-gpg-key.asc`](docs/public-gpg-key.asc).
+
+## Thanks
+
+To the security, devops, and open source communities. 🙏🏽
 
 ---
 

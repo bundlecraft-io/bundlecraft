@@ -11,7 +11,7 @@ This guide covers common issues, root causes, and quick fixes when using the Fet
   - Fix: Use https:// URLs (or file:// for local). For APIs, configure verify.ca_file and optionally verify.tls_fingerprint_sha256.
 
 - SHA256 mismatch
-  - Symptom: SHA256 mismatch for <name>: expected X, got Y
+  - Symptom: SHA256 mismatch for `<name>`: expected X, got Y
   - Cause: Source content changed or expected pin incorrect.
   - Fix: Re-validate the source from the authoritative location; if expected, update verify.sha256. Otherwise investigate integrity concerns.
 
@@ -32,9 +32,9 @@ This guide covers common issues, root causes, and quick fixes when using the Fet
   - Symptom: "Vault token not found in environment variable" or "Vault address is required"
   - Fix: Set VAULT_TOKEN (or token_ref env), and VAULT_ADDR (or set addr in config). Optionally set namespace.
 
-- Offline mode with fetch entries
-  - Symptom: "Offline mode is enabled but fetch entries are present."
-  - Fix: Pre-stage artifacts with bundlecraft fetch in a connected environment, commit/package them, then run build with --offline.
+- Offline build with fetch entries
+  - Symptom: Network access is unavailable or disallowed, and your config includes `fetch:` entries.
+  - Fix: Pre-stage artifacts with `bundlecraft fetch` in a connected environment, commit/package them, then run build with `--skip-fetch`.
 
 ---
 
@@ -58,7 +58,7 @@ When a config file doesn't meet the schema, BundleCraft shows a Pydantic error w
 
 ### What the error looks like
 
-```
+```text
 [ERROR] Fetch failed: Config validation failed for /path/to/config/bundles/test-bundle.yaml:
 1 validation error for BundleConfig
 fetch.0.url
@@ -67,41 +67,44 @@ fetch.0.url
 
 ### How to navigate and resolve
 
-1) Identify the file
-- The path after "for" is the config with the problem.
+- Identify the file
 
-2) Identify the section and field
-- The line like `fetch.0.url` means: in the `fetch` list, the first element (index 0), field `url`.
-- Other examples:
-  - `repo.1.include.0` → repo[1] include list, first item
-  - `targets` → the whole targets structure is invalid or empty
-  - `metadata.policy_version` → wrong type/value under metadata
+  - The path after "for" is the config with the problem.
 
-3) Apply the fix (common cases)
-- Insecure HTTP URL
-  - Symptom: `Only HTTPS URLs are allowed for security`
-  - Fix: Use `https://` (or `file://` for local), exception for `http://localhost`.
+- Identify the section and field
 
-- Missing required field for fetch type
-  - Symptom: `'url' is required for fetch type 'url'` (or `'endpoint' ...`, `'mount' and 'path' ...`)
-  - Fix: Provide the required fields for the specified `type`.
+  - The line like `fetch.0.url` means: in the `fetch` list, the first element (index 0), field `url`.
+  - Other examples:
+    - `repo.1.include.0` → repo[1] include list, first item
+    - `targets` → the whole targets structure is invalid or empty
+    - `metadata.policy_version` → wrong type/value under metadata
 
-- Duplicate or reserved names
-  - Symptom: `Duplicate repo names found: X` or `'<name>' is a reserved name`
-  - Fix: Make names unique and avoid reserved: `include`, `exclude`, `fetch`, `repo`.
+- Apply the fix (common cases)
 
-- Empty/invalid targets in craft
-  - Symptom: `Craft must have at least one target defined` or
-    `At least one of 'includes', 'include_bundles', or 'compose' must be provided`
-  - Fix: Add at least one include list to each target.
+  - Insecure HTTP URL
+    - Symptom: `Only HTTPS URLs are allowed for security`
+    - Fix: Use `https://` (or `file://` for local), exception for `http://localhost`.
 
-- Inline include mappings
-  - Symptom: `Include dict must have either 'inline' or 'path' key`
-  - Fix: Use a string path, `{ path: ... }`, or `{ inline: <PEM>, name?: <file> }`.
+  - Missing required field for fetch type
+    - Symptom: `'url' is required for fetch type 'url'` (or `'endpoint' ...`, `'mount' and 'path' ...`)
+    - Fix: Provide the required fields for the specified `type`.
 
-- Numeric metadata fields
-  - Symptom: `metadata.policy_version: Input should be a valid string`
-  - Fix: Allowed now; numeric values are auto-converted to strings by the schema.
+  - Duplicate or reserved names
+    - Symptom: `Duplicate repo names found: X` or `'<name>' is a reserved name`
+    - Fix: Make names unique and avoid reserved: `include`, `exclude`, `fetch`, `repo`.
+
+  - Empty/invalid targets in craft
+    - Symptom: `Craft must have at least one target defined` or
+      `At least one of 'includes', 'include_bundles', or 'compose' must be provided`
+    - Fix: Add at least one include list to each target.
+
+  - Inline include mappings
+    - Symptom: `Include dict must have either 'inline' or 'path' key`
+    - Fix: Use a string path, `{ path: ... }`, or `{ inline: <PEM>, name?: <file> }`.
+
+  - Numeric metadata fields
+    - Symptom: `metadata.policy_version: Input should be a valid string`
+    - Fix: Allowed now; numeric values are auto-converted to strings by the schema.
 
 ### Quick commands while iterating
 

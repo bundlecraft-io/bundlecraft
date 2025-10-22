@@ -38,7 +38,7 @@ We need a secure, deterministic, and policy-controlled way to **fetch certificat
 
 Add a **fourth, preceding layer: `fetch`**
 
-```
+```text
 fetch  →  build  →  verify  →  convert
 ```
 
@@ -48,9 +48,9 @@ fetch  →  build  →  verify  →  convert
 | ----------------------------- | --------------------------------------------------------------------------------------------- |
 | **Declarative configuration** | Define remote sources (URL, API, Vault path, collection ID) within bundle or env YAML.        |
 | **Trusted origins only**      | Each source must specify an approved scheme, expected fingerprint/CA pin, or checksum policy. |
-| **Staging & provenance**      | Downloaded certs are staged under `sources/fetched/<env>/<bundle>/` with metadata (origin URL, SHA256, timestamp). No persistent cache; directory cleaned each run. |
+| **Staging & provenance**      | Downloaded certs are staged under `sources/staged/<env>/<bundle>/` with metadata (origin URL, SHA256, timestamp). No persistent cache; directory cleaned each run. |
 | **Reproducibility**           | Build logs include exact hashes and timestamps so the same inputs can be re-fetched later.    |
-| **Offline/air-gapped**        | `--offline` mode disallows network access; builds proceed only with committed or pre-staged artifacts. |
+| **Offline/air-gapped**        | Offline-friendly flow: pre-stage fetch inputs and run `bundlecraft build --skip-fetch`; builds proceed only with committed or pre-staged artifacts. |
 
 ### Example bundle config excerpt
 
@@ -80,7 +80,7 @@ fetch:
 
 1. **Pre-build phase:**
    The `fetch` module runs explicitly (via `bundlecraft fetch`) or as part of `bundlecraft build` unless fetch is skipped.
-   It downloads, validates, and stores certs under `sources/fetched/<env>/<bundle>/`. The staging directory is cleaned each run; there is no persistent cache.
+   It downloads, validates, and stores certs under `sources/staged/<env>/<bundle>/`. The staging directory is cleaned each run; there is no persistent cache.
 
 2. **Build phase:**
    The `build` module treats fetched files as normal inputs alongside any repository-resident certs.
@@ -121,7 +121,7 @@ fetch:
 
 ### a. Architecture
 
-```
+```text
 ┌───────────────────────────┐
 │ Fetch Sources (trusted)   │
 │  - URLs / APIs / Vault    │
@@ -146,6 +146,7 @@ fetch:
   ```python
   fetch(source_cfg: dict, dest_dir: Path) -> list[Path]
   ```
+
 * Shared validation utilities (`sha256_file`, TLS CA pinning).
 * Reuse existing logging and manifest system for provenance.
 
@@ -196,7 +197,8 @@ fetch:
    ```json
    "sources": [{"path": "...", "origin": "...", "sha256": "..."}]
    ```
-4. Add builder `--prefetch` and `--offline` modes.
+
+4. Builder fetch behavior: default to fetching; support `--skip-fetch` for offline/iterative builds (replace older `--prefetch`/`--offline` ideas with simpler semantics).
 5. Extend tests to validate fetch behavior and provenance embedding.
 6. Update documentation and diagrams (README, CLI reference, pipeline overview).
 
@@ -204,6 +206,6 @@ fetch:
 
 ### ✅ Summary
 
-**BundleCraft vNext = Fetch → Build → Verify → Convert**
+`BundleCraft vNext = Fetch → Build → Verify → Convert`
 
 By introducing a **trusted fetching layer**, BundleCraft evolves from a static trust-store builder into a **dynamic trust-source orchestrator** - maintaining the same immutability and audit guarantees while embracing real-time, policy-compliant sourcing of certificates.

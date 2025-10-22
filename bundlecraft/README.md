@@ -31,8 +31,6 @@ pip install -e .
 
 This installs the CLI command `bundlecraft` globally (editable, so code changes take immediate effect).
 
-
-
 ### Manual module invocation (no install)
 
 ```bash
@@ -62,12 +60,14 @@ Commands:
 
 ### 🌐 `bundlecraft fetch`
 
-Purpose: Reach out to preconfigured and trusted certificate sources at build-time, verify content, and stage PEMs for the builder. No persistent caching; artifacts are written to `sources/fetched/<craft>/<bundle>/` and cleaned on each run by default.
+Purpose: Reach out to preconfigured and trusted certificate sources at build-time, verify content, and stage PEMs for the builder. No persistent caching; artifacts are staged under `sources/staged/<bundle>/` by default (configurable via `--output-dir`) and cleaned on each run unless `--no-clean` is used.
 
 Usage:
 
 ```bash
-bundlecraft fetch --craft <craft> --bundle <bundle_name> [--workspace-root <dir>] [--no-clean] [--offline]
+bundlecraft fetch --bundle-config-file config/bundles/<bundle>.yaml \
+  [--output-dir ./sources/staged] [--fetch-name <name>] [--workspace-root <dir>] \
+  [--no-clean] [--dry-run] [--json] [--verbose]
 ```
 
 Config excerpts (in `config/bundles/<bundle>.yaml`):
@@ -93,18 +93,20 @@ fetch:
 ```
 
 Notes:
+
 - Only HTTPS and file URLs are supported for URL fetchers; generic API fetcher supports bearer auth.
 - Optional SHA256 pinning defends against tampering; mismatches abort the fetch.
 - Optional TLS security: custom CA bundle and leaf certificate fingerprint pinning.
 - Staging only: no persistent cache. Staging dir is cleaned per run unless `--no-clean`.
-- Offline mode: `--offline` fails if a fetch section exists (no network access allowed).
+  Treat `sources/staged/` as ephemeral staging, not a cache.
 
 Philosophy & best practices:
+
 - You configure trust; BundleCraft enforces it and records provenance.
 - Prefer HTTPS + CA pinning for APIs; add TLS leaf fingerprint pinning during rotations.
 - Pin content hashes for static bundles (e.g., Mozilla public roots) when feasible.
 - Keep secrets in env vars, not YAML; use CI secret stores.
-- Treat `sources/fetched/` as ephemeral staging, not a cache.
+- Treat `sources/staged/` as ephemeral staging, not a cache.
 
 ### 🔐 Vault fetcher
 
@@ -131,6 +133,7 @@ fetch:
 ```
 
 Environment variables supported:
+
 - `VAULT_ADDR` and `VAULT_TOKEN` are used if `addr` or `token_ref` are not set.
 
 ### 🧩 Keyfactor fetcher (generic API)
@@ -156,15 +159,17 @@ export KEYFACTOR_TOKEN=...
 ```
 
 Testing without live Vault/Keyfactor:
+
 - Use `file://` and `https://` against known public resources to validate fetch.
 - For provider flows, mock the endpoints locally (e.g., with `pytest` monkeypatch or a tiny HTTP server) and point `endpoint:` to `http://127.0.0.1:NNNN` (note: the fetcher rejects insecure HTTP by default; for tests use HTTPS with self-signed + `verify.ca_file`, or patch the URL opener in tests).
 - Unit tests in this repo exercise the fetch module via file URLs and hash pinning; provider-specific tests can stub network calls.
 
 Troubleshooting highlights:
+
 - Insecure HTTP rejected → use HTTPS or file URLs.
 - SHA256/TLS fingerprint mismatch → update pins after validating legitimate changes.
 - `hvac` missing → install extras `.[fetchers]`.
-- `--offline` with `fetch:` present → pre-stage in connected environments.
+- Offline builds → pre-stage inputs using `bundlecraft fetch` in a connected environment, commit or package them, then run `bundlecraft build --skip-fetch`.
 
 ---
 
@@ -182,23 +187,34 @@ bundlecraft build --craft <craft> --bundle <bundle_name> [OPTIONS]
 
 **Options:**
 
-| Option          | Description                                              |
-| --------------- | -------------------------------------------------------- |
-| `--craft`       | Craft name (e.g., `dev`, `prod`, `dmz`). Required. |
-| `--bundle`      | Bundle name (e.g., `internal`, `external`). Required.    |
-| `--package`     | Also create a `.tar.gz` archive of the build folder.     |
-| `--verify-only` | Skip build; verify certificates only.                    |
-| `--offline`     | Do not contact the network; fail if `fetch` is required. |
-| `--output-root` | Root directory for build outputs (default: `./dist`).    |
+| Option            | Description |
+| ----------------- | ----------- |
+| `--craft` / `--env` | Craft name (e.g., `dev`, `prod`). Required. |
+| `--bundle`        | Target name to build (from craft `targets`). If omitted, builds all targets; legacy: a non-target value builds a single bundle. |
+| `--verify-only`   | Skip build; only verify existing output or staged sources. |
+| `--skip-fetch`    | Skip the fetch stage; use existing staged inputs (offline-friendly). |
+| `--skip-verify`   | Skip verification (not recommended for production). |
+| `--output-root`   | Root directory for outputs (default: `./dist`). |
+| `--verbose`       | Enable verbose logging. |
+| `--force`         | Overwrite existing output files. |
+| `--dry-run`       | Show actions without writing files or executing external tools. |
+| `--sign`          | GPG-sign release artifacts. |
+| `--gpg-key-id`    | GPG key ID to use for signing. |
+| `--generate-sbom` | Generate CycloneDX SBOM (default). |
+| `--no-sbom`       | Disable SBOM generation. |
+| `--json`          | Emit machine-readable JSON. |
+| `--keep-temp`     | Preserve temporary build directories on failure. |
 
 **Outputs:**
 
-* `bundlecraft-ca-trust.pem`: canonical PEM bundle
-* `bundlecraft-ca-trust.jks`: Java KeyStore bundle
-* `bundlecraft-ca-trust.p12`: PKCS#12 bundle
-* `bundlecraft-ca-trust.p7b`: PKCS#7 bundle
-* `checksums.sha256`: per-file integrity manifest
-* `manifest.json`: build metadata summary
+- `bundlecraft-ca-trust.pem`: canonical PEM bundle
+- `bundlecraft-ca-trust.jks`: Java KeyStore bundle
+- `bundlecraft-ca-trust.p12`: PKCS#12 bundle
+- `bundlecraft-ca-trust.p7b`: PKCS#7 bundle
+- `checksums.sha256`: per-file integrity manifest
+- `manifest.json`: build metadata summary
+- `package.tar.gz`: deterministic tar archive of artifacts (controlled by craft config `package`, default: enabled)
+- `sbom.json`: CycloneDX SBOM (when enabled)
 
 **Examples:**
 
@@ -209,8 +225,11 @@ bundlecraft build --craft prod --bundle internal
 # Verify only (no rebuild)
 bundlecraft build --env dev --bundle internal --verify-only
 
-# Offline build: will fail if bundle config contains 'fetch:' entries
-bundlecraft build --craft prod --bundle internal --offline
+# Offline-friendly build:
+# 1) Pre-stage in a connected environment: bundlecraft fetch --bundle-config-file config/bundles/internal.yaml
+# 2) Commit or package staged inputs
+# 3) Build without network access:
+bundlecraft build --craft prod --bundle internal --skip-fetch
 ```
 
 Local source schema tip:
@@ -255,10 +274,10 @@ bundlecraft verify --target <build_dir_or_file> [OPTIONS]
 
 **Verification Features:**
 
-* Validates file checksums via `checksums.sha256`
-* Ensures bundle consistency across formats
-* Counts certificates in PEM, P12, P7B, and JKS
-* Detects hash mismatches or empty bundles
+- Validates file checksums via `checksums.sha256`
+- Ensures bundle consistency across formats
+- Counts certificates in PEM, P12, P7B, and JKS
+- Detects hash mismatches or empty bundles
 
 **Examples:**
 
@@ -271,7 +290,6 @@ bundlecraft verify --target dist/prod/internal --verify-all --verbose
 ```
 
 ---
-
 
 ### 🔄 `bundlecraft convert`
 
@@ -310,6 +328,7 @@ bundlecraft convert --input dist/prod/internal/bundlecraft-ca-trust.pem --output
 
 **Output Filenames:**
 All outputs use standardized naming: `bundlecraft-ca-trust.[FORMAT]`
+
 - Example: `bundlecraft-ca-trust.pem`, `bundlecraft-ca-trust.jks`, `bundlecraft-ca-trust.tar.gz`
 
 **ZIP Output Format:**
@@ -371,12 +390,14 @@ bundlecraft diff --from dist/prod/v1/internal --to dist/prod/v2/internal --outpu
 **Output:**
 
 Human-readable format includes:
+
 - Summary of changes (added, removed, unchanged counts)
 - Full details of added certificates (subject, fingerprint, issuer, validity period)
 - Full details of removed certificates
 - Manifest metadata from both bundles (craft, target, timestamp)
 
 JSON format provides structured data suitable for:
+
 - Automated CI/CD pipelines
 - Integration with monitoring systems
 - Historical tracking and analysis

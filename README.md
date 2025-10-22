@@ -1,19 +1,18 @@
 # 🔐 BundleCraft - Modern PKI Trust Store Builder
 
-## Overview
-
 ![GitHub license](https://img.shields.io/github/license/bundlecraft-io/bundlecraft)
 ![GitHub release](https://img.shields.io/github/v/release/bundlecraft-io/bundlecraft)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/bundlecraft-io/bundlecraft/bundlecraft.yaml)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/bundlecraft-io/bundlecraft/bundlecraft.yaml?branch=main)
+
+> ⚠️ **Important:** BundleCraft is in early pre-release (v0.1.0). The API, CLI, and docs may change as we iterate toward a stable v1.0.0. This is an independent, passion-driven project developed in off-hours with a focus on practical PKI automation, secure engineering practices, and contributing back to the PKI community.
 
 ---
 
 ## Overview
 
-**BundleCraft** is a modern, configuration-as-code system for **fetching, building, verifying, and distributing multi-format certificate trust bundles** across environments.
-It securely sources certificate material from trusted remote origins or local files, then produces reproducible, auditable outputs for OS, Java, and application platforms.
+**BundleCraft** is a modern, configuration-as-code system for **fetching, building, verifying, and distributing multi-format certificate trust bundles** across environments. It securely sources certificate material from trusted remote origins or local files, then produces reproducible, auditable outputs for OS, Java, and application platforms.
 
-> **In short:** BundleCraft lets you define *how trust is built* - not just *what to trust*.
+> In short: BundleCraft lets you define how trust is built-not just what to trust.
 
 ---
 
@@ -51,7 +50,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 - **Problem:** "It works on my machine" but fails in CI. Different Python versions, missing tools, inconsistent outputs.
 - **Solution:** Configuration-as-code with deterministic builds. Same inputs = same outputs, every time. Perfect for GitOps workflows.
 
-**Key Outputs Each Build:**
+### Key Outputs Each Build
 
 - Canonical **PEM** bundle (with annotated subjects, deduplication)
 - **PKCS#7 (.p7b)** - DER-encoded bundle
@@ -59,8 +58,8 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 - **PKCS#12 (.p12/.pfx)** - multi-cert export, password-protected
 - **ZIP** (tarball of PEMs, one per cert)
 - Deterministic **manifest.json** and **checksums.sha256** (traceability)
-- **SBOM (Software Bill of Materials)** in CycloneDX format (automatic)
-- **GPG signatures (.asc)** for all artifacts (optional)
+- **SBOM (Software Bill of Materials)** in CycloneDX format (optional, on by default)
+- **GPG signatures (.asc)** for all artifacts (optional, when `--sign`)
 
 ---
 
@@ -73,9 +72,9 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 - **Extensible config model:** defaults → environment → bundle
 - **Portable tooling:** Python + OpenSSL + Java keytool
 - **Manifest and checksum generation:** for auditing and release integrity
-- **SBOM generation:** Automatic CycloneDX SBOM for supply chain transparency
-- **GPG signing integration:** Sign all release artifacts with detached signatures
-- **Signature verification:** Built-in verification for signed releases
+- **SBOM generation:** CycloneDX SBOM for supply chain transparency (enabled by default; can be disabled)
+- **GPG signing integration:** Sign release artifacts with detached signatures (`--sign`)
+- **Signature verification:** Built-in verification for signed releases (see Verifier)
 - **CI/CD ready:** Designed for (but not exclusive to) GitHub Actions, supports concurrency and artifact management
 - **Flexible bundle and environment definitions**: Easily add new trust bundles or environments
 
@@ -83,7 +82,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 ## 📁 Repository Structure
 
-```
+```shell
 ├── sources/                # Certificate sources (roots, intermediates, vendor, etc.)
 ├── config/                 # YAML configuration (defaults, crafts, bundles)
 │   ├── defaults.yaml
@@ -94,7 +93,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 ├── docs/                   # Project documentation
 ├── .github/
 │   └── workflows/
-│       └── bundlecraft.yaml  # CI/CD pipeline for builds, verification, releases
+│       └── bundlecraft.yaml  # CI for builds/verification (see also test workflows)
 ├── pyproject.toml        # Project metadata and dependencies
 ├── README.md               # This file
 └── LICENSE                 # MIT License
@@ -102,11 +101,11 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 ---
 
-## 🏗️ How It Works - Pipeline
+## 🏗️ How It Works – Pipeline
 
-BundleCraft uses a **layered configuration model** and a four-stage pipeline:
+BundleCraft uses a **layered configuration model** and a three-stage pipeline:
 
-fetch → build → verify → convert (CI orchestrates discover → build → collect → verify → publish)
+fetch → convert → verify (CI orchestrates discover → build → collect → verify → publish)
 
 1. **Defaults** (`config/defaults.yaml`):
    Global settings (verification, filters, formats)
@@ -118,12 +117,12 @@ fetch → build → verify → convert (CI orchestrates discover → build → c
    Content definition (certificate sources to include/exclude)
 
 4. **Fetch (optional but recommended)** (`fetch:` in bundle):
-  Securely fetch and stage certificates from trusted remote origins into `sources/fetched/<env>/<bundle>/`. Staging is cleaned each run; no persistent cache.
+  Securely fetch and stage certificates from trusted remote origins into `sources/staged/<craft>/<bundle>/`. Staging is cleaned each run; no persistent cache.
 
 **Flow:**
 
 - Merge config layers: defaults ← env ← bundle
-- If `fetch:` is present, securely stage remote sources under `sources/fetched/<env>/<bundle>/` with provenance
+- If `fetch:` is present, securely stage remote sources under `sources/staged/<craft>/<bundle>/` with provenance
 - Deduplicate, verify, and annotate certs
 - Generate canonical PEM bundle
 - Convert to JKS, P7B, P12
@@ -132,7 +131,9 @@ fetch → build → verify → convert (CI orchestrates discover → build → c
 - Verify all outputs and cross-format consistency
 - Optionally sign and publish release artifacts
 
-### Craft composition (merge bundles per craft)
+---
+
+### ⚙️ Target/Bundle Composition in Craft Config Files
 
 Environments can define composed target bundles that merge one or more base bundles.
 
@@ -158,8 +159,8 @@ bundlecraft build --craft prod --bundle mozilla
 
 Outputs:
 
-- `dist/Development/internal-dev/` contains both internal and mozilla certs (craft display name)
-- `dist/Production/mozilla/` contains only mozilla certs
+- `dist/dev/internal-dev/` contains both internal and mozilla certs (target name)
+- `dist/prod/mozilla/` contains only mozilla certs
 
 ---
 
@@ -167,9 +168,14 @@ Outputs:
 
 ### Bundle Config (`config/bundles/*.yaml`)
 
-Defines what certificates go into a bundle and where to fetch them from.
+These configuration files are your **trusted certificate sources.**
 
-Use the named repo schema for local sources and optionally add fetch entries for remote sources.
+It defines where BundleCraft where retrieve CA certificates from and stage them for a build. These certificates can either come from:
+
+- `repo`: a locally committed source, useful for simplicity or if you'd like explicit control of which exact certificates are built from within the repository, along with the rest of `bundlecraft` build configuration.
+- `fetch`: a trusted remote source, such as HashiCorp Vault, Keyfactor Command, or the Mozilla CA Bundle from [curl.se](https://curl.se/docs/caextract.html). Useful when managing trusted certificates in separate systems, while still being able to use `bundlecraft` configuration to perform further filtering.
+
+These bundles are then referenced by craft configuration files, which will go on to define which bundles these sourced certificates will appear in.
 
 ```yaml
 bundle_name: internal
@@ -197,6 +203,12 @@ fetch:
 ### Craft Config (`config/crafts/*.yaml`)
 
 Defines **how** bundles are built in a specific context, including secrets, output path, global filters, and format behavior.
+
+These configuration files are your **customized certificate trust bundles.**
+
+It defines how BundleCraft (based on the certificate source configurations from `config/bundles/`) will build, merge, package, and prepare your trust bundle files for distribution. These are essentially your environment specific configuration files.
+
+Additional build filters, verification guardrails, packaging settings, and formatting options can be specified here.
 
 ```yaml
 name: Example Craft
@@ -232,11 +244,11 @@ These can be overridden by environment or bundle configs.
 
 ---
 
-## 🚀 Quickstart - Fetching, Building, and Verifying Trust Bundles
+## 🚀 Quickstart – Fetching, Building, and Verifying Trust Bundles
 
 ### 1. Install Prerequisites
 
-**System dependencies:**
+System dependencies
 
 ```bash
 # Required for conversions and verification
@@ -246,7 +258,7 @@ sudo apt-get install openssl openjdk-17-jre-headless  # (for keytool)
 sudo apt-get install jq
 ```
 
-**Python dependencies:**
+Python dependencies
 
 ```bash
 # Install with runtime dependencies
@@ -256,15 +268,24 @@ pip install -e .
 pip install -e ".[dev]"
 ```
 
-**Shell completion (optional):**
+### Shell completion (optional)
+
+BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags:
 
 ```bash
-# Bash - add to ~/.bashrc for persistence
+# Bash - run in your current shell (or add to ~/.bashrc for persistence)
 eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
 
-# Zsh - add to ~/.zshrc for persistence
+# Zsh - run in your current shell (or add to ~/.zshrc for persistence)
 eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 ```
+
+**Notes:**
+
+- You need to run this **after** activating your venv (if using one)
+- The completion works for all subcommands (`build`, `verify`, `convert`, etc.) and their flags
+- For persistence, add the `eval` line to your shell's rc file (`~/.bashrc` or `~/.zshrc`)
+- If completion stops working, re-run the `eval` command
 
 ### 2. Prepare Certificate Sources
 
@@ -275,11 +296,11 @@ eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 ### 3. Fetch and Build
 
 ```bash
-# Build a craft target (fetch is done automatically unless skipped)
+# Build a craft target (fetch runs automatically unless skipped)
 bundlecraft build --craft prod --bundle internal-prod
 ```
 
-- Produces artifacts in `dist/Production/internal-prod/`:
+- Produces artifacts in `dist/prod/internal-prod/`:
 
 ```text
 bundlecraft-ca-trust.pem
@@ -294,7 +315,7 @@ package.tar.gz  # if enabled
 ### 4. Verify Outputs
 
 ```bash
-bundlecraft verify --target dist/Production/internal-prod --verbose --verify-all
+bundlecraft verify --target dist/prod/internal-prod --verbose --verify-all
 ```
 
 - Checks:
@@ -308,7 +329,7 @@ bundlecraft verify --target dist/Production/internal-prod --verbose --verify-all
 - `1`: Warnings (certs expiring soon)
 - `5`: Failure (expired certs, parse errors, empty/mismatched outputs)
 
-### 5. Convert Bundles Ad-Hoc (if needed)
+### 5. Convert Bundles Ad-hoc (if needed)
 
 ```bash
 # Convert DER to PEM
@@ -354,9 +375,10 @@ BundleCraft supports the following environment variables for configuration:
 - **SBOM generation:** Automatic Software Bill of Materials in CycloneDX format
 - **Signature verification:** Built-in verification for signed releases with keyring support
 
-### Signing Release Artifacts
+### Signing Release Artifacts (optional)
 
 Sign all release artifacts with GPG:
+
 ```bash
 # Generate or use existing GPG key
 gpg --full-generate-key
@@ -369,7 +391,8 @@ bundlecraft build --craft prod --bundle mozilla --sign
 bundlecraft verify --target dist/Production/mozilla --verify-signatures
 ```
 
-See [SIGNING-AND-SBOM.md](docs/SIGNING-AND-SBOM.md) for complete guide on:
+See [SIGNING-AND-SBOM.md](docs/SIGNING-AND-SBOM.md) for the complete guide on:
+
 - GPG key generation and management
 - CI/CD integration with GitHub Actions
 - SBOM usage and validation
@@ -377,20 +400,20 @@ See [SIGNING-AND-SBOM.md](docs/SIGNING-AND-SBOM.md) for complete guide on:
 
 ---
 
-## 🧰 Scripts Reference
+## 🧰 Scripts Reference (selected)
 
 |Script|Purpose|Example Usage|
 |---|---|---|
-| `bundlecraft.fetch` (CLI: `bundlecraft fetch`) | Securely fetch remote sources and stage them (no persistent cache) | `bundlecraft fetch --env prod --bundle internal` |
+| `bundlecraft.fetch` (CLI: `bundlecraft fetch`) | Securely fetch remote sources and stage them (no persistent cache) | `bundlecraft fetch --craft prod --bundle internal` |
 | `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --craft prod --bundle internal-prod` |
-| `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify dist/prod/internal/` |
+| `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify dist/prod/internal` |
 | `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert any supported input to any supported output (PEM, P7B, JKS, P12, ZIP) | `bundlecraft convert --input dist/prod/internal/bundlecraft-ca-trust.pem --output-dir dist/prod/internal/ --output-format jks` |
 
 For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/README.md).
 
 ---
 
-## 📐 Trust Matrix (Envs × Bundles)
+## 📐 Trust Matrix (Environments × Bundles)
 
 The release pipeline now publishes a trust matrix that shows which crafts (rows) trust which bundles (columns), derived from `config/crafts/*.yaml` composition (`targets.<name>.includes`).
 
@@ -419,7 +442,7 @@ Notes:
 
 ---
 
-## 🏭 CI/CD Pipeline
+## 🏭 CI/CD Pipeline (quick overview)
 
 The included workflows automate builds and fetch tests:
 
@@ -433,10 +456,10 @@ The included workflows automate builds and fetch tests:
 - Optionally signs and publishes a release tarball
 - Concurrency: only one pipeline per branch at a time
 
-Notes:
+Notes
 
 - Prefer declaring composed targets in env files (for example: `internal-dev` includes `[internal, mozilla]`).
-- If you want bundles to build offline, pre-stage with `bundlecraft fetch` in a connected job, then run build with `--offline`.
+- If you want bundles to build offline, pre-stage with `bundlecraft fetch` in a connected job, then run build with `--skip-fetch`.
 
 Test server used in CI:
 
@@ -519,13 +542,13 @@ When triggering manually, you can optionally filter environments:
   Install optional extras: `pip install -e .[fetchers]`.
 
 - **Offline builds**
-  `bundlecraft build --offline` fails if `fetch:` is present (by design). Pre-stage with `bundlecraft fetch` in connected environments, then commit or package the staged inputs.
+  Use `bundlecraft build --skip-fetch` to avoid network access. If your config includes `fetch:`, pre-stage with `bundlecraft fetch` in connected environments, then commit or package the staged inputs.
 
 See also: [Troubleshooting Guide](docs/troubleshooting.md)
 
 ---
 
-## 🔮 Philosophy, Best Practices, and Roadmap
+## 🔮 Philosophy & Best Practices
 
 ### Philosophy: BundleCraft as a trusted middleman
 
@@ -581,7 +604,7 @@ Core principles:
         ca_file: config/certs/vault-ca.pem
   ```
 
-Best config practices:
+Best config practices
 
 - Always use HTTPS; never `http://`
 - Pin content (`verify.sha256`) for static/public bundles when possible (e.g., Mozilla)
@@ -596,14 +619,14 @@ Best config practices:
 
 ---
 
-## ⏳ Release & Signing
+## ⏳ Release & Signing (initial release)
 
 - **Release artifacts** are published automatically via GitHub Actions.
 - **GPG signing** is supported if a key is provided via GitHub Secrets.
 - **Verification instructions** are included in release notes:
 
   ```bash
-  curl -O https://raw.githubusercontent.com/chrisjpich/bundlecraft/main/docs/public-gpg-key.asc
+  curl -O https://raw.githubusercontent.com/bundlecraft-io/bundlecraft/main/docs/public-gpg-key.asc
   gpg --import public-gpg-key.asc
   gpg --verify truststore_bundle.tar.gz.asc truststore_bundle.tar.gz
   ```
@@ -619,13 +642,16 @@ Best config practices:
 
 ---
 
-## � Quick Reference
+## ⚡ Quick Reference
 
 ### Common Commands
 
 ```bash
-# Build a bundle
-bundlecraft build --env prod --bundle internal
+# Build all bundles in the production environment
+bundlecraft build --craft prod
+
+# Build only the internal bundle in the production environment
+bundlecraft build --craft prod --bundle internal
 
 # Verify a bundle
 bundlecraft verify --target dist/prod/internal --verify-all
@@ -634,7 +660,7 @@ bundlecraft verify --target dist/prod/internal --verify-all
 bundlecraft convert --input bundlecraft-ca-trust.pem --output-dir ./ --output-format jks
 
 # Build with packaging
-bundlecraft build --env prod --bundle internal --package
+bundlecraft build --craft prod --bundle internal --force
 
 # Force overwrite during conversion
 bundlecraft convert --input bundlecraft-ca-trust.der --output-dir ./ --output-format pem --force
@@ -659,6 +685,7 @@ bundlecraft verify --target dist/prod/mozilla --json | jq -r '.verified_files'
 ```
 
 **Benefits:**
+
 - **Stable schemas** - Documented, versioned JSON schemas for reliable parsing
 - **Error handling** - Structured error messages in JSON even on failures
 - **CI/CD friendly** - No ANSI colors, emojis, or unparseable output
@@ -691,21 +718,24 @@ Every build produces:
 
 - Issues and PRs are welcome!
 - Please ensure all changes are reflected in relevant docs in [`docs/`](docs/).
-- For major changes, propose in a GitHub Discussion.
+- For more info, see: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 
 ---
 
 ## 🏷️ Tags & Metadata
 
-- **Category:** PKI, Certificate Management, DevOps, Security Automation
+- **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, openssl, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, keytool, certificates, pki-tools
 
 ---
 
 ## 🔗 Related Projects & References
 
-- [OpenSSL Documentation](https://www.openssl.org/docs/)
-- [Java Keytool Documentation](https://docs.oracle.com/javase/8/docs/technotes/tools/unix/keytool.html)
-- [PKI Concepts](https://en.wikipedia.org/wiki/Public_key_infrastructure)
+- [RFC 5280 — Internet X.509 PKI Certificate and CRL Profile](https://datatracker.ietf.org/doc/html/rfc5280)
+- [RFC 5652 — Cryptographic Message Syntax (CMS / PKCS#7)](https://datatracker.ietf.org/doc/html/rfc5652)
+- [RFC 7292 — PKCS #12 v1.1 (Personal Information Exchange)](https://datatracker.ietf.org/doc/html/rfc7292)
+- OpenSSL documentation: [pkcs12](https://www.openssl.org/docs/manmaster/man1/openssl-pkcs12.html), [x509](https://www.openssl.org/docs/manmaster/man1/openssl-x509.html), [crl2pkcs7](https://www.openssl.org/docs/manmaster/man1/openssl-crl2pkcs7.html)
+- Java keytool documentation: [keytool](https://docs.oracle.com/javase/8/docs/technotes/tools/unix/keytool.html)
+- OpenSSL Cookbook (practical guide): <https://www.feistyduck.com/library/openssl-cookbook/online/>
 
 ---
 
@@ -719,12 +749,12 @@ Special thanks to all the security and infrastructure teams out there, whose col
 
 ## 📣 Questions?
 
-Open an [issue](https://github.com/chrisjpich/bundlecraft/issues)
-or reach out via [GitHub Discussions](https://github.com/chrisjpich/bundlecraft/discussions)
+Open an [issue](https://github.com/bundlecraft-io/bundlecraft/issues)
+or reach out via [GitHub Discussions](https://github.com/bundlecraft-io/bundlecraft/discussions)
 
 ---
 
-© 2025 Chris J Pich
+© 2025 Chris J. Pich
 Licensed under the [MIT License](./LICENSE).
 
 > Made with ❤️ (and ☕) for anyone who’s ever debugged a broken trust chain.
