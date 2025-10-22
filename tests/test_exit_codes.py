@@ -161,7 +161,7 @@ class TestFetchCommandExitCodes:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(tmp_path / "nonexistent.yaml"),
             ],
         )
@@ -175,7 +175,7 @@ class TestFetchCommandExitCodes:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(invalid_config),
             ],
         )

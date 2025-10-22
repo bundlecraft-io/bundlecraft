@@ -122,12 +122,12 @@ BundleCraft provides the building blocks for trust bundle creation, while your C
 3. **Sources** (`config/sources/<source>.yaml`):
    Bundle content definition (certificate sources to include/exclude)
     - **Fetch** (`fetch:` in `<source>`):
-  Securely fetch and stage certificates from trusted remote origins into `sources/staged/<craft>/<bundle>/`. Staging is cleaned each run; no persistent cache.
+  Securely fetch and stage certificates from trusted remote origins into `sources/staged/<env>/<bundle>/`. Staging is cleaned each run; no persistent cache.
 
 **Flow:**
 
 - Merge config layers: defaults ← env ← bundle
-- If `fetch:` is present, securely stage remote sources under `sources/staged/<craft>/<bundle>/` with provenance
+- If `fetch:` is present, securely stage remote sources under `sources/staged/<env>/<bundle>/` with provenance
 - Deduplicate, verify, and annotate certs
 - Generate canonical PEM bundle
 - Convert to JKS, P7B, P12
@@ -140,7 +140,7 @@ BundleCraft provides the building blocks for trust bundle creation, while your C
 
 ### ⚙️ Target/Bundle Composition in Environment Config Files
 
-Environments can define composed target bundles that merge one or more base bundles.
+Environments can define composed target bundles that merge one or more base sources.
 
 In `config/envs/dev.yaml`:
 
@@ -155,17 +155,17 @@ bundles:
 Commands:
 
 ```bash
-# Build the composed target (composed from bundles)
-bundlecraft build --env dev --bundle internal-dev
+# Build all configured bundles (composed from sources)
+bundlecraft build --env dev
 
-# Build one target from a production craft
-bundlecraft build --env prod --bundle mozilla
+# Build one bundle from the dev environment
+bundlecraft build --env dev --bundle mozilla
 ```
 
 Outputs:
 
 - `dist/dev/internal-dev/` contains both internal and mozilla certs (target name)
-- `dist/prod/mozilla/` contains only mozilla certs
+- `dist/dev/mozilla/` contains only mozilla certs
 
 ---
 
@@ -301,7 +301,7 @@ eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 ### 3. Fetch and Build
 
 ```bash
-# Build a craft target (fetch runs automatically unless skipped)
+# Build a bundle (fetch runs automatically unless skipped)
 bundlecraft build --env prod --bundle internal-prod
 ```
 
@@ -447,7 +447,7 @@ Notes:
 
 ---
 
-## 🏭 CI/CD Pipeline (quick overview)
+## 🏭 CI/CD Pipeline
 
 The included workflows automate builds and fetch tests:
 
@@ -455,7 +455,7 @@ The included workflows automate builds and fetch tests:
 - [test-bundlecraft-fetch.yaml](.github/workflows/test-bundlecraft-fetch.yaml): Fetch test suite (Vault, HTTP, API)
 
 - Discover → Build → Collect → Verify → Publish
-- Build per-craft “targets” declared in `config/envs/<env>.yaml` under `bundles:` (composition-aware)
+- Build per-env “bundles” declared in `config/envs/<env>.yaml` under `bundles:` (composition-aware)
 - For each target, the job runs `bundlecraft build` and respects `build_path` via `--output-root`
 - Uploads artifacts per target using the naming `trust-store-<env>-<target>`
 - Optionally signs and publishes a release tarball
@@ -680,7 +680,7 @@ All BundleCraft commands support `--json` flag for CI/CD automation and scriptin
 bundlecraft build --env prod --bundle mozilla --json | jq .
 
 # Parse specific fields in scripts
-SUCCESS=$(bundlecraft fetch --bundle-config-file config/sources/mozilla.yaml --json | jq -r '.success')
+SUCCESS=$(bundlecraft fetch --source-config-file config/sources/mozilla.yaml --json | jq -r '.success')
 if [ "$SUCCESS" = "true" ]; then
   echo "Fetch succeeded"
 fi

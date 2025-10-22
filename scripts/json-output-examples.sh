@@ -21,9 +21,9 @@ echo ""
 
 # Example 1: Fetch command with JSON output
 echo "1. Fetch Command (dry-run)"
-echo "Command: bundlecraft fetch --bundle-config-file config/sources/mozilla.yaml --dry-run --json"
+echo "Command: bundlecraft fetch --source-config-file config/sources/mozilla.yaml --dry-run --json"
 echo ""
-bundlecraft fetch --bundle-config-file config/sources/mozilla.yaml --dry-run --json | jq .
+bundlecraft fetch --source-config-file config/sources/mozilla.yaml --dry-run --json | jq .
 echo ""
 
 # Example 2: Convert command with JSON output
@@ -45,14 +45,14 @@ echo ""
 echo "4. Extracting Specific Fields with jq"
 echo "Command: bundlecraft fetch ... --json | jq -r '.success'"
 echo ""
-SUCCESS=$(bundlecraft fetch --bundle-config-file config/sources/mozilla.yaml --dry-run --json | jq -r '.success')
+SUCCESS=$(bundlecraft fetch --source-config-file config/sources/mozilla.yaml --dry-run --json | jq -r '.success')
 echo "Success: $SUCCESS"
 echo ""
 
 # Example 5: Using JSON output in error handling
 echo "5. Error Handling with JSON Output"
 echo ""
-OUTPUT=$(bundlecraft fetch --bundle-config-file config/sources/mozilla.yaml --dry-run --json)
+OUTPUT=$(bundlecraft fetch --source-config-file config/sources/mozilla.yaml --dry-run --json)
 if echo "$OUTPUT" | jq -e '.success' > /dev/null; then
     echo "✅ Operation succeeded"
     FETCHED=$(echo "$OUTPUT" | jq -r '.fetched_sources')

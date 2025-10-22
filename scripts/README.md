@@ -427,7 +427,7 @@ Parse `config/crafts/*.yaml` (or legacy `config/envs/*.yaml`) and output a JSON 
 
 - Reads craft files for `targets: <name>.includes: [...]`
 - Emits objects: `{ "env": "<craft>", "target": "<target>", "output_root": "<build_path or dist>" }`
-- Used by GitHub Actions to build per craft/target
+- Used by GitHub Actions to build per env/bundle
 
 Usage:
 

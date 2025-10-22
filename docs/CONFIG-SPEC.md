@@ -572,7 +572,7 @@ bundlecraft build --env prod --bundle internal-prod --force
 ### Fetch
 
 ```bash
-bundlecraft fetch --bundle-config-file config/sources/mozilla.yaml --workspace-root .
+bundlecraft fetch --source-config-file config/sources/mozilla.yaml --workspace-root .
 ```
 
 - Loads `config/sources/mozilla.yaml` and stages into `sources/staged/<craft>/<bundle>/`

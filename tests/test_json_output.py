@@ -39,7 +39,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_config),
                 "--workspace-root",
                 str(tmp_path),
@@ -68,7 +68,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_config),
                 "--json",
             ],
@@ -243,7 +243,7 @@ class TestJsonOutputSchema:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_config),
                 "--dry-run",
                 "--json",
@@ -270,7 +270,7 @@ class TestJsonOutputSchema:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_config),
                 "--json",
             ],
@@ -293,7 +293,7 @@ class TestJsonOutputSchema:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_config),
                 "--dry-run",
                 "--json",

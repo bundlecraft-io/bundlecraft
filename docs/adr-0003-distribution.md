@@ -9,7 +9,7 @@ Related: ADR-0001, README, SECURITY.md, RELEASE.md, CI/CD workflows
 
 ## 1) Context update
 
-ADR-0001 recommended distributing BundleCraft primarily as an OCI-compliant container image and a template repository, explicitly avoiding PyPI. As the project matured (environment configs, CI filtering, clearer separation of bundle vs craft responsibilities), we revisited distribution to balance security, developer UX, and portability.
+ADR-0001 recommended distributing BundleCraft primarily as an OCI-compliant container image and a template repository, explicitly avoiding PyPI. As the project matured (environment configs, CI filtering, clearer separation of source vs env responsibilities), we revisited distribution to balance security, developer UX, and portability.
 
 The goal: keep trust-sensitive workflows safe and reproducible while making local adoption and CI integration simple.
 

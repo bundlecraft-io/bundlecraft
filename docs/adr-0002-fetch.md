@@ -13,7 +13,7 @@ BundleCraft currently operates as a **three-stage pipeline**:
 
 | Stage       | Purpose                                         | Typical Input        | Output                       |
 | ----------- | ----------------------------------------------- | -------------------- | ---------------------------- |
-| **build**   | Aggregate certificates, craft bundle structures | `.pem` files (local) | Canonical PEM                |
+| **build**   | Aggregate certificates sources, env/bundle structures, verify files | `.pem` files (local) | Canonical PEM                |
 | **verify**  | Validate contents and health of the bundle      | Built PEMs           | Verified manifest            |
 | **convert** | Produce alternate formats for consumption       | Verified bundle      | `.p12`, `.jks`, `.p7b`, etc. |
 

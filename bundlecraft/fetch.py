@@ -541,7 +541,7 @@ def _fetch_each_to_named_dirs(
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
-    "--bundle-config-file",
+    "--source-config-file",
     "source_config_file",
     type=click.Path(exists=True, dir_okay=False, file_okay=True, path_type=Path),
     required=True,

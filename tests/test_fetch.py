@@ -24,7 +24,7 @@ class TestFetch:
     def test_fetch_help(self, cli_runner):
         result = cli_runner.invoke(fetch_main, ["--help"])
         assert result.exit_code == 0
-        assert "--bundle-config-file" in result.output
+        assert "--source-config-file" in result.output
 
     def test_fetch_no_section(self, cli_runner, temp_workspace, test_data_dir):
         # Create a bundle config with includes only (no fetch section)
@@ -47,7 +47,7 @@ repo:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(cfg_path),
                 "--workspace-root",
                 str(temp_workspace),
@@ -80,7 +80,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
@@ -112,7 +112,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
@@ -136,7 +136,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
@@ -173,7 +173,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
@@ -201,7 +201,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
@@ -227,7 +227,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),
@@ -287,7 +287,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_dir / "test-bundle.yaml"),
                 "--workspace-root",
                 str(temp_workspace),

@@ -94,7 +94,7 @@ Example (json):
 
 ### 2) Policy-driven build
 
-Config (craft and/or bundle level):
+Config (env level):
 
 ```yaml
 algorithm_policy:

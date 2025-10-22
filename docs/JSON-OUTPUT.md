@@ -285,7 +285,7 @@ The `fetch` command produces the following JSON structure:
 
 **Successful fetch:**
 ```bash
-bundlecraft fetch --bundle-config-file config/sources/mozilla.yaml --json
+bundlecraft fetch --source-config-file config/sources/mozilla.yaml --json
 ```
 
 ```json

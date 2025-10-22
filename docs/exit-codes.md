@@ -122,11 +122,11 @@ fi
 
 **Example:**
 ```bash
-bundlecraft fetch --bundle-config-file bundle.yaml
+bundlecraft fetch --source-config-file bundle.yaml
 if [ $? -eq 20 ]; then
     echo "Network error - retrying..."
     sleep 5
-    bundlecraft fetch --bundle-config-file bundle.yaml
+    bundlecraft fetch --source-config-file bundle.yaml
 fi
 ```
 
@@ -247,7 +247,7 @@ MAX_RETRIES=3
 RETRY_DELAY=5
 
 for i in $(seq 1 $MAX_RETRIES); do
-    bundlecraft fetch --bundle-config-file bundle.yaml
+    bundlecraft fetch --source-config-file bundle.yaml
     EXIT_CODE=$?
 
     if [ $EXIT_CODE -eq 0 ]; then
@@ -317,7 +317,7 @@ esac
        # Test config error
        bundlecraft build --env-config-file invalid.yaml || true
        # Test network error handling
-       bundlecraft fetch --bundle-config-file bundle.yaml || true
+       bundlecraft fetch --source-config-file bundle.yaml || true
    ```
 
 5. **Document expected exit codes in your CI/CD pipeline:**

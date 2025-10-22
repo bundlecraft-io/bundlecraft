@@ -159,7 +159,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_config),
                 "--workspace-root",
                 str(temp_dir),
@@ -188,7 +188,7 @@ fetch:
         result = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_config),
                 "--workspace-root",
                 str(temp_dir),
@@ -216,7 +216,7 @@ repo:
         _ = cli_runner.invoke(
             fetch_main,
             [
-                "--bundle-config-file",
+                "--source-config-file",
                 str(bundle_config),
                 "--workspace-root",
                 str(temp_dir),

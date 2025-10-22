@@ -33,7 +33,7 @@ Build Flow:
 ┌─────────────────────────────────────────────────────┐
 │ 3. Atomic commit (on success)                       │
 │    os.replace(temp, final) → POSIX atomic rename    │
-│    dist/craft/target/ now contains complete build   │
+│    dist/env/bundle/ now contains complete build   │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -59,7 +59,7 @@ Failure Flow:
                       ▼
 ┌─────────────────────────────────────────────────────┐
 │ Existing final location unchanged                   │
-│ dist/craft/target/ still has previous build (if any)│
+│ dist/env/bundle/ still has previous build (if any)│
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -233,7 +233,7 @@ ps aux | grep bundlecraft
 **Solution**:
 ```bash
 # Check permissions
-ls -ld dist/craft/target/
+ls -ld dist/env/bundle/
 
 # Fix permissions
 sudo chown -R $(whoami) dist/

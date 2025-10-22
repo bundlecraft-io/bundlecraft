@@ -214,7 +214,7 @@ Once you have bundle and environment configs, test the CLI directly:
 bundlecraft build --env dev
 
 # Individual stages
-bundlecraft fetch --bundle-config-file config/sources/internal.yaml
+bundlecraft fetch --source-config-file config/sources/internal.yaml
 bundlecraft convert --input dist/dev/internal/bundlecraft-ca-trust.pem --output-dir dist/dev/internal
 bundlecraft verify --target dist/dev/internal --verify-all
 bundlecraft diff --from sources/staged/internal/rootCA.pem --to dist/dev/internal/bundlecraft-ca-trust.pem
@@ -368,7 +368,7 @@ Handy commands for common tasks:
 | Run tests            | `pytest -v`                                                   |
 | Build bundle         | `bundlecraft build --env dev --bundle internal`             |
 | Verify bundle        | `bundlecraft verify --target dist/dev/internal --verify-all`  |
-| Fetch remote sources | `bundlecraft fetch --bundle-config-file config/sources/*.yaml` |
+| Fetch remote sources | `bundlecraft fetch --source-config-file config/sources/*.yaml` |
 | Build Python package | `python -m build`                                             |
 | Validate package     | `twine check dist/*`                                          |
 

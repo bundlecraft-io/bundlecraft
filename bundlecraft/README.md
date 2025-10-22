@@ -65,7 +65,7 @@ Purpose: Reach out to preconfigured and trusted certificate sources at build-tim
 Usage:
 
 ```bash
-bundlecraft fetch --bundle-config-file config/bundles/<bundle>.yaml \
+bundlecraft fetch --source-config-file config/bundles/<bundle>.yaml \
   [--output-dir ./sources/staged] [--fetch-name <name>] [--workspace-root <dir>] \
   [--no-clean] [--dry-run] [--json] [--verbose]
 ```
@@ -182,15 +182,15 @@ Troubleshooting highlights:
 **Usage:**
 
 ```bash
-bundlecraft build --craft <craft> --bundle <bundle_name> [OPTIONS]
+bundlecraft build --env <env>  [OPTIONS]
 ```
 
 **Options:**
 
 | Option            | Description |
 | ----------------- | ----------- |
-| `--craft` / `--env` | Craft name (e.g., `dev`, `prod`). Required. |
-| `--bundle`        | Target name to build (from craft `targets`). If omitted, builds all targets; legacy: a non-target value builds a single bundle. |
+| `--env`           | Env name (e.g., `dev`, `prod`). Required. |
+| `--bundle`        | Bundle name to build (from env `bundles`). If omitted, builds all bundles|
 | `--verify-only`   | Skip build; only verify existing output or staged sources. |
 | `--skip-fetch`    | Skip the fetch stage; use existing staged inputs (offline-friendly). |
 | `--skip-verify`   | Skip verification (not recommended for production). |
@@ -213,23 +213,23 @@ bundlecraft build --craft <craft> --bundle <bundle_name> [OPTIONS]
 - `bundlecraft-ca-trust.p7b`: PKCS#7 bundle
 - `checksums.sha256`: per-file integrity manifest
 - `manifest.json`: build metadata summary
-- `package.tar.gz`: deterministic tar archive of artifacts (controlled by craft config `package`, default: enabled)
+- `package.tar.gz`: deterministic tar archive of artifacts (controlled by env config `package`, default: enabled)
 - `sbom.json`: CycloneDX SBOM (when enabled)
 
 **Examples:**
 
 ```bash
-# Build a composed target in a craft
-bundlecraft build --craft prod --bundle internal
+# Build a composed bundle in an env
+bundlecraft build --env prod --bundle internal
 
 # Verify only (no rebuild)
 bundlecraft build --env dev --bundle internal --verify-only
 
 # Offline-friendly build:
-# 1) Pre-stage in a connected environment: bundlecraft fetch --bundle-config-file config/bundles/internal.yaml
+# 1) Pre-stage in a connected environment: bundlecraft fetch --source-config-file config/bundles/internal.yaml
 # 2) Commit or package staged inputs
 # 3) Build without network access:
-bundlecraft build --craft prod --bundle internal --skip-fetch
+bundlecraft build --env prod --bundle internal --skip-fetch
 ```
 
 Local source schema tip:
@@ -394,7 +394,7 @@ Human-readable format includes:
 - Summary of changes (added, removed, unchanged counts)
 - Full details of added certificates (subject, fingerprint, issuer, validity period)
 - Full details of removed certificates
-- Manifest metadata from both bundles (craft, target, timestamp)
+- Manifest metadata from both bundles (e, target, timestamp)
 
 JSON format provides structured data suitable for:
 
