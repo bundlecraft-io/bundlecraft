@@ -49,7 +49,7 @@ def convert_to_formats(
     Args:
         pem_path (Path): Input PEM file path
         build_root (Path): Output directory
-        formats (list[str]): Target formats (e.g., ["p7b", "jks", "p12"])
+        formats (list[str]): Bundle formats (e.g., ["p7b", "jks", "p12"])
         fmt_overrides (dict|None): Optional per-format overrides (alias/password settings)
         output_basename (str|None): Base name for output files (default: input file stem)
         dry_run (bool): If True, show what would be done without executing

@@ -211,7 +211,7 @@ The `convert` command produces the following JSON structure:
 
 - **input_path**: `string` - Path to the input file
 - **output_dir**: `string` - Path to the output directory
-- **output_format**: `string` - Target output format (e.g., "pem", "jks", "p12", "p7b")
+- **output_format**: `string` - Bundle output format (e.g., "pem", "jks", "p12", "p7b")
 - **certificate_count**: `integer` - Number of certificates processed (0 if count unavailable)
 - **errors**: `array of string` (optional) - List of errors if conversion failed
 - **dry_run**: `boolean` (optional) - Present and `true` if `--dry-run` was used

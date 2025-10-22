@@ -85,8 +85,8 @@ output_formats: [pem, jks]
 
         target_a = craft_out / "bundle-a"
         target_b = craft_out / "bundle-b"
-        assert target_a.exists(), "Target A should exist"
-        assert target_b.exists(), "Target B should exist"
+        assert target_a.exists(), "Bundle A should exist"
+        assert target_b.exists(), "Bundle B should exist"
 
         # Verify both targets have identical PEM content (copied from cache)
         pem_a = (target_a / "bundlecraft-ca-trust.pem").read_text()
@@ -94,11 +94,11 @@ output_formats: [pem, jks]
         cached_pem = (cache_root / "bundlecraft-ca-trust.pem").read_text()
 
         assert pem_a == pem_b, "Both targets should have identical PEM"
-        assert pem_a == cached_pem, "Target PEM should match cached PEM"
+        assert pem_a == cached_pem, "Bundle PEM should match cached PEM"
 
         # Verify both targets have JKS files
-        assert (target_a / "bundlecraft-ca-trust.jks").exists(), "Target A JKS should exist"
-        assert (target_b / "bundlecraft-ca-trust.jks").exists(), "Target B JKS should exist"
+        assert (target_a / "bundlecraft-ca-trust.jks").exists(), "Bundle A JKS should exist"
+        assert (target_b / "bundlecraft-ca-trust.jks").exists(), "Bundle B JKS should exist"
 
 
 def test_multi_bundle_target_merges_cached_pems(

@@ -589,7 +589,7 @@ bundlecraft build --env prod --bundle internal-prod --skip-fetch
 
 ---
 
-## Distribution Target Types
+## Distribution Bundle Types
 
 Supported values for `distribution_metadata.targets[].type`:
 

@@ -236,7 +236,7 @@ def main(
             if not json_output:
                 click.secho(f"[dry-run] Would convert from: {in_path}", fg="yellow")
                 click.secho(f"[dry-run] Would write to: {out_dir}", fg="yellow")
-                click.secho(f"[dry-run] Target format(s): {', '.join(formats)}", fg="yellow")
+                click.secho(f"[dry-run] Bundle format(s): {', '.join(formats)}", fg="yellow")
                 if output_basename:
                     click.secho(f"[dry-run] Output basename: {output_basename}", fg="yellow")
                 click.secho("\n[SUCCESS] [dry-run] Conversion simulation complete", fg="yellow")
