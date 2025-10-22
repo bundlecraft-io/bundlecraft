@@ -149,8 +149,8 @@ bundlecraft/
 │   └── helpers/           # Internal utilities
 ├── config/                # Configuration files
 │   ├── defaults.yaml      # Global defaults
-│   ├── crafts/            # Craft/environment definitions
-│   └── bundles/           # Bundle definitions
+│   ├── envs/              # Environment definitions
+│   └── sources/           # Cert sources definitions
 ├── sources/               # Certificate sources
 │   ├── internal/          # Committed certificates
 │   └── staged/            # Fetched certificates (ephemeral)
@@ -197,8 +197,8 @@ bundlecraft/
 
 #### Configuration
 
-- `config/defaults.yaml` – Global defaults for all crafts/bundles
-- `config/envs/*.yaml` – Environment/craft definitions (targets, filters, verify policies)
+- `config/defaults.yaml` – Global defaults for all envs/sources
+- `config/envs/*.yaml` – Environment definitions (targets, filters, verify policies)
 - `config/sources/*.yaml` – Bundle definitions (sources, fetch specs)
 
 ---
@@ -345,7 +345,7 @@ See `docs/adr-0006-corerelease.md` for the full distribution strategy.
 
 ## 🌐 Notes on the Fetch Layer
 
-- Fetch is staging-only: do not introduce persistent caches; use `sources/staged/<craft>/<bundle>/` which is cleaned per run.
+- Fetch is staging-only: do not introduce persistent caches; use `sources/staged/<env>/<sources>/` which is cleaned per run.
 - Security controls to uphold:
   - HTTPS only for remote endpoints (URLs/APIs)
   - Optional custom CA (`verify.ca_file`), optional TLS leaf fingerprint pin (`verify.tls_fingerprint_sha256`)

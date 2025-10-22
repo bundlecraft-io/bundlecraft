@@ -13,10 +13,10 @@ concurrency:
   cancel-in-progress: true
 jobs:
   discover:
-    name: Discover environment targets
+    name: Discover environment bundles
     runs-on: ubuntu-latest
     outputs:
-      env_targets: ${{ steps.detect.outputs.env_targets }}
+      env_bundles: ${{ steps.detect.outputs.env_bundles }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,18 +28,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml
-      - name: Detect environment targets
+      - name: Detect environment bundles
         id: detect
         env:
           INPUT_ENVIRONMENTS: ${{ github.event.inputs.environments }}
         run: |
           set -euo pipefail
           if [ -n "${INPUT_ENVIRONMENTS:-}" ]; then
-            python scripts/detect_env_targets.py --envs "${INPUT_ENVIRONMENTS}" --github-release-only | tee env_targets.json
+            python scripts/detect_env_bundles.py --envs "${INPUT_ENVIRONMENTS}" --github-release-only | tee env_bundles.json
           else
-            python scripts/detect_env_targets.py --github-release-only | tee env_targets.json
+            python scripts/detect_env_bundles.py --github-release-only | tee env_bundles.json
           fi
-          echo "env_targets=$(cat env_targets.json)" >> "$GITHUB_OUTPUT"
+          echo "env_bundles=$(cat env_bundles.json)" >> "$GITHUB_OUTPUT"
       - name: Summarize selection and validate
         env:
           INPUT_ENVIRONMENTS: ${{ github.event.inputs.environments }}
@@ -50,8 +50,8 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y jq
           fi
-          ALL_JSON=$(python scripts/detect_env_targets.py)
-          FILTERED_JSON=$(cat env_targets.json)
+          ALL_JSON=$(python scripts/detect_env_bundles.py)
+          FILTERED_JSON=$(cat env_bundles.json)
           ALL_ENVS_FILE=$(mktemp)
           echo "$ALL_JSON" | jq -r '.[].env' | sort -u > "$ALL_ENVS_FILE"
           FILTERED_ENVS=$(echo "$FILTERED_JSON" | jq -r '.[].env' | sort -u | paste -sd ', ' - || true)
@@ -88,7 +88,7 @@ jobs:
               if [ "$TARGETS_COUNT" -gt 0 ]; then
                 echo
                 echo '### Targets'
-                echo "$FILTERED_JSON" | jq -r '.[] | "- \(.env)/\(.target)"'
+                echo "$FILTERED_JSON" | jq -r '.[] | "- \(.env)/\(.bundle)"'
               fi
             } >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -97,17 +97,17 @@ jobs:
             exit 2
           fi
           if [ -n "${SELECTED_SORTED}" ] && [ "$TARGETS_COUNT" -eq 0 ]; then
-            echo "::error::No targets found for the selected environments." >&2
+            echo "::error::No bundles found for the selected environments." >&2
             exit 2
           fi
   build:
-    name: Build per environment target
+    name: Build per environment bundle
     needs: discover
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        item: ${{ fromJson(needs.discover.outputs.env_targets) }}
+        item: ${{ fromJson(needs.discover.outputs.env_bundles) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -119,12 +119,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-      - name: Build bundle target
+      - name: Build bundle
         run: |
-          echo "Building target: ${{ matrix.item.target }} in craft: ${{ matrix.item.env }}"
+          echo "Building bundle: ${{ matrix.item.bundle }} in env: ${{ matrix.item.env }}"
           bundlecraft build \
             --env ${{ matrix.item.env }} \
-            --bundle ${{ matrix.item.target }} \
+            --bundle ${{ matrix.item.bundle }} \
             --output-root "${{ matrix.item.output_root }}" \
             --verbose --json
       - name: Show output directory structure
@@ -136,17 +136,17 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          matches=("${{ matrix.item.output_root }}"/*/"${{ matrix.item.target }}")
+          matches=("${{ matrix.item.output_root }}"/*/"${{ matrix.item.bundle }}")
           if [ ${#matches[@]} -eq 0 ]; then
-            echo "::error::No build output found at ${{ matrix.item.output_root }}/*/${{ matrix.item.target }}/"
+            echo "::error::No build output found at ${{ matrix.item.output_root }}/*/${{ matrix.item.bundle }}/"
             exit 1
           fi
           echo "Found build output: ${matches[0]}"
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
-          name: trust-store-${{ matrix.item.env }}-${{ matrix.item.target }}
-          path: ${{ matrix.item.output_root }}/*/${{ matrix.item.target }}/
+          name: trust-store-${{ matrix.item.env }}-${{ matrix.item.bundle }}
+          path: ${{ matrix.item.output_root }}/*/${{ matrix.item.bundle }}/
           if-no-files-found: error
   collect:
     name: Collect and package all builds
@@ -177,16 +177,16 @@ jobs:
               dest="bundlecraft/${env}/${bundle}"
               mkdir -p "$dest"
 
-              # Detect nested layout: artifact may contain craft-dir/target-dir structure
+              # Detect nested layout: artifact may contain env-dir/bundle-dir structure
               # Look for subdirectories matching the bundle name
               shopt -s nullglob
               nested_sources=("${artifact_dir}"/*/"${bundle}")
               if [ ${#nested_sources[@]} -gt 0 ] && [ -d "${nested_sources[0]}" ]; then
-                # Found nested structure: copy from craft-dir/target-dir
+                # Found nested structure: copy from env-dir/bundle-dir
                 echo "  Detected nested layout; copying from: ${nested_sources[0]}"
                 cp -R "${nested_sources[0]}/"* "$dest"/ || true
               else
-                # Flat structure or direct target content: copy from artifact root
+                # Flat structure or direct bundle content: copy from artifact root
                 cp -R "${artifact_dir}/"* "$dest"/ || true
               fi
               shopt -u nullglob
@@ -207,14 +207,14 @@ jobs:
           sha256sum bundlecraft-trust.tar.gz > bundlecraft-trust.sha256
           echo "Created tarball and checksum:"
           sha256sum bundlecraft-trust.tar.gz
-          echo "=== Creating per-craft-bundle tarballs (flat contents) ==="
+          echo "=== Creating per-env-bundle tarballs (flat contents) ==="
           mapfile -t TARGETS < <(find bundlecraft -mindepth 2 -maxdepth 2 -type d | sort)
           for dir in "${TARGETS[@]}"; do
-            craft="$(echo "$dir" | awk -F/ '{print $2}')"
+            env="$(echo "$dir" | awk -F/ '{print $2}')"
             bundle="$(echo "$dir" | awk -F/ '{print $3}')"
-            name="bundlecraft-trust-craft-${craft}-bundle-${bundle}.tar.gz"
+            name="bundlecraft-trust-env-${env}-bundle-${bundle}.tar.gz"
             # Create a flat tarball with the contents of the bundle at the archive root
-            tar -czf "$name" -C "bundlecraft/${craft}/${bundle}" .
+            tar -czf "$name" -C "bundlecraft/${env}/${bundle}" .
             sha256sum "$name" > "${name%.tar.gz}.sha256"
             echo "Created per-bundle tarball: $name"
           done
@@ -233,10 +233,10 @@ jobs:
       - name: Upload per-bundle tarballs
         uses: actions/upload-artifact@v4
         with:
-          name: truststore-target-bundles
+          name: truststore-bundles
           path: |
-            bundlecraft-trust-craft-*-bundle-*.tar.gz
-            bundlecraft-trust-craft-*-bundle-*.sha256
+            bundlecraft-trust-env-*-bundle-*.tar.gz
+            bundlecraft-trust-env-*-bundle-*.sha256
   verify:
     name: Verify builds and tarball
     needs: collect
@@ -320,7 +320,7 @@ jobs:
       - name: Download per-bundle artifacts
         uses: actions/download-artifact@v4
         with:
-          name: truststore-target-bundles
+          name: truststore-bundles
           path: release/
       - name: Generate release tag and name
         id: version
@@ -422,7 +422,7 @@ jobs:
           fi
           perenv_md=""
           shopt -s nullglob
-          files=(release/bundlecraft-trust-craft-*-bundle-*.tar.gz)
+          files=(release/bundlecraft-trust-env-*-bundle-*.tar.gz)
           if [ ${#files[@]} -eq 0 ]; then
             perenv_md="(none)\n"
           else
@@ -452,7 +452,7 @@ jobs:
             sha_lines+=$(cat release/bundlecraft-trust.sha256)
             sha_lines+=$'\n'
           fi
-          for s in release/bundlecraft-trust-craft-*-bundle-*.sha256; do
+          for s in release/bundlecraft-trust-env-*-bundle-*.sha256; do
             [ -f "$s" ] || continue
             sha_lines+=$(cat "$s")
             sha_lines+=$'\n'
@@ -468,7 +468,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          files=(release/bundlecraft-trust-craft-*-bundle-*.tar.gz)
+          files=(release/bundlecraft-trust-env-*-bundle-*.tar.gz)
           if [ ${#files[@]} -eq 0 ]; then
             echo "craft_count=0" >> "$GITHUB_OUTPUT"
             {
@@ -478,14 +478,14 @@ jobs:
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          mapfile -t PAIRS < <(printf "%s\n" "${files[@]}" | sed -E 's#^.*/bundlecraft-trust-craft-([^/]+)-bundle-(.+)\.tar\.gz$#\1/\2#' | sort)
+          mapfile -t PAIRS < <(printf "%s\n" "${files[@]}" | sed -E 's#^.*/bundlecraft-trust-env-([^/]+)-bundle-(.+)\.tar\.gz$#\1/\2#' | sort)
           count=${#PAIRS[@]}
           echo "craft_count=$count" >> "$GITHUB_OUTPUT"
           {
             echo "craft_list_markdown<<EOF"
             for p in "${PAIRS[@]}"; do
-              craft="${p%%/*}"; bundle="${p#*/}"
-              echo "- ${craft}/${bundle} (bundlecraft-trust-craft-${craft}-bundle-${bundle}.tar.gz)"
+              env="${p%%/*}"; bundle="${p#*/}"
+              echo "- ${env}/${bundle} (bundlecraft-trust-env-${env}-bundle-${bundle}.tar.gz)"
             done
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
@@ -511,7 +511,7 @@ jobs:
             ### Download assets
             - Combined (all envs):
             ${{ steps.assets.outputs.assets_combined_markdown }}
-            - Per-craft/bundle assets:
+            - Per-env/bundle assets:
             ${{ steps.assets.outputs.assets_perenv_markdown }}
 
             ### SHA256 checksums
@@ -552,21 +552,21 @@ jobs:
             - Certificate metadata (serial, issuer, subject, fingerprints)
             - Fetch provenance (source URLs, verification hashes)
             - Tooling metadata (Python version, cryptography version)
-            - Build metadata (craft, target, timestamp)
+            - Build metadata (env, bundle, timestamp)
 
             ### Consumers: quick start
-            Per-craft/bundle archive (recommended for targeted usage):
+            Per-env/bundle archive (recommended for targeted usage):
             ```bash
             # Verify checksum
-            sha256sum -c bundlecraft-trust-craft-<craft>-bundle-<bundle>.sha256
+            sha256sum -c bundlecraft-trust-env-<env>-bundle-<bundle>.sha256
 
             # Extract (flat contents at archive root)
-            tar -xzf bundlecraft-trust-craft-<craft>-bundle-<bundle>.tar.gz
+            tar -xzf bundlecraft-trust-env-<env>-bundle-<bundle>.tar.gz
 
             # Access bundle files
             ls -la
             ```
-            Combined bundle (all crafts and targets):
+            Combined bundle (all envs and bundles):
             ```bash
             # Verify checksum and signature (if provided)
             sha256sum -c bundlecraft-trust.sha256
@@ -582,8 +582,8 @@ jobs:
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
             release/bundlecraft-trust.tar.gz.asc
-            release/bundlecraft-trust-craft-*-bundle-*.tar.gz
-            release/bundlecraft-trust-craft-*-bundle-*.sha256
+            release/bundlecraft-trust-env-*-bundle-*.tar.gz
+            release/bundlecraft-trust-env-*-bundle-*.sha256
             release/TRUST_MATRIX.md
             release/trust-matrix.json
       - name: Create GitHub Release (unsigned)
@@ -608,7 +608,7 @@ jobs:
             ### Download assets
             - Combined (all envs):
             ${{ steps.assets.outputs.assets_combined_markdown }}
-            - Per-target bundles:
+            - Per-bundle:
             ${{ steps.assets.outputs.assets_perenv_markdown }}
 
             ### SHA256 checksums
@@ -628,21 +628,21 @@ jobs:
             - Certificate metadata (serial, issuer, subject, fingerprints)
             - Fetch provenance (source URLs, verification hashes)
             - Tooling metadata (Python version, cryptography version)
-            - Build metadata (craft, target, timestamp)
+            - Build metadata (env, bundle, timestamp)
 
             ### Consumers: quick start
-            Per-craft-target bundle (recommended for targeted usage):
+            Per-env-bundle (recommended for targeted usage):
             ```bash
             # Verify checksum
-            sha256sum -c bundlecraft-trust-craft-<craft>-target-<target>.sha256
+            sha256sum -c bundlecraft-trust-env-<env>-bundle-<bundle>.sha256
 
-            # Extract (creates <craft>/<target>/ directory structure)
-            tar -xzf bundlecraft-trust-craft-<craft>-target-<target>.tar.gz
+            # Extract (creates <env>/<bundle>/ directory structure)
+            tar -xzf bundlecraft-trust-env-<env>-bundle-<bundle>.tar.gz
 
             # Access bundle files
-            ls <craft>/<target>/
+            ls <env>/<bundle>/
             ```
-            Combined bundle (all crafts and targets):
+            Combined bundle (all envs and bundles):
             ```bash
             # Verify checksum
             sha256sum -c bundlecraft-trust.sha256
@@ -656,8 +656,8 @@ jobs:
           files: |-
             release/bundlecraft-trust.tar.gz
             release/bundlecraft-trust.sha256
-            release/bundlecraft-trust-craft-*-bundle-*.tar.gz
-            release/bundlecraft-trust-craft-*-bundle-*.sha256
+            release/bundlecraft-trust-env-*-bundle-*.tar.gz
+            release/bundlecraft-trust-env-*-bundle-*.sha256
             release/TRUST_MATRIX.md
             release/trust-matrix.json
             release/bundlecraft-trust-env-*-bundle-*.sha256

@@ -84,12 +84,12 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 ```shell
 ├── sources/                # Certificate sources (roots, intermediates, vendor, etc.)
-├── config/                 # YAML configuration (defaults, crafts, bundles)
+├── config/                 # YAML configuration (defaults, envs, sources)
 │   ├── defaults.yaml
-│   ├── crafts/
-│   └── bundles/
+│   ├── envs/
+│   └── sources/
 ├── bundlecraft/            # Python scripts for build, verify, convert, helpers
-├── dist/                   # Generated outputs (per craft/target)
+├── dist/                   # Generated outputs (per env/bundle)
 ├── docs/                   # Project documentation
 ├── .github/
 │   └── workflows/
@@ -103,20 +103,25 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 ## 🏗️ How It Works – Pipeline
 
-BundleCraft uses a **layered configuration model** and a three-stage pipeline:
+BundleCraft uses a **layered configuration model** and a three-stage pipeline when performing a `bundlecraft build`, its core operation:
 
-fetch → convert → verify (CI orchestrates discover → build → collect → verify → publish)
+`fetch/source → convert → verify`
+
+BundleCraft provides the building blocks for trust bundle creation, while your CI/CD environment orchestrates the broader workflow:
+
+`discover → build → collect → publish`
+
+**Configuration Overview:**
 
 1. **Defaults** (`config/defaults.yaml`):
    Global settings (verification, filters, formats)
 
-2. **Craft** (`config/envs/<craft>.yaml`):
+2. **Environments** (`config/envs/<env>.yaml`):
   Contextual overrides (paths, secrets, output formats, targets)
 
-3. **Bundle** (`config/sources/<bundle>.yaml`):
-   Content definition (certificate sources to include/exclude)
-
-4. **Fetch (optional but recommended)** (`fetch:` in bundle):
+3. **Sources** (`config/sources/<source>.yaml`):
+   Bundle content definition (certificate sources to include/exclude)
+    - **Fetch** (`fetch:` in `<source>`):
   Securely fetch and stage certificates from trusted remote origins into `sources/staged/<craft>/<bundle>/`. Staging is cleaned each run; no persistent cache.
 
 **Flow:**
@@ -415,7 +420,7 @@ For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/R
 
 ## 📐 Trust Matrix (Environments × Bundles)
 
-The release pipeline now publishes a trust matrix that shows which crafts (rows) trust which bundles (columns), derived from `config/envs/*.yaml` composition (`targets.<name>.includes`).
+The release pipeline now publishes a trust matrix that shows which envs (rows) trust which sources/bundles (columns), derived from `config/envs/*.yaml` composition (`targets.<name>.includes`).
 
 Artifacts attached to releases:
 
