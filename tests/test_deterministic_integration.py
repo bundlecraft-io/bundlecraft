@@ -87,8 +87,8 @@ verify:
                 catch_exceptions=False,
             )
 
-        if result1.exit_code != 0:
-            pytest.skip(f"Build 1 failed: {result1.output}")
+        # Build must succeed
+        assert result1.exit_code == 0, f"Build 1 failed: {result1.output}"
 
         # Wait a moment to ensure different timestamp
         time.sleep(0.2)
@@ -109,15 +109,16 @@ verify:
                 catch_exceptions=False,
             )
 
-        if result2.exit_code != 0:
-            pytest.skip(f"Build 2 failed: {result2.output}")
+        # Build must succeed
+        assert result2.exit_code == 0, f"Build 2 failed: {result2.output}"
 
         # Compare package.tar.gz files
         pkg1 = output1 / "Test" / "test-bundle" / "package.tar.gz"
         pkg2 = output2 / "Test" / "test-bundle" / "package.tar.gz"
 
-        if not pkg1.exists() or not pkg2.exists():
-            pytest.skip("Package files not created")
+        # Expected artifacts must exist
+        assert pkg1.exists(), "First build package.tar.gz missing"
+        assert pkg2.exists(), "Second build package.tar.gz missing"
 
         hash1 = hashlib.sha256(pkg1.read_bytes()).hexdigest()
         hash2 = hashlib.sha256(pkg2.read_bytes()).hexdigest()
@@ -193,13 +194,13 @@ verify:
                 catch_exceptions=False,
             )
 
-        if result.exit_code != 0:
-            pytest.skip(f"Build failed: {result.output}")
+        # Build must succeed
+        assert result.exit_code == 0, f"Build failed: {result.output}"
 
         # Check checksums file
         checksums_path = output / "Test" / "test-bundle" / "checksums.sha256"
-        if not checksums_path.exists():
-            pytest.skip("Checksums file not created")
+        # Checksums file must exist
+        assert checksums_path.exists(), "Checksums file not created"
 
         checksums_content = checksums_path.read_text()
 

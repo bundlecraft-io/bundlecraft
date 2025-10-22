@@ -55,9 +55,10 @@ class TestBuilder:
                     str(temp_workspace / "dist"),
                 ],
             )
-            # May succeed or fail depending on config availability
-            # Just ensure it runs without crashing
-            assert isinstance(result.exit_code, int)
+            # Without explicit configs in this test, build should fail gracefully
+            assert result.exit_code != 0
+            out = result.output.lower()
+            assert "error" in out or "missing" in out or "environment config not found" in out
 
     def test_build_with_packaging(self, cli_runner, temp_workspace):
         """Test building a bundle with packaging enabled."""
@@ -74,8 +75,10 @@ class TestBuilder:
                     str(temp_workspace / "dist"),
                 ],
             )
-            # Just verify the --package flag is accepted
-            assert isinstance(result.exit_code, int)
+            # No configs provided, so expect a non-zero exit with a helpful message
+            assert result.exit_code != 0
+            out = result.output.lower()
+            assert "package" in out or "missing" in out or "environment config not found" in out
 
     @pytest.mark.parametrize("format", ["pem", "p7b", "jks", "p12"])
     def test_build_different_formats(self, cli_runner, temp_workspace, format):
@@ -94,7 +97,10 @@ class TestBuilder:
                     str(temp_workspace / "dist"),
                 ],
             )
-            assert isinstance(result.exit_code, int)
+            # Without configs, build should fail; verify error surfaced
+            assert result.exit_code != 0
+            out = result.output.lower()
+            assert "format" in out or "missing" in out or "environment config not found" in out
 
     def test_build_missing_config(self, cli_runner, temp_dir):
         """Test that build fails gracefully with missing config."""
@@ -141,9 +147,10 @@ class TestBuilder:
                     str(temp_workspace / "dist"),
                 ],
             )
-            # Should fail or warn about no sources
-            # Exit code check ensures it runs
-            assert isinstance(result.exit_code, int)
+            # Should fail or warn (no config in this scenario)
+            assert result.exit_code != 0
+            out = result.output.lower()
+            assert "source" in out or "missing" in out or "environment config not found" in out
 
     def test_build_targets_output_structure(
         self, cli_runner, temp_workspace, sample_bundle_config, monkeypatch

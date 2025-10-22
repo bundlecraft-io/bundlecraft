@@ -326,7 +326,7 @@ jobs:
         id: version
         run: |
           DATE=$(date -u +"%Y.%m.%d-%H%M")
-          echo "tag=truststore-v${DATE}" >> $GITHUB_OUTPUT
+          echo "tag=bundlecraft-truststore-v${DATE}" >> $GITHUB_OUTPUT
           echo "name=BundleCraft CA Trust Store - ${DATE}" >> $GITHUB_OUTPUT
       - name: Check if GPG key is available
         id: gpg-check

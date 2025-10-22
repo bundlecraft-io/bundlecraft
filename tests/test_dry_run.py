@@ -136,7 +136,8 @@ class TestBuilderDryRun:
         assert result.exit_code in (0, 2)
         # If dry-run mode is active, it should show the message
         if "[DRY RUN MODE]" in result.output or "[dry-run]" in result.output.lower():
-            assert True  # Dry-run message present
+            # Ensure the generic dry-run explanation is present
+            assert "no files will be written" in result.output.lower()
 
 
 @pytest.mark.dry_run
