@@ -89,7 +89,7 @@ fetch:
             ],
         )
         assert result.exit_code == 0
-        files = list((staging / "test-bundle" / "sample").glob("*.pem"))
+        files = list((staging / "test-bundle" / "fetch" / "sample").glob("*.pem"))
         assert files
         assert _sha256_of(files[0]) == sha
 
@@ -183,8 +183,8 @@ fetch:
         )
         assert result.exit_code == 0
         assert not extra.exists()
-        # Expect files under bundle dir then named subdir 'sample'
-        assert list((staging / "test-bundle" / "sample").glob("*.pem"))
+        # Expect files under bundle dir then fetch/<name> subdir 'sample'
+        assert list((staging / "test-bundle" / "fetch" / "sample").glob("*.pem"))
 
     def test_fetch_api_https_required(self, cli_runner, temp_workspace):
         bundle_dir = temp_workspace / "config" / "sources"
@@ -296,8 +296,8 @@ fetch:
         assert result.exit_code == 0
         # Default output directory changed from sources/fetched to sources/staged
         staged = temp_workspace / "sources" / "staged"
-        assert (staged / "test-bundle" / "from_vault").exists()
-        pems = list((staged / "test-bundle" / "from_vault").glob("*.pem"))
+        assert (staged / "test-bundle" / "fetch" / "from_vault").exists()
+        pems = list((staged / "test-bundle" / "fetch" / "from_vault").glob("*.pem"))
         assert len(pems) > 0
-        # Under new CLI, files go under <output-dir>/<source_name>/<fetch-name>
-        assert list((staged / "test-bundle" / "from_vault").glob("*.pem"))
+        # Files go under <output-dir>/<source_name>/fetch/<fetch-name>
+        assert list((staged / "test-bundle" / "fetch" / "from_vault").glob("*.pem"))

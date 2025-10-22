@@ -69,7 +69,7 @@ BundleCraft uses standardized exit codes to communicate command outcomes to call
 
 **Example:**
 ```bash
-bundlecraft build --env-config-file craft.yaml
+bundlecraft build --env-config-file env.yaml
 echo $?  # Check exit code
 ```
 
@@ -86,7 +86,7 @@ echo $?  # Check exit code
 
 **Example:**
 ```bash
-bundlecraft verify --target dist/my-craft/production/
+bundlecraft verify --target dist/my-env/production/
 if [ $? -eq 31 ]; then
     echo "ERROR: Expired certificates detected"
     exit 1
@@ -146,7 +146,7 @@ fi
 ```yaml
 - name: Build trust bundle
   id: build
-  run: bundlecraft build --env-config-file craft.yaml
+  run: bundlecraft build --env-config-file env.yaml
   continue-on-error: true
 
 - name: Handle build failure
@@ -154,14 +154,14 @@ fi
   run: |
     EXIT_CODE=${{ steps.build.outputs.exit_code }}
     if [ "$EXIT_CODE" -eq 2 ]; then
-      echo "::error::Configuration error - fix craft.yaml"
+      echo "::error::Configuration error - fix env.yaml"
       exit 1
     elif [ "$EXIT_CODE" -eq 31 ]; then
       echo "::warning::Expired certificates detected"
       # Continue with build but notify team
     elif [ "$EXIT_CODE" -eq 20 ]; then
       echo "::warning::Network error - retrying"
-      bundlecraft build --env-config-file craft.yaml
+      bundlecraft build --env-config-file env.yaml
     else
       echo "::error::Build failed with exit code $EXIT_CODE"
       exit 1
@@ -173,7 +173,7 @@ fi
 ```yaml
 build_bundle:
   script:
-    - bundlecraft build --env-config-file craft.yaml
+    - bundlecraft build --env-config-file env.yaml
   allow_failure:
     exit_codes:
       - 31  # Allow expired cert warnings in dev
@@ -190,20 +190,20 @@ pipeline {
             steps {
                 script {
                     def exitCode = sh(
-                        script: 'bundlecraft build --env-config-file craft.yaml',
+                        script: 'bundlecraft build --env-config-file env.yaml',
                         returnStatus: true
                     )
 
                     if (exitCode == 0) {
                         echo 'Build successful'
                     } else if (exitCode == 2) {
-                        error('Configuration error - check craft.yaml')
+                        error('Configuration error - check env.yaml')
                     } else if (exitCode == 31) {
                         unstable('Expired certificates detected')
                     } else if (exitCode == 20) {
                         // Retry on network errors
                         retry(3) {
-                            sh 'bundlecraft build --env-config-file craft.yaml'
+                            sh 'bundlecraft build --env-config-file env.yaml'
                         }
                     } else {
                         error("Build failed with exit code: ${exitCode}")
@@ -266,7 +266,7 @@ done
 #### Expired Certificate Handling
 ```bash
 #!/bin/bash
-bundlecraft build --env-config-file craft.yaml
+bundlecraft build --env-config-file env.yaml
 EXIT_CODE=$?
 
 case $EXIT_CODE in
@@ -293,7 +293,7 @@ esac
 
 1. **Always check exit codes in automation:**
    ```bash
-   bundlecraft build --env-config-file craft.yaml || exit $?
+   bundlecraft build --env-config-file env.yaml || exit $?
    ```
 
 2. **Use exit codes for conditional logic:**

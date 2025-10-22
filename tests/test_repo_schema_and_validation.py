@@ -76,8 +76,8 @@ repo:
     # Verify staging layout contains both repo names under build_cache
     cache_root = temp_workspace / "build_cache" / "TestCraft" / "repo-bundle"
     assert cache_root.exists()
-    # build_cache stores canonical outputs, but staging happens under sources/staged/<env>/<bundle>/<repo>
-    staged_repo_root = temp_workspace / "sources" / "staged" / "test" / "repo-bundle"
+    # build_cache stores canonical outputs, but staging happens under sources/staged/<source_name>/<repo>
+    staged_repo_root = temp_workspace / "sources" / "staged" / "repo-bundle"
     assert (staged_repo_root / "roots").exists()
     assert (staged_repo_root / "extras").exists()
 

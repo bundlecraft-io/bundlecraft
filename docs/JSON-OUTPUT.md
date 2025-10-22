@@ -38,7 +38,7 @@ The `build` command produces the following JSON structure:
   "command": "build",
   "timestamp": "2025-10-21T12:00:00+00:00",
   "version": "0.1.0",
-  "craft": string,
+  "env": string,
   "targets": [
     {
       "name": string,
@@ -60,7 +60,7 @@ The `build` command produces the following JSON structure:
 
 #### Build Fields
 
-- **craft**: `string` - Name of the craft/environment used for the build
+- **env**: `string` - Name of the env/environment used for the build
 - **targets**: `array` - List of targets that were built
   - **name**: `string` - Name of the target
   - **certificate_count**: `integer` - Number of certificates in the bundle
@@ -87,7 +87,7 @@ bundlecraft build --env prod --bundle mozilla --json
   "command": "build",
   "timestamp": "2025-10-21T12:00:00+00:00",
   "version": "0.1.0",
-  "craft": "prod",
+  "env": "prod",
   "targets": [
     {
       "name": "mozilla",
@@ -112,7 +112,7 @@ bundlecraft build --env prod --bundle mozilla --json
   "command": "build",
   "timestamp": "2025-10-21T12:00:00+00:00",
   "version": "0.1.0",
-  "craft": "prod",
+  "env": "prod",
   "targets": [],
   "errors": ["Craft config not found: prod"]
 }
@@ -419,13 +419,13 @@ from jsonschema import validate
 
 build_schema = {
     "type": "object",
-    "required": ["success", "command", "timestamp", "version", "craft", "targets"],
+    "required": ["success", "command", "timestamp", "version", "env", "targets"],
     "properties": {
         "success": {"type": "boolean"},
         "command": {"type": "string", "const": "build"},
         "timestamp": {"type": "string"},
         "version": {"type": "string"},
-        "craft": {"type": "string"},
+        "env": {"type": "string"},
         "targets": {
             "type": "array",
             "items": {

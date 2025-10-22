@@ -93,7 +93,7 @@ fetch.0.url
     - Symptom: `Duplicate repo names found: X` or `'<name>' is a reserved name`
     - Fix: Make names unique and avoid reserved: `include`, `exclude`, `fetch`, `repo`.
 
-  - Empty/invalid targets in craft
+  - Empty/invalid targets in env
     - Symptom: `Craft must have at least one target defined` or
       `At least one of 'includes', 'include_bundles', or 'compose' must be provided`
     - Fix: Add at least one include list to each target.
@@ -125,7 +125,7 @@ python3 - <<'PY'
 from pathlib import Path
 from bundlecraft.helpers.utils import load_yaml
 from bundlecraft.helpers.config_schema import validate_craft_config
-load_yaml(Path('config/envs/example-craft.yaml'), validate=validate_craft_config)
+load_yaml(Path('config/envs/example-env.yaml'), validate=validate_craft_config)
 print('OK')
 PY
 ```
@@ -141,7 +141,7 @@ python3 -m pytest tests/test_config_validation.py::TestBundleConfigValidation::t
 - Prefer the `repo:` structure for includes; the legacy top-level `include`/`exclude` still works but is discouraged.
 - Vault configs use `mount`, not `mount_point`.
 - API endpoints must be HTTPS (`endpoint:`), like URL fetchers.
-- Keep `bundle_name`/`description` (bundle) and `name`/`description` (craft) non-empty.
+- Keep `bundle_name`/`description` (bundle) and `name`/`description` (env) non-empty.
 
 ---
 
