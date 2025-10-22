@@ -692,7 +692,7 @@ For step-by-step guidance on interpreting and fixing validation errors (plus pyt
 
 ### Common Validation Errors
 
-**Error: Missing required field**
+#### Error: Missing required field
 
 ```
 1 validation error for BundleConfig
@@ -709,7 +709,7 @@ description: My bundle description
 
 ---
 
-**Error: Empty string**
+#### Error: Empty string
 
 ```
 1 validation error for BundleConfig
@@ -725,7 +725,7 @@ description: Internal CA roots for production
 
 ---
 
-**Error: Invalid output format**
+#### Error: Invalid output format
 
 ```
 1 validation error for CraftConfig
@@ -741,7 +741,7 @@ output_formats: [pem, jks, p7b, p12]  # Fixed: jsk → jks
 
 ---
 
-**Error: Insecure HTTP URL**
+#### Error: Insecure HTTP URL
 
 ```
 1 validation error for BundleConfig
@@ -760,7 +760,7 @@ fetch:
 
 ---
 
-**Error: Reserved name**
+#### Error: Reserved name
 
 ```
 1 validation error for BundleConfig
@@ -776,7 +776,7 @@ bundle_name: mozilla-fetch  # Changed from 'fetch'
 
 ---
 
-**Error: Duplicate names**
+#### Error: Duplicate names
 
 ```
 1 validation error for BundleConfig
@@ -795,7 +795,7 @@ repo:
 
 ---
 
-**Error: No sources defined**
+#### Error: No sources defined
 
 ```
 1 validation error for BundleConfig
@@ -812,7 +812,7 @@ repo:
 
 ---
 
-**Error: Missing type-specific field**
+#### Error: Missing type-specific field
 
 ```
 1 validation error for BundleConfig
@@ -831,7 +831,7 @@ fetch:
 
 ---
 
-**Error: Key size too small**
+#### Error: Key size too small
 
 ```
 1 validation error for DefaultsConfig
@@ -849,7 +849,7 @@ filters:
 
 ---
 
-**Error: Numeric policy_version**
+#### Error: Numeric policy_version
 
 ```
 # This is automatically handled - no error!

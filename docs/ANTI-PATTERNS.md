@@ -53,7 +53,7 @@ This is a conscious design choice, not an omission:
 Implementing revocation awareness at the trust-store layer would therefore **encode support for a misuse pattern**, not a best practice.
 Revocation should be enforced by **end-entity certificate validation systems** (browsers, libraries, mTLS frameworks), not by a CA bundle build tool.
 
-BundleCraft’s role is to ensure that the trust anchors themselves are correct, verified, and deterministic - not to police revocation of certificates that should never have been trusted in the first place.
+BundleCraft's role is to ensure that the trust anchors themselves are correct, verified, and deterministic - not to police revocation of certificates that should never have been trusted in the first place.
 
 ---
 
@@ -62,24 +62,32 @@ BundleCraft’s role is to ensure that the trust anchors themselves are correct,
 Follow these quick checks to ensure your BundleCraft configuration remains aligned with PKI best practices:
 
 ### ✅ Trust Definition
-- [ ] Each certificate entry includes a verified fingerprint or hash for provenance.
-- [ ] No subordinate or intermediate CA certificates are listed as trust anchors.
-- [ ] Internal and external roots are maintained in **separate configs** or environments.
+
+- [ ] Remote fetch sources include SHA-256 verification (`verify.sha256`) for static downloads or TLS pinning (`verify.tls_fingerprint_sha256`) for dynamic endpoints.
+- [ ] Filter `root_certs_only: true` is enabled in defaults or craft configs to exclude subordinate/intermediate CAs from trust anchors.
+- [ ] Filter `ca_certs_only: true` ensures only certificates with BasicConstraints CA:TRUE are included.
+- [ ] Internal and external roots are maintained in **separate bundle configs** (e.g., `internal.yaml`, `mozilla.yaml`).
 
 ### 🧱 Build Integrity
-- [ ] Builds are executed in controlled CI/CD or provisioning contexts - **not as periodic background jobs**.
-- [ ] Deterministic tar and normalized metadata options are enabled to ensure reproducible builds.
-- [ ] All generated artifacts are signed or attested for integrity verification.
+
+- [ ] Builds are executed in controlled CI/CD or provisioning workflows - **not as periodic background jobs or cron tasks**.
+- [ ] Package option (`package: true`) is enabled in craft configs when deterministic tar archives are required.
+- [ ] Generated `checksums.sha256` files are validated and versioned alongside bundles.
+- [ ] Build artifacts are committed to version control or signed in CI for audit trails.
 
 ### 🔐 Security and Policy
-- [ ] Legacy formats (e.g., JKS/BKS) are used only when explicitly required, never as defaults.
-- [ ] PEM bundles do not mix auxiliary (Trusted PEM) and standard certs unless policy demands it.
-- [ ] Revocation handling is delegated to relying systems, not simulated within trust bundles.
-- [ ] Sensitive source paths, API tokens, and credentials are never stored inline in the config file.
+
+- [ ] Legacy formats (JKS, etc.) appear in `output_formats` only when required by consuming systems - never as universal defaults.
+- [ ] PEM subject comments (`pem.include_subject_comments: true`) are enabled for human readability and audit (on by default).
+- [ ] Verification policies (`verify.fail_on_expired: true`, `verify.warn_days_before_expiry: 30`) are configured to catch expiring/expired certificates early.
+- [ ] Sensitive credentials (API tokens, Vault tokens, keystore passwords) use environment variable references (`token_ref`, `TRUST_JKS_PASSWORD`) - **never inline values**.
+- [ ] Filters ensure only valid, non-expired CA certificates enter bundles (`not_expired_only: true`, `unique_by_fingerprint: true` in defaults).
 
 ### 🧭 Governance
-- [ ] Every trust store change is peer-reviewed or approved via pull request.
-- [ ] CI pipelines verify that fingerprints match declared sources before publishing.
-- [ ] Build diffs between releases are reviewed to ensure no unapproved trust anchors are added.
 
-These checks collectively help maintain **deterministic trust**, **configuration transparency**, and **policy consistency** - the core principles of BundleCraft’s security model.
+- [ ] Every bundle config change (new sources, modified fetch URLs) is peer-reviewed via pull request.
+- [ ] CI workflows validate fetch source integrity (SHA-256 matches, TLS pins) before accepting downloaded content.
+- [ ] Build diffs are reviewed between releases to ensure no unapproved trust anchors or expired certificates are introduced.
+- [ ] Craft configs specify explicit target compositions (`targets.<name>.includes`) to prevent unintended bundle merging.
+
+These checks collectively help maintain **deterministic trust**, **configuration transparency**, and **policy consistency** - the core principles of BundleCraft's security model.

@@ -22,12 +22,14 @@ The following features were intentionally excluded from MVP to maintain simplici
 **What:** Single-file Python executable bundling all dependencies
 
 **Why deferred:**
+
 * Niche use case (air-gapped/offline environments)
 * Adds build complexity (PEX tooling, dependency resolution)
 * Maintenance burden for another distribution channel
 * OCI containers can be saved/loaded for offline use (`docker save`)
 
 **Trigger for implementation:**
+
 * Multiple user requests for air-gapped deployment
 * Evidence that OCI offline workflows are insufficient
 
@@ -36,12 +38,14 @@ The following features were intentionally excluded from MVP to maintain simplici
 **What:** Custom GitHub Action that wraps the OCI image
 
 **Why deferred:**
+
 * Users can already call the OCI image directly in workflows
 * Adds another repository to maintain (bundlecraft/action)
 * Wrapper provides minimal value over direct container invocation
 * Action marketplace has discovery challenges
 
 **Trigger for implementation:**
+
 * Significant friction in user workflows calling OCI directly
 * Community requests for simplified GitHub-native integration
 
@@ -50,12 +54,14 @@ The following features were intentionally excluded from MVP to maintain simplici
 **What:** Build both `linux/amd64` and `linux/arm64` images
 
 **Why deferred:**
+
 * Most CI/CD runs on amd64 (primary use case)
 * Multi-arch builds add significant CI time and complexity
 * Cross-compilation can introduce subtle bugs
 * arm64 users can build locally if needed
 
 **Trigger for implementation:**
+
 * Measurable arm64 usage (GitHub Runners, AWS Graviton, Apple Silicon servers)
 * User requests with specific arm64 requirements
 
@@ -64,12 +70,14 @@ The following features were intentionally excluded from MVP to maintain simplici
 **What:** Detailed SBOMs (CycloneDX/SPDX), SLSA Level 3+ provenance
 
 **Why deferred:**
+
 * GitHub's native attestations provide basic provenance for MVP
 * Full SBOM tooling (syft, etc.) adds CI complexity
 * SLSA Level 3 requires significant infrastructure
 * Diminishing returns for current user base
 
 **Trigger for implementation:**
+
 * Enterprise compliance requirements
 * Supply chain transparency regulations
 * User requests for detailed dependency tracking
@@ -79,12 +87,14 @@ The following features were intentionally excluded from MVP to maintain simplici
 **What:** `requirements.lock` with cryptographic hashes for all dependencies
 
 **Why deferred:**
+
 * `pyproject.toml` constraints provide sufficient reproducibility for MVP
 * Hash locking adds regeneration overhead (on every dep update)
 * Pip-tools or Poetry adds another tool dependency
 * Can use Dependabot for dependency tracking initially
 
 **Trigger for implementation:**
+
 * Evidence of supply chain attacks on dependencies
 * Reproducibility issues in production builds
 * User demands for deterministic builds
@@ -94,12 +104,14 @@ The following features were intentionally excluded from MVP to maintain simplici
 **What:** Scheduled workflow to rebuild images and scan for vulnerabilities
 
 **Why deferred:**
+
 * Manual rebuilds on demand are sufficient for MVP
 * Automated scanning generates noise without response process
 * Requires dependency update strategy and testing
 * Better handled reactively with Dependabot alerts initially
 
 **Trigger for implementation:**
+
 * Active user base requiring security SLAs
 * Historical CVE impact on BundleCraft dependencies
 * Resources available for security response process
@@ -109,12 +121,14 @@ The following features were intentionally excluded from MVP to maintain simplici
 **What:** All channels reference canonical OCI digest; automated verification
 
 **Why deferred:**
+
 * Single-commit releases provide traceability for MVP
 * Complex digest propagation across channels
 * Verification tooling adds user friction
 * GitHub's built-in signing provides sufficient trust
 
 **Trigger for implementation:**
+
 * Evidence of supply chain attacks
 * Compliance requirements for attestation
 * Multi-repository complexity increases drift risk
@@ -155,7 +169,3 @@ For each feature:
 3. Assess maintenance burden
 4. Document implementation in dedicated ADR if complex
 5. Implement incrementally with rollback plan
-
----
-
-**End of ADR-0007**
