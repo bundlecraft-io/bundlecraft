@@ -2,24 +2,22 @@
 """
 trust_matrix.py
 
-Generate a trust matrix showing which environments (rows) trust which bundles/sources (columns),
-based on composition defined in config/envs/*.yaml.
-
-Trust = union of all sources referenced by any bundle in an environment's `bundles.<name>.include_sources`.
+Generate a trust matrix showing which environments (rows, using config 'name') build which bundles (columns),
+and which sources are trusted in each bundle, based on config/envs/*.yaml and config/sources/*.yaml.
 
 Outputs:
-  - table (unicode box table for terminals)
-  - markdown (GitHub-friendly table)
-  - csv
-  - json (structured data)
+    - table (unicode box table for terminals): environments × bundles
+    - markdown (GitHub-friendly table): environments × bundles
+    - csv: environments × bundles
+    - json: structured mapping of environments → bundles → sources
 
 Usage:
-  python scripts/trust_matrix.py --config-dir config --format table
-  python scripts/trust_matrix.py --format markdown --output TRUST_MATRIX.md
-  python scripts/trust_matrix.py --format json --output trust-matrix.json
+    python scripts/trust_matrix.py --config-dir config --format table
+    python scripts/trust_matrix.py --format markdown --output TRUST_MATRIX.md
+    python scripts/trust_matrix.py --format json --output trust-matrix.json
 
 Notes:
-    - Requires PyYAML.
+        - Requires PyYAML.
 """
 
 from __future__ import annotations
@@ -45,73 +43,89 @@ def load_yaml(path: Path) -> dict:
         return {}
 
 
-def collect_env_trust(
-    config_dir: Path,
-) -> tuple[list[str], list[str], dict[str, set[str]], dict[str, dict[str, list[str]]]]:
+def collect_env_trust(config_dir: Path):
     envs_dir = config_dir / "envs"
+    sources_dir = config_dir / "sources"
     if not envs_dir.exists():
         raise FileNotFoundError(f"Missing envs directory: {envs_dir}")
+    if not sources_dir.exists():
+        raise FileNotFoundError(f"Missing sources directory: {sources_dir}")
 
-    env_to_bundles: dict[str, set[str]] = {}
-    env_to_targets: dict[str, dict[str, list[str]]] = {}
+    envs = []
+    env_to_bundles = {}
+    env_to_bundle_sources = {}
+    all_sources_set = set()
 
     for env_path in sorted(envs_dir.glob("*.yaml")):
-        env_name = env_path.stem
         data = load_yaml(env_path)
-        trusted_sources_for_env: set[str] = set()
-        bundles_map: dict[str, list[str]] = {}
-
-        # New schema: bundles.<name>.include_sources
+        env_name = data.get("name") or env_path.stem
+        envs.append(env_name)
         bundles = data.get("bundles") or {}
-        if isinstance(bundles, dict):
-            for b_name, b_cfg in bundles.items():
-                include_sources = b_cfg.get("include_sources") if isinstance(b_cfg, dict) else None
-                if isinstance(include_sources, list):
-                    bundles_map[b_name] = [str(x) for x in include_sources]
-                    trusted_sources_for_env.update(str(x) for x in include_sources)
-                elif isinstance(include_sources, str):
-                    bundles_map[b_name] = [include_sources]
-                    trusted_sources_for_env.add(include_sources)
+        bundle_names = list(bundles.keys())
+        env_to_bundles[env_name] = set(bundle_names)
+        env_to_bundle_sources[env_name] = {}
+        for b_name, b_cfg in bundles.items():
+            include_sources = b_cfg.get("include_sources") if isinstance(b_cfg, dict) else None
+            if isinstance(include_sources, list):
+                env_to_bundle_sources[env_name][b_name] = [str(x) for x in include_sources]
+                all_sources_set.update(str(x) for x in include_sources)
+            elif isinstance(include_sources, str):
+                env_to_bundle_sources[env_name][b_name] = [include_sources]
+                all_sources_set.add(include_sources)
 
-        if trusted_sources_for_env:
-            env_to_bundles[env_name] = trusted_sources_for_env
-            env_to_targets[env_name] = bundles_map
+    # All unique bundle names as columns
+    all_bundles = sorted({b for s in env_to_bundles.values() for b in s})
+    # All unique sources as columns
+    all_sources = sorted(all_sources_set)
 
-    # All unique bundles as columns
-    all_bundles: list[str] = sorted({b for s in env_to_bundles.values() for b in s})
-    all_envs: list[str] = sorted(env_to_bundles.keys())
-    return all_envs, all_bundles, env_to_bundles, env_to_targets
+    # Bundle to sources mapping (across all envs)
+    bundle_to_sources = {}
+    for env in envs:
+        for b in env_to_bundle_sources[env]:
+            bundle_to_sources.setdefault(b, set()).update(env_to_bundle_sources[env][b])
+
+    # Env to sources mapping (union of all sources in all bundles)
+    env_to_sources = {}
+    for env in envs:
+        sources = set()
+        for b in env_to_bundle_sources[env].values():
+            sources.update(b)
+        env_to_sources[env] = sources
+
+    return (
+        envs,
+        all_bundles,
+        all_sources,
+        env_to_bundles,
+        env_to_bundle_sources,
+        bundle_to_sources,
+        env_to_sources,
+    )
 
 
-def render_table(envs: list[str], bundles: list[str], env_to_bundles: dict[str, set[str]]) -> str:
+def render_table(envs, bundles, env_to_bundles):
     if not envs or not bundles:
         return "(no data)"
-
-    # Build rows
     header = ["environment \\ bundle"] + bundles
-    rows: list[list[str]] = [header]
+    rows = [header]
     for env in envs:
         row = [env]
-        trusted = env_to_bundles.get(env, set())
+        present = env_to_bundles.get(env, set())
         for b in bundles:
-            row.append("✔" if b in trusted else "")
+            row.append("✔" if b in present else "")
         rows.append(row)
-
-    # Compute column widths
     widths = [max(len(r[c]) for r in rows) for c in range(len(rows[0]))]
 
-    def hr(char_left: str, char_mid: str, char_right: str) -> str:
-        pieces = []
-        for w in widths:
-            pieces.append("─" * (w + 2))
+    def hr(char_left, char_mid, char_right):
+        pieces = ["─" * (w + 2) for w in widths]
         return char_left + char_mid.join(pieces) + char_right
 
     top = hr("┌", "┬", "┐")
     mid = hr("├", "┼", "┤")
     bot = hr("└", "┴", "┘")
 
-    def fmt_row(cols: list[str]) -> str:
-        padded = [f" {col}{' ' * (w - len(col))} " for col, w in zip(cols, widths, strict=False)]
+    def fmt_row(cols):
+        padded = [f" {col}{' ' * (w - len(col))} " for col, w in zip(cols, widths, strict=True)]
         return "│" + "│".join(padded) + "│"
 
     lines = [top, fmt_row(rows[0]), mid]
@@ -121,9 +135,71 @@ def render_table(envs: list[str], bundles: list[str], env_to_bundles: dict[str, 
     return "\n".join(lines)
 
 
-def render_markdown(
-    envs: list[str], bundles: list[str], env_to_bundles: dict[str, set[str]]
-) -> str:
+def render_bundle_source_table(bundles, sources, bundle_to_sources):
+    if not bundles or not sources:
+        return "(no data)"
+    header = ["bundle \\ source"] + sources
+    rows = [header]
+    for b in bundles:
+        row = [b]
+        present = bundle_to_sources.get(b, set())
+        for s in sources:
+            row.append("✔" if s in present else "")
+        rows.append(row)
+    widths = [max(len(r[c]) for r in rows) for c in range(len(rows[0]))]
+
+    def hr(char_left, char_mid, char_right):
+        pieces = ["─" * (w + 2) for w in widths]
+        return char_left + char_mid.join(pieces) + char_right
+
+    top = hr("┌", "┬", "┐")
+    mid = hr("├", "┼", "┤")
+    bot = hr("└", "┴", "┘")
+
+    def fmt_row(cols):
+        padded = [f" {col}{' ' * (w - len(col))} " for col, w in zip(cols, widths, strict=True)]
+        return "│" + "│".join(padded) + "│"
+
+    lines = [top, fmt_row(rows[0]), mid]
+    for r in rows[1:]:
+        lines.append(fmt_row(r))
+    lines.append(bot)
+    return "\n".join(lines)
+
+
+def render_env_source_table(envs, sources, env_to_sources):
+    if not envs or not sources:
+        return "(no data)"
+    header = ["environment \\ source"] + sources
+    rows = [header]
+    for env in envs:
+        row = [env]
+        present = env_to_sources.get(env, set())
+        for s in sources:
+            row.append("✔" if s in present else "")
+        rows.append(row)
+    widths = [max(len(r[c]) for r in rows) for c in range(len(rows[0]))]
+
+    def hr(char_left, char_mid, char_right):
+        pieces = ["─" * (w + 2) for w in widths]
+        return char_left + char_mid.join(pieces) + char_right
+
+    top = hr("┌", "┬", "┐")
+    mid = hr("├", "┼", "┤")
+    bot = hr("└", "┴", "┘")
+
+    def fmt_row(cols):
+        padded = [f" {col}{' ' * (w - len(col))} " for col, w in zip(cols, widths, strict=True)]
+        return "│" + "│".join(padded) + "│"
+
+    lines = [top, fmt_row(rows[0]), mid]
+    for r in rows[1:]:
+        lines.append(fmt_row(r))
+    lines.append(bot)
+    return "\n".join(lines)
+
+
+def render_markdown(envs, bundles, env_to_bundles):
     if not envs or not bundles:
         return "(no data)"
     header = ["environment \\ bundle"] + bundles
@@ -135,7 +211,31 @@ def render_markdown(
     return "\n".join(lines)
 
 
-def render_csv(envs: list[str], bundles: list[str], env_to_bundles: dict[str, set[str]]) -> str:
+def render_bundle_source_markdown(bundles, sources, bundle_to_sources):
+    if not bundles or not sources:
+        return "(no data)"
+    header = ["bundle \\ source"] + sources
+    sep = ["---"] * len(header)
+    lines = ["| " + " | ".join(header) + " |", "| " + " | ".join(sep) + " |"]
+    for b in bundles:
+        row = [b] + ["✔" if s in bundle_to_sources.get(b, set()) else "" for s in sources]
+        lines.append("| " + " | ".join(row) + " |")
+    return "\n".join(lines)
+
+
+def render_env_source_markdown(envs, sources, env_to_sources):
+    if not envs or not sources:
+        return "(no data)"
+    header = ["environment \\ source"] + sources
+    sep = ["---"] * len(header)
+    lines = ["| " + " | ".join(header) + " |", "| " + " | ".join(sep) + " |"]
+    for env in envs:
+        row = [env] + ["✔" if s in env_to_sources.get(env, set()) else "" for s in sources]
+        lines.append("| " + " | ".join(row) + " |")
+    return "\n".join(lines)
+
+
+def render_csv(envs, bundles, env_to_bundles):
     from io import StringIO
 
     buf = StringIO()
@@ -147,21 +247,46 @@ def render_csv(envs: list[str], bundles: list[str], env_to_bundles: dict[str, se
     return buf.getvalue()
 
 
+def render_bundle_source_csv(bundles, sources, bundle_to_sources):
+    from io import StringIO
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["bundle \\ source", *sources])
+    for b in bundles:
+        row = [b] + [("1" if s in bundle_to_sources.get(b, set()) else "0") for s in sources]
+        writer.writerow(row)
+    return buf.getvalue()
+
+
+def render_env_source_csv(envs, sources, env_to_sources):
+    from io import StringIO
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["environment \\ source", *sources])
+    for env in envs:
+        row = [env] + [("1" if s in env_to_sources.get(env, set()) else "0") for s in sources]
+        writer.writerow(row)
+    return buf.getvalue()
+
+
 def render_json(
-    envs: list[str],
-    bundles: list[str],
-    env_to_bundles: dict[str, set[str]],
-    env_to_targets: dict[str, dict[str, list[str]]],
-) -> str:
+    envs, bundles, sources, env_to_bundles, env_to_bundle_sources, bundle_to_sources, env_to_sources
+):
     payload = {
-        "bundles": bundles,
         "environments": {
             env: {
-                "trusts": sorted(list(env_to_bundles.get(env, set()))),
-                "bundles": env_to_targets.get(env, {}),
+                "bundles": sorted(list(env_to_bundles.get(env, set()))),
+                "sources": sorted(list(env_to_sources.get(env, set()))),
+                "bundle_sources": {
+                    b: env_to_bundle_sources[env].get(b, []) for b in env_to_bundle_sources[env]
+                },
             }
             for env in envs
         },
+        "bundles": {b: sorted(list(bundle_to_sources.get(b, set()))) for b in bundles},
+        "sources": sources,
     }
     return json.dumps(payload, indent=2, sort_keys=True)
 
@@ -184,19 +309,51 @@ def main(argv: list[str] | None = None) -> int:
 
     config_dir = Path(args.config_dir)
     try:
-        envs, bundles, env_to_bundles, env_to_targets = collect_env_trust(config_dir)
+        (
+            envs,
+            bundles,
+            sources,
+            env_to_bundles,
+            env_to_bundle_sources,
+            bundle_to_sources,
+            env_to_sources,
+        ) = collect_env_trust(config_dir)
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         return 2
 
     if args.format == "table":
-        out = render_table(envs, bundles, env_to_bundles)
+        print("\n[Environments × Bundles]")
+        print(render_table(envs, bundles, env_to_bundles))
+        print("\n[Bundles × Sources]")
+        print(render_bundle_source_table(bundles, sources, bundle_to_sources))
+        print("\n[Environments × Sources]")
+        print(render_env_source_table(envs, sources, env_to_sources))
+        out = ""
     elif args.format == "markdown":
-        out = render_markdown(envs, bundles, env_to_bundles)
+        out = "\n[Environments × Bundles]\n" + render_markdown(envs, bundles, env_to_bundles)
+        out += "\n\n[Bundles × Sources]\n" + render_bundle_source_markdown(
+            bundles, sources, bundle_to_sources
+        )
+        out += "\n\n[Environments × Sources]\n" + render_env_source_markdown(
+            envs, sources, env_to_sources
+        )
     elif args.format == "csv":
-        out = render_csv(envs, bundles, env_to_bundles)
+        out = "[Environments × Bundles]\n" + render_csv(envs, bundles, env_to_bundles)
+        out += "\n[Bundles × Sources]\n" + render_bundle_source_csv(
+            bundles, sources, bundle_to_sources
+        )
+        out += "\n[Environments × Sources]\n" + render_env_source_csv(envs, sources, env_to_sources)
     else:
-        out = render_json(envs, bundles, env_to_bundles, env_to_targets)
+        out = render_json(
+            envs,
+            bundles,
+            sources,
+            env_to_bundles,
+            env_to_bundle_sources,
+            bundle_to_sources,
+            env_to_sources,
+        )
 
     if args.output:
         Path(args.output).write_text(out, encoding="utf-8")

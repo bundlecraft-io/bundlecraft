@@ -75,7 +75,7 @@ You can declare local certificate sources in two ways. The new preferred schema 
     - name: partners
       include:
         - sources/partners/
-  ```
+  ```yaml
 
   Include item forms supported:
   - String: a file or directory path
@@ -97,7 +97,7 @@ You can declare local certificate sources in two ways. The new preferred schema 
     - sources/partners/
   exclude:
     - sources/partners/deprecated.pem
-  ```
+  ```yaml
 
   Staging layout (legacy include): `sources/staged/<source_name>/include/...`
 
@@ -122,7 +122,7 @@ repo:
           -----BEGIN CERTIFICATE-----
           ...
           -----END CERTIFICATE-----
-```
+```yaml
 
 Legacy form (paths only):
 
@@ -130,7 +130,7 @@ Legacy form (paths only):
 include:
   - sources/internal/roots/
   - sources/internal/rootCA.pem
-```
+```yaml
 
 ### Fetch Definitions
 
@@ -165,7 +165,7 @@ fetch:
     pem_field: pem
     addr: http://127.0.0.1:8200
     token_ref: VAULT_TOKEN
-```
+```yaml
 
 **Fetch Retry and Timeout Configuration:**
 
@@ -191,7 +191,7 @@ metadata:
   purpose: Internal PKI trust anchors
   change_control: CAB-2025-001
   tags: [internal, production]
-```
+```yaml
 
 ### Complete Source Config Example
 
@@ -210,11 +210,11 @@ metadata:
   owner: pki-team@bundlecraft.io
   purpose: Internal service mesh authentication
   tags: [internal, ca-bundle]
-```
+```yaml
 
 ---
 
-## 2) Environment Configuration: `config/envs/<craft>.yaml`
+## 2) Environment Configuration: `config/envs/<env>.yaml`
 
 Defines build behavior and deployment configuration for a craft.
 
@@ -226,7 +226,7 @@ bundles:
     include_sources: [internal, mozilla]  # Merge multiple bundles
   mozilla-only:
     include_sources: [mozilla]
-```
+```yaml
 
 ### Output Configuration
 

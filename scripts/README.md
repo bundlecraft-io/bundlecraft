@@ -6,8 +6,8 @@ Quick catalog:
 
 | Script | Purpose |
 |---|---|
-| `detect_env_targets.py` | Discover craft targets from `config/crafts/*.yaml` (or legacy `config/envs/*.yaml`) and emit a JSON matrix for CI |
-| `trust_matrix.py` | Build a Craft × Bundle trust matrix from craft configs (table/markdown/csv/json) |
+| `detect_env_targets.py` | Discover env targets from `config/crafts/*.yaml` |
+| `trust_matrix.py` | Build a Craft × Bundle trust matrix from env configs (table/markdown/csv/json) |
 | `generate_test_cas.py` | Generate self-signed test CA certificates with automatic private key disposal (TESTING ONLY) |
 | `test-server-local.py` | Local HTTPS test server for CI and development with Swagger UI |
 | `vault-local.py` | Spin up a local HashiCorp Vault dev instance for testing the Vault fetcher |
@@ -42,7 +42,7 @@ python scripts/generate_test_cas.py --name prod-root --output-dir /tmp/test-cas 
 
 # Batch generation from config
 python scripts/generate_test_cas.py --config scripts/example_ca_config.json --no-warning
-```
+```bash
 
 ### CLI Options
 
@@ -62,7 +62,7 @@ python scripts/generate_test_cas.py --config scripts/example_ca_config.json --no
 
 Certificates are organized hierarchically within the output directory:
 
-```
+```bash
 generated-test-cas/
 ├── <env>/
 │   └── <boundary>/
@@ -72,15 +72,15 @@ generated-test-cas/
 │       │   └── <name>-sub1.pem
 │       └── tier2/
 │           └── <name>-sub2.pem
-```
+```bash
 
 Or for a simple root-only CA without env/boundary:
 
-```
+```bash
 generated-test-cas/
 └── root/
     └── <name>.pem
-```
+```bash
 
 ### Example: Generate Test Chain
 
@@ -93,7 +93,7 @@ python scripts/generate_test_cas.py \
   --key-size 2048 \
   --validity 365 \
   --no-warning
-```
+```bash
 
 Output:
 - `generated-test-cas/dev/internal/root/dev-internal-root.pem`
@@ -122,7 +122,7 @@ Create a config file (e.g., `my_hierarchies.json`):
     "validity_days": 730
   }
 ]
-```
+```bash
 
 Run:
 
@@ -365,10 +365,10 @@ fetch:
     token_ref: VAULT_TOKEN
 ```
 
-And a minimal craft file:
+And a minimal env file:
 
 ```yaml
-# config/crafts/dev.yaml
+# config/envs/dev.yaml
 name: Dev
 ```
 
@@ -377,7 +377,7 @@ Then run:
 ```bash
 export VAULT_ADDR="http://127.0.0.1:8200"
 export VAULT_TOKEN="root"
-bundlecraft fetch --craft dev --bundle local-vault
+bundlecraft fetch --env dev --bundle local-vault
 ```
 
 This will stage the local Vault-provided PEM under `sources/staged/<source_name>/fetch/from_vault/from_vault.pem`.
@@ -415,8 +415,8 @@ Quick catalog:
 
 | Script | Purpose |
 |---|---|
-| `detect_env_targets.py` | Discover craft targets from `config/crafts/*.yaml` (or legacy `config/envs/*.yaml`) and emit a JSON matrix for CI |
-| `trust_matrix.py` | Build a Craft × Bundle trust matrix from craft configs (table/markdown/csv/json) |
+| `detect_env_targets.py` | Discover env targets from `config/crafts/*.yaml` (or legacy `config/envs/*.yaml`) and emit a JSON matrix for CI |
+| `trust_matrix.py` | Build a Craft × Bundle trust matrix from env configs (table/markdown/csv/json) |
 | `vault-local.sh` | Spin up a local HashiCorp Vault dev instance for testing the Vault fetcher |
 
 ---
@@ -425,8 +425,8 @@ Quick catalog:
 
 Parse `config/crafts/*.yaml` (or legacy `config/envs/*.yaml`) and output a JSON array describing the CI build matrix.
 
-- Reads craft files for `targets: <name>.includes: [...]`
-- Emits objects: `{ "env": "<craft>", "target": "<target>", "output_root": "<build_path or dist>" }`
+- Reads env files for `targets: <name>.includes: [...]`
+- Emits objects: `{ "env": "<env>", "target": "<target>", "output_root": "<build_path or dist>" }`
 - Used by GitHub Actions to build per env/bundle
 
 Usage:
@@ -446,37 +446,50 @@ Example output:
 ```
 
 Notes:
-- If a craft defines `build_path`, it is emitted as `output_root`.
+- If a env defines `build_path`, it is emitted as `output_root`.
 - Crafts without `targets` are ignored.
 
 ---
 
+
 ## 📐 trust_matrix.py
 
-Generate a trust matrix showing which crafts (rows) trust which bundles (columns), based on `targets.<name>.includes` in `config/crafts/*.yaml`.
+Generate a holistic trust matrix showing:
+
+- **Environments × Bundles**: Which environments build which bundles
+- **Bundles × Sources**: Which sources are included in each bundle
+- **Environments × Sources**: Which sources are trusted in each environment (via any bundle)
 
 Supported formats:
-- `table`: Unicode box table for terminals
-- `markdown`: GitHub-friendly table
-- `csv`: numeric matrix (1/0)
-- `json`: structured data including per-craft `targets` and `trusts`
+- `table`: Unicode box tables for terminals (all three mappings)
+- `markdown`: GitHub-friendly tables (all three mappings)
+- `csv`: numeric matrices (all three mappings)
+- `json`: structured data with full mappings
 
 Usage:
 
 ```bash
-# Terminal table
+# Terminal tables (all mappings)
 python scripts/trust_matrix.py --config-dir config --format table
 
-# Markdown
+# Markdown tables
 python scripts/trust_matrix.py --format markdown --output TRUST_MATRIX.md
 
 # JSON
 python scripts/trust_matrix.py --format json --output trust-matrix.json
 ```
 
-Notes:
-- Trust for a craft = union of all bundles listed in its targets' `includes`.
-- Legacy `bundle_targets: [...]` is supported and treated as trusted bundles.
+Output includes:
+- **[Environments × Bundles]**: ✔ if bundle is built in environment
+- **[Bundles × Sources]**: ✔ if source is included in bundle
+- **[Environments × Sources]**: ✔ if source is trusted in environment (via any bundle)
+
+JSON output provides:
+- `environments`: mapping of environment → bundles, sources, bundle_sources
+- `bundles`: mapping of bundle → sources
+- `sources`: list of all sources
+
+This gives a one-stop view of how environments, bundles, and sources relate in your BundleCraft config.
 
 ---
 
@@ -556,7 +569,7 @@ podman run --rm -p 8200:8200 \
 # Run your BundleCraft fetch after exporting env vars (see config example below)
 export VAULT_ADDR="http://127.0.0.1:8200"
 export VAULT_TOKEN="root"
-bundlecraft fetch --craft dev --bundle local-vault
+bundlecraft fetch --env dev --bundle local-vault
 
 # Tear down environment
 ./vault-local.sh down
@@ -573,7 +586,7 @@ Vault will wait for you to finish, then clean up automatically.
 #### CI/CD Mode
 
 ```bash
-./vault-local.sh up --ci-cmd "bundlecraft fetch --craft dev --bundle local-vault"
+./vault-local.sh up --ci-cmd "bundlecraft fetch --env dev --bundle local-vault"
 ```
 
 Runs your test command, then removes the local Vault environment automatically.
@@ -629,7 +642,7 @@ fetch:
     token_ref: VAULT_TOKEN
 ```
 
-And a minimal craft file:
+And a minimal env file:
 
 ```yaml
 # config/crafts/dev.yaml
@@ -641,7 +654,7 @@ Then run:
 ```bash
 export VAULT_ADDR="http://127.0.0.1:8200"
 export VAULT_TOKEN="root"
-bundlecraft fetch --craft dev --bundle local-vault
+bundlecraft fetch --env dev --bundle local-vault
 ```
 
 This will stage the local Vault-provided PEM under `sources/staged/<source_name>/fetch/from_vault/from_vault.pem`.
