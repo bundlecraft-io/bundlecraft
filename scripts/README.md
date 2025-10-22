@@ -211,21 +211,15 @@ Example output:
 ]
 ```
 
-Notes:
-
 ## 📐 trust_matrix.py
 
 Generate a trust matrix showing which envs (rows) trust which bundles (columns), based on `bundles.<name>.include_sources` in `config/envs/*.yaml`.
 
-# Scripts
+## 🌎 test-server-local.py
 
-Local helper scripts for development and CI.
+A self-contained HTTPS Flask server used for local testing of HTTP and API based Fetch modules. It provides:
 
-## test-server-local.py
-
-A self-contained HTTPS Flask server used for local testing and CI. It provides:
-
-- A friendly HTML homepage at `/` with quick usage tips and a link to BundleCraft
+- A friendly HTML homepage at `/`
 - A plain HTTP download endpoint at `/test-cert.pem`
 - A token-protected API endpoint at `/Certificates/Download` (Keyfactor-like)
 - Built-in Swagger UI at `/apidocs`
@@ -235,7 +229,7 @@ Key features:
 - Generates ephemeral TLS cert/key and stores them in a temp dir
 - Prints the homepage URL first for convenience
 - Runs Flask in its own process group for reliable shutdown
-- Uses your project virtualenv Python if available
+- Uses your project `virtualenv` Python if available
 
 Usage
 
@@ -264,46 +258,38 @@ Notes
 - The CA certificate is at `<data_dir>/server.crt` for trusting the server in tests.
 - The API expects `Authorization: Bearer <TOKEN>` and a JSON body like `{ "CertID": 12345, "CertificateFormat": "PEM", "IncludeChain": true }`.
 
-## vault-local.py
+## 🛡️ vault-local.py
 
-Helper to run a local Vault dev server using Podman during CI, with an option to run a post-start CI command.
+Helper to run a local [HashiCorp Vault](https://developer.hashicorp.com/vault) server, with an option to run a post-start CI command. Useful for testing Vault-based fetch modules.
 
-# Add HashiCorp repo
+The script will use a local installation of the `vault` binary if available, but it also supports starting Vault via a Podman container. Either one of the two dependencies (as well as availability to retrieve the Vault image in the case of the latter) is needed to run the script.
 
+### Option 1: Install Vault Binary
+
+```bash
 wget -O- <https://apt.releases.hashicorp.com/gpg> | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] <https://apt.releases.hashicorp.com> $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
 
 sudo apt-get update
 sudo apt-get install -y vault
 
-```
-
-Verify:
-
-```bash
 vault version
 ```
 
-#### Option 2: Podman Container (Alternative)
-
-If you prefer isolation, install Podman:
+### Option 2: Install Podman Runtime
 
 ```bash
 sudo apt-get install -y podman
+
+# Then you can run Vault as:
+
+# podman run --rm -p 8200:8200 \
+#   -e 'VAULT_DEV_ROOT_TOKEN_ID=root' \
+#   -e 'VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200' \
+#   docker.io/library/vault:latest
 ```
 
-Then you can run Vault as:
-
-```bash
-podman run --rm -p 8200:8200 \
-  -e 'VAULT_DEV_ROOT_TOKEN_ID=root' \
-  -e 'VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200' \
-  docker.io/library/vault:latest
-```
-
-*(Podman supports rootless containers - safer and Docker-compatible syntax.)*
-
-### 🧪 Usage
+### 🧪 Script Usage
 
 ```bash
 # Start Vault in local dev mode (binary runtime)
@@ -318,18 +304,10 @@ bundlecraft fetch --env dev --bundle local-vault
 ./vault-local.py down
 ```
 
-#### Auto-Cleanup
-
-```bash
-./vault-local.py up --auto-cleanup
-```
-
-Vault will wait for you to finish, then clean up automatically.
-
 #### CI/CD Mode
 
 ```bash
-./vault-local.py up --ci-cmd "bundlecraft fetch --env dev --bundle local-vault"
+./vault-local.py up --runtime podman --ci-cmd "bundlecraft fetch --env dev --bundle local-vault"
 ```
 
 Runs your test command, then removes the local Vault environment automatically.
@@ -373,7 +351,12 @@ And a minimal env file:
 
 ```yaml
 # config/envs/dev.yaml
-name: Dev
+name: dev
+description: dev environment trusting vault cert authority
+bundles:
+  vault-bundle:
+    include_sources: [from_vault]
+
 ```
 
 Then run:
@@ -381,7 +364,7 @@ Then run:
 ```bash
 export VAULT_ADDR="http://127.0.0.1:8200"
 export VAULT_TOKEN="root"
-bundlecraft fetch --env dev --bundle local-vault
+bundlecraft fetch --env dev --bundle vault-bundle
 ```
 
 This will stage the local Vault-provided PEM under `sources/staged/<source_name>/fetch/from_vault/from_vault.pem`.

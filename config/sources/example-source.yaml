@@ -1,4 +1,7 @@
 ---
+# Kubernetes-style identifiers (optional but recommended)
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
 # =====================================================================
 # Example source configuration for BundleCraft
 # Location: config/sources/example-source.yaml
@@ -80,4 +83,7 @@ metadata:
   purpose: Example demonstrating all bundle configuration options
   change_control: CAB-2025-001  # Optional audit tracking
   upstream: https://internal.example.com/pki/docs
-  tags: [example, multi-source, documented]
+  tags: [example, multi-source, documented, public-web]
+  labels:
+    team: security
+    tier: demo

@@ -183,6 +183,10 @@ It defines where BundleCraft where retrieve CA certificates from and stage them 
 These bundles are then referenced by environment configuration files, which will go on to define which bundles these sourced certificates will appear in.
 
 ```yaml
+# Optional, recommended identifiers for future controller/CRD-style tooling
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
+
 bundle_name: internal
 description: Trust bundle for internal PKI services
 repo:
@@ -203,6 +207,11 @@ fetch:
   - name: mozilla_roots
     type: url
     url: https://curl.se/ca/cacert.pem
+metadata:
+  # Free-form documentation and selectors
+  owner: pki-team@bundlecraft.io
+  tags: [internal]
+  labels: { team: security, tier: core }
 ```
 
 ### Environment Config (`config/envs/*.yaml`)
@@ -216,6 +225,10 @@ It defines how BundleCraft (based on the certificate source configurations from 
 Additional build filters, verification guardrails, packaging settings, and formatting options can be specified here.
 
 ```yaml
+# Optional, recommended identifiers
+apiVersion: bundlecraft.io/v1alpha1
+kind: EnvConfig
+
 name: Example Craft
 build_path: dist/example/
 package: false
@@ -241,6 +254,12 @@ metadata:
   contact: security@bundlecraft.io
   policy_version: 1.0
 ```
+
+#### Notes on config headers and metadata
+
+- `apiVersion` and `kind` are optional but validated when present. They future‑proof configs for strict environments (e.g., Kubernetes-style controllers) without changing behavior.
+- `metadata.labels` is supported on source and environment configs to attach machine-readable key/value tags for internal automation. It’s not used for selection today (envs reference sources by name only) but provides a clean place for future selectors and CI policies.
+- Separation of concerns is enforced: environment configs compose sources by name and control build/distribution; source configs own repo/fetch definitions. Envs do not reference nested repo/fetch entries.
 
 ### Defaults (`config/defaults.yaml`)
 

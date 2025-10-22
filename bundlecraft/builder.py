@@ -49,6 +49,7 @@ CONFIG_DIR = ROOT / "config"
 SOURCES_DIR = ROOT / "sources"
 STAGED_DIR = SOURCES_DIR / "staged"
 DIST_DIR = ROOT / "dist"
+# (no tag-based bundle composition helpers)
 
 
 # ---------------------------------------------------------------------
@@ -529,7 +530,7 @@ def main(
     if isinstance(raw_bundles, dict):
         for bname, entry in raw_bundles.items():
             entry = entry or {}
-            sources = entry.get("include_sources") or []
+            sources = list(entry.get("include_sources") or [])
             bundles_map[bname] = {"include_sources": sources}
 
     # Determine which bundle(s) to build

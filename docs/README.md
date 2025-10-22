@@ -26,3 +26,9 @@ Each document describes a specific layer of the system - from goals and design p
 > **Note:**
 > All documents are version-controlled and treated as part of the source of truth.
 > Any design or behavioral change **must** be reflected here.
+
+Quick config notes:
+
+- Config files support optional headers `apiVersion: bundlecraft.io/v1alpha1` and `kind: <EnvConfig|SourceConfig|DefaultsConfig>`. These are validated if present and recommended for stricter config environments.
+- `metadata.labels` is supported (in addition to `metadata.tags`) for attaching machine-readable key/value pairs to configs.
+- Environment configs compose sources by name; they don’t reference inner repo/fetch names from source configs to preserve separation of concerns.

@@ -1,4 +1,7 @@
 ---
+# Kubernetes-style identifiers (optional but recommended)
+apiVersion: bundlecraft.io/v1alpha1
+kind: EnvConfig
 # =====================================================================
 # Example Environment Configuration for BundleCraft
 # =====================================================================

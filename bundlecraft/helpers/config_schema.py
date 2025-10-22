@@ -75,6 +75,7 @@ class MetadataModel(BaseModel):
     purpose: str | None = None
     upstream: str | None = None
     tags: list[str] = Field(default_factory=list)
+    labels: dict[str, str] = Field(default_factory=dict)
     environment_tier: str | None = None
     approval_required: bool | None = None
     maintainer: str | None = None
@@ -318,11 +319,24 @@ class BundleEntry(BaseModel):
 class SourceConfig(BaseModel):
     """Schema for source configuration files (config/sources/*.yaml)."""
 
+    apiVersion: str | None = Field(
+        default=None, description="Schema API version (e.g., bundlecraft.io/v1alpha1)"
+    )
+    kind: str | None = Field(default=None, description="Config kind: SourceConfig")
     source_name: str = Field(min_length=1, description="Unique source identifier")
     description: str = Field(min_length=1, description="Human-readable description")
     repo: list[RepoEntry] = Field(default_factory=list, description="Local repository sources")
     fetch: list[FetchEntry] = Field(default_factory=list, description="Remote fetch sources")
     metadata: MetadataModel = Field(default_factory=MetadataModel)
+
+    @model_validator(mode="after")
+    def validate_api_version_and_kind(self) -> SourceConfig:
+        """If apiVersion/kind are provided, ensure they match expected values."""
+        if self.apiVersion is not None and self.apiVersion != "bundlecraft.io/v1alpha1":
+            raise ValueError("apiVersion must be 'bundlecraft.io/v1alpha1'")
+        if self.kind is not None and self.kind != "SourceConfig":
+            raise ValueError("kind must be 'SourceConfig'")
+        return self
 
     @field_validator("source_name")
     @classmethod
@@ -365,6 +379,10 @@ class SourceConfig(BaseModel):
 class EnvConfig(BaseModel):
     """Schema for environment configuration files (config/envs/*.yaml)."""
 
+    apiVersion: str | None = Field(
+        default=None, description="Schema API version (e.g., bundlecraft.io/v1alpha1)"
+    )
+    kind: str | None = Field(default=None, description="Config kind: EnvConfig")
     name: str = Field(min_length=1, description="Environment display name")
     description: str = Field(min_length=1, description="Human-readable description")
     bundles: dict[str, BundleEntry] = Field(
@@ -402,12 +420,21 @@ class EnvConfig(BaseModel):
         """Validate bundles structure and check for duplicates."""
         if not self.bundles:
             raise ValueError("Environment must have at least one bundle defined")
+        # Optional apiVersion/kind check when provided
+        if self.apiVersion is not None and self.apiVersion != "bundlecraft.io/v1alpha1":
+            raise ValueError("apiVersion must be 'bundlecraft.io/v1alpha1'")
+        if self.kind is not None and self.kind != "EnvConfig":
+            raise ValueError("kind must be 'EnvConfig'")
         return self
 
 
 class DefaultsConfig(BaseModel):
     """Schema for defaults configuration file (config/defaults.yaml)."""
 
+    apiVersion: str | None = Field(
+        default=None, description="Schema API version (e.g., bundlecraft.io/v1alpha1)"
+    )
+    kind: str | None = Field(default=None, description="Config kind: DefaultsConfig")
     output_formats: list[OutputFormat | str] = Field(
         default_factory=lambda: ["pem"], description="Default output formats"
     )
@@ -433,6 +460,14 @@ class DefaultsConfig(BaseModel):
                     f"Invalid output format '{fmt}'. Valid formats: {', '.join(sorted(valid_formats))}"
                 )
         return v
+
+    @model_validator(mode="after")
+    def validate_kind(self) -> DefaultsConfig:
+        if self.apiVersion is not None and self.apiVersion != "bundlecraft.io/v1alpha1":
+            raise ValueError("apiVersion must be 'bundlecraft.io/v1alpha1'")
+        if self.kind is not None and self.kind != "DefaultsConfig":
+            raise ValueError("kind must be 'DefaultsConfig'")
+        return self
 
 
 # =====================================================================

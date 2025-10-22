@@ -42,11 +42,18 @@ This document defines the configuration schema for BundleCraft, clearly separati
 
 ## 1) Source Configuration: `config/sources/<bundle>.yaml`
 
+Top-level fields (Kubernetes-style identifiers are optional but recommended):
+
+- `apiVersion`: bundlecraft.io/v1alpha1
+- `kind`: SourceConfig
+- `source_name`: string (logical identifier)
+- `description`: string
+
 Defines certificate sources for a logical bundle.
 
 ### Required Keys
 
-- `bundle_name`: string (logical identifier)
+- `source_name`: string (logical identifier)
 - `description`: string (purpose/context)
 
 ### Source Definition
@@ -191,6 +198,7 @@ metadata:
   purpose: Internal PKI trust anchors
   change_control: CAB-2025-001
   tags: [internal, production]
+  labels: { team: security, tier: core }
 ```yaml
 
 ### Complete Source Config Example
@@ -218,12 +226,18 @@ metadata:
 
 Defines build behavior and deployment configuration for an env.
 
+Top-level fields (optional but recommended):
+
+- `apiVersion`: bundlecraft.io/v1alpha1
+- `kind`: EnvConfig
+
 ### Bundle Composition
 
 ```yaml
 bundles:
   internal-prod:
-    include_sources: [internal, mozilla]  # Merge multiple bundles
+    include_sources: [internal, mozilla]  # Merge specific sources
+    include_sources_by_tags: [public-web]  # Plus any sources tagged with 'public-web'
   mozilla-only:
     include_sources: [mozilla]
 ```yaml
@@ -242,6 +256,9 @@ package: true  # Create .tar.gz of outputs
 ```
 
 ### Verification & Filtering
+
+<!-- Env-wide fetch defaults intentionally not supported to preserve separation. -->
+
 
 ```yaml
 verify:
@@ -489,6 +506,11 @@ metadata:
 
 Global fallback settings applied before environment config.
 
+Top-level fields (optional but recommended):
+
+- `apiVersion`: bundlecraft.io/v1alpha1
+- `kind`: DefaultsConfig
+
 ```yaml
 ---
 output_formats:
@@ -546,8 +568,32 @@ metadata:
 **For composed bundles:**
 
 - Env defines `bundles.<name>.include_sources: [bundle1, bundle2]`
+<!-- Tag-based bundle composition is intentionally not supported at this time to reduce complexity. -->
 - Builder loads each source config and merges their `include` + `exclude` lists
 - Env config controls ALL build behavior (formats, verification, etc.)
+
+---
+
+## FAQ: Why don't env configs reference `repo`/`fetch` names?
+
+Environment configs intentionally do not point to inner keys like `repo[].name` or `fetch[].name` inside source configs. They only compose at the bundle level via `bundles.<name>.include_sources`.
+
+Rationale:
+
+- Reproducibility & provenance: the "what/where" of certificate sourcing lives in a single place (the source config). Allowing envs to tweak or address nested repo/fetch entries would blur provenance and make builds harder to audit.
+- Clear separation of concerns: envs define how to build and distribute, sources define what to gather. Cross-referencing nested names couples layers and increases breakage when source internals change.
+- Simpler change control: teams can evolve fetch/repo structure inside a source without touching any env files.
+
+How to tune behavior per environment:
+
+- Global network behavior (timeouts, retries, backoff) can be set in `config/defaults.yaml` under `fetch:` and applies everywhere. Individual fetch entries can still override within the source config.
+- If you need env-specific fetch tuning, consider maintaining a separate source config variant per env (e.g., `mozilla-dev.yaml` vs `mozilla-prod.yaml`) and include the appropriate one via `include_sources`.
+
+Future extension (optional):
+
+- If you need a middle ground, we can introduce an optional `env.fetch` block to override the global defaults per environment (still not addressing individual `fetch[].name`). Precedence would become: built-in → defaults → env.fetch → source-specific overrides → individual fetch entry.
+
+This keeps env files free from addressing nested names while enabling targeted, env-wide adjustments when necessary.
 
 ---
 

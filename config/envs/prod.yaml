@@ -1,4 +1,9 @@
 ---
+# Kubernetes-style identifiers (optional but recommended)
+# These fields help with future controller/CRD-style validation.
+# They are validated if present but are not required.
+apiVersion: bundlecraft.io/v1alpha1
+kind: EnvConfig
 # =====================================================================
 # Production Environment Configuration
 # =====================================================================
@@ -10,6 +15,9 @@ description: Production environment with full certificate suite and signed relea
 # ---------------------------------------------------------------------
 # Bundle Composition
 # ---------------------------------------------------------------------
+# Each bundle composes one or more source configs by name.
+# Note: environment files intentionally do NOT reference inner repo/fetch entries
+# from source configs to preserve separation of concerns and provenance.
 bundles:
   internal-and-mozilla:
     include_sources: [internal, mozilla]  # Merge internal + Mozilla roots
@@ -27,6 +35,9 @@ package: true  # Create .tar.gz archives
 # ---------------------------------------------------------------------
 # Verification & Filtering
 # ---------------------------------------------------------------------
+# Build-time verification and filtering guardrails.
+# Source definitions (WHAT/WHERE to gather) live in config/sources/*.yaml.
+# Environment controls HOW to build and distribute only.
 verify:
   fail_on_expired: true  # Abort on expired certificates
   warn_days_before_expiry: 30  # Warn within 30 days of expiration
@@ -75,6 +86,8 @@ distribution_metadata:
 # ---------------------------------------------------------------------
 # Metadata
 # ---------------------------------------------------------------------
+# Free-form metadata for documentation and automation.
+# You can also add labels: { key: value } to attach machine-readable tags.
 metadata:
   contact: security@bundlecraft.io
   environment_tier: production
