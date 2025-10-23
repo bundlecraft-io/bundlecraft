@@ -1,6 +1,6 @@
 ---
-name: 🧱 BundleCraft CA Trust Pipeline
-run-name: 'BundleCraft CA Trust Pipeline - ${{ github.ref_name }} - Run #${{ github.run_number }}'
+name: 🧱 BundleCraft Build Trust Release
+run-name: 'BundleCraft Build Trust Release - ${{ github.ref_name }} - Run #${{ github.run_number }}'
 on:
   workflow_dispatch:
     inputs:
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   discover:
-    name: Discover environment bundles
+    name: Discover Environment Configurations
     runs-on: ubuntu-latest
     outputs:
       env_bundles: ${{ steps.detect.outputs.env_bundles }}
@@ -101,7 +101,7 @@ jobs:
             exit 2
           fi
   build:
-    name: Build per environment bundle
+    name: BundleCraft Build
     needs: discover
     runs-on: ubuntu-latest
     strategy:
@@ -159,7 +159,7 @@ jobs:
             ${{ matrix.item.output_root }}/*/${{ matrix.item.bundle }}/
           if-no-files-found: error
   collect:
-    name: Collect and package all builds
+    name: Collect and Package Builds
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -248,7 +248,7 @@ jobs:
             bundlecraft-trust-env-*-bundle-*.tar.gz
             bundlecraft-trust-env-*-bundle-*.sha256
   verify:
-    name: Verify builds and tarball
+    name: Verify Builds and Tarball
     needs: collect
     runs-on: ubuntu-latest
     steps:
