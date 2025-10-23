@@ -569,7 +569,7 @@ def _fetch_each_to_named_dirs(
 @click.option(
     "--output-dir",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
-    default=Path("sources") / "staged",
+    default=Path("cert_sources") / "staged",
     help="Output directory for staged certificates (default: ./cert_sources/staged)",
 )
 @click.option("--verbose", is_flag=True, help="Show extra debug output for fetch operations")

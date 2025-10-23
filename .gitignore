@@ -9,6 +9,7 @@ build*
 
 # Personal/local test folders
 personal*/
+tmp*/
 
 # Non-PEM certificate formats and generated artifacts
 *.crt
