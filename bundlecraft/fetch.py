@@ -638,6 +638,10 @@ def main(
         # Determine source identifier for staging root
         source_name = cfg.get("source_name") or source_config_file.stem
 
+        # Human-readable parity with builder: announce which source is being staged
+        if not json_output:
+            click.secho(f"Staging certificate source: {source_name}", fg="blue")
+
         # Prepare staging dir: <output_dir>/<source_name>
         # If output_dir is relative, resolve it against workspace_root
         if not output_dir.is_absolute():

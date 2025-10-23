@@ -198,7 +198,7 @@ These settings can be configured globally in `config/defaults.yaml` under the `f
 
 ```yaml
 metadata:
-  owner: security-team@bundlecraft.io
+  owner: security@bundlecraft.io
   purpose: Internal PKI trust anchors
   change_control: CAB-2025-001
   tags: [internal, production]
@@ -219,7 +219,7 @@ include:
 exclude: []
 
 metadata:
-  owner: pki-team@bundlecraft.io
+  owner: example@bundlecraft.io
   purpose: Internal service mesh authentication
   tags: [internal, ca-bundle]
 ```yaml
@@ -552,7 +552,7 @@ format_overrides:
     filename: default-ca-bundle.p12
 
 metadata:
-  maintainer: pki-team@bundlecraft.io
+  maintainer: example@bundlecraft.io
   policy_version: 1.0
 ```
 

@@ -205,7 +205,7 @@ fetch:
     url: https://curl.se/ca/cacert.pem
 metadata:
   # Free-form documentation and selectors
-  owner: pki-team@bundlecraft.io
+  owner: example@bundlecraft.io
   tags: [internal]
   labels: { team: security, tier: core }
 ```

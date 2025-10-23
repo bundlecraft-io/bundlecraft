@@ -79,7 +79,7 @@ fetch:
 # Metadata
 # ---------------------------------------------------------------------
 metadata:
-  owner: pki-team@bundlecraft.io
+  owner: example@bundlecraft.io
   purpose: Example demonstrating all bundle configuration options
   change_control: CAB-2025-001  # Optional audit tracking
   upstream: https://internal.example.com/pki/docs

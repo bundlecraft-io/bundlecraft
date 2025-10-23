@@ -11,7 +11,7 @@ repo:
       - cert_sources/internal/BundleCraftTestCA1.pem
       - cert_sources/internal/BundleCraftTestCA2.pem
 metadata:
-  owner: pki-team@bundlecraft.io
+  owner: example@bundlecraft.io
   purpose: Internal service authentication and TLS
   tags: [internal, production]
   labels: {team: security, tier: core}

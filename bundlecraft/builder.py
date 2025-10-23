@@ -21,6 +21,7 @@ import tarfile
 from pathlib import Path
 
 import click
+import yaml
 
 from bundlecraft.helpers.atomic_build import AtomicBuildContext
 from bundlecraft.helpers.config_schema import (
@@ -1258,6 +1259,21 @@ def main(
                 )
                 if expanded_metadata:
                     manifest_obj["output_metadata"] = expanded_metadata
+                    # Also write a YAML sidecar for easy consumption in tools like ConfigMap generation
+                    sidecar_path = build_root / "metadata.yaml"
+                    sidecar_path.write_text(
+                        yaml.dump(expanded_metadata, default_flow_style=False, sort_keys=True),
+                        encoding="utf-8",
+                    )
+                    if not json_output:
+                        try:
+                            display_path = sidecar_path.relative_to(ROOT)
+                        except ValueError:
+                            display_path = sidecar_path
+                        click.secho(
+                            f"  [{bundle_name}] ✓ Wrote metadata sidecar: {display_path}",
+                            fg="green",
+                        )
 
             # Write manifest
             manifest_path = build_root / "manifest.json"
