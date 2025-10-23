@@ -122,7 +122,7 @@ def main(
     dry_run,
     json_output,
 ):
-    """Convert certificate bundles between formats without losing certificates.
+    """Convert certificates between different formats.
 
     IMPORTANT: Private keys are NOT processed. Only certificates are extracted and converted.
     Output files are always named 'bundlecraft-ca-trust.[FORMAT]'.
