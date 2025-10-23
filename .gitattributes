@@ -53,5 +53,5 @@
 
 # Documents
 *.pdf  -text
-*.asc  text eol=lf   # armored signatures are text
-*.sig  -text         # raw/detached signatures often binary
+*.asc  -text eol=lf
+*.sig  -text
