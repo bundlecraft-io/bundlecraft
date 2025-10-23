@@ -568,10 +568,15 @@ def main(
             )
         )
     else:
+        # Uniform success/failure messaging with icons and colors
         if ok:
-            logger.info("✅ All verifications passed.")
+            import click as _click
+
+            _click.secho("✅ Verification complete: all checks passed.", fg="green")
         else:
-            logger.error("❌ One or more verifications failed.")
+            import click as _click
+
+            _click.secho("❌ Verification failed: one or more checks did not pass.", fg="red")
 
     if not ok:
         exit(ExitCode.VALIDATION_ERROR)

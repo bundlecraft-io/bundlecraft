@@ -709,9 +709,11 @@ def main(
             )
         else:
             if dry_run:
-                click.secho("[SUCCESS] [dry-run] Fetch simulation completed.", fg="yellow")
+                # Uniform success icon and color for dry-run completion
+                click.secho("✅ [dry-run] Fetch simulation completed.", fg="yellow")
             else:
-                click.secho("[SUCCESS] Fetch completed.", fg="green")
+                # Uniform success icon and color
+                click.secho("✅ Fetch completed.", fg="green")
 
     except click.ClickException as e:
         error_msg = str(e)

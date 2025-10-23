@@ -305,7 +305,8 @@ def main(
                 )
             )
         else:
-            click.secho(f"[SUCCESS] Conversion complete → {out_dir}", fg="green")
+            # Uniform success icon and color
+            click.secho(f"✅ Conversion complete → {out_dir}", fg="green")
         sys.exit(ExitCode.SUCCESS)
     except Exception as e:
         error_msg = f"Conversion failed: {e}"
