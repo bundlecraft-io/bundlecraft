@@ -295,7 +295,7 @@ fetch:
         )
         assert result.exit_code == 0
         # Default output directory changed from cert_sources/fetched to cert_sources/staged
-        staged = temp_workspace / "sources" / "staged"
+        staged = temp_workspace / "cert_sources" / "staged"
         assert (staged / "test-bundle" / "fetch" / "from_vault").exists()
         pems = list((staged / "test-bundle" / "fetch" / "from_vault").glob("*.pem"))
         assert len(pems) > 0
