@@ -8,6 +8,7 @@ repo:
     include:
       - cert_sources/internal/rootCA.pem
       - cert_sources/internal/issuingCA1.pem
+      - cert_sources/internal/BundleCraftTestCA1.pem
 metadata:
   owner: pki-team@bundlecraft.io
   purpose: Internal service authentication and TLS
