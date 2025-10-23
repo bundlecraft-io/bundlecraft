@@ -1,8 +1,6 @@
 # 🔐 BundleCraft - Modern PKI Trust Store Builder
 
 ![GitHub license](https://img.shields.io/github/license/bundlecraft-io/bundlecraft)
-![GitHub release](https://img.shields.io/github/v/release/bundlecraft-io/bundlecraft)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/bundlecraft-io/bundlecraft/bundlecraft.yaml?branch=main)
 
 > ⚠️ **Important:** BundleCraft is in early pre-release (v0.1.1). The API, CLI, and docs may change as we iterate toward a stable v1.0.0. This is an independent, passion-driven project developed with a focus on practical PKI automation, secure engineering practices, and contributing back to the PKI community. Feedback welcome.
 

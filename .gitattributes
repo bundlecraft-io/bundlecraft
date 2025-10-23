@@ -1,0 +1,57 @@
+#
+# Git attributes for BundleCraft
+# - Normalize line endings to LF across platforms
+# - Mark binaries to avoid EOL conversions
+# - Improve diffs for common text types
+
+# Default: treat files as text where reasonable, normalize to LF
+* text=auto eol=lf
+
+# Explicit text types
+*.py   text eol=lf diff=python
+*.md   text eol=lf
+*.txt  text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.json text eol=lf
+*.ini  text eol=lf
+*.cfg  text eol=lf
+*.toml text eol=lf
+*.sh   text eol=lf
+*.bash text eol=lf
+*.env  text eol=lf
+*.ipynb text eol=lf
+*.svg  text eol=lf
+*.pem  text eol=lf
+
+# Certificates / keystores (binary)
+*.der -text
+*.p12 -text
+*.jks -text
+*.p7b -text
+*.crt -text
+*.cer -text
+
+# Archives and compressed files (binary)
+*.tar    -text
+*.tgz    -text
+*.tar.gz -text
+*.gz     -text
+*.zip    -text
+*.7z     -text
+*.bz2    -text
+*.xz     -text
+
+# Images (binary)
+*.png  -text
+*.jpg  -text
+*.jpeg -text
+*.gif  -text
+*.bmp  -text
+*.ico  -text
+*.icns -text
+
+# Documents
+*.pdf  -text
+*.asc  text eol=lf   # armored signatures are text
+*.sig  -text         # raw/detached signatures often binary
