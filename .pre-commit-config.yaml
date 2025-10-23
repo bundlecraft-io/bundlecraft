@@ -23,11 +23,52 @@ repos:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
 
+  # Python import sorter (with autofix). Configure rules in pyproject.toml [tool.isort]
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - {id: isort}
+
   # Python code formatter (opinionated). Configure in pyproject.toml [tool.black]
   - repo: https://github.com/psf/black
     rev: 24.10.0
     hooks:
       - id: black
+
+  # Python type checker
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        additional_dependencies: []
+
+  # Python dependency vulnerability scanner
+  # Ignores Pip 25.2 warning
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        args: [--progress-spinner=off, --ignore-vuln, GHSA-4xh5-x5gv-qwph]
+
+  # Security linter for Python
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - {id: bandit, args: [-ll, -r, bundlecraft, tests]}
+
+  # Secret detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: package.lock.json
+
+  # Markdown linter
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.1
+    hooks:
+      - {id: actionlint}
 
   # YAML linter
   - repo: https://github.com/adrienverge/yamllint
