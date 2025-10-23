@@ -4,15 +4,10 @@ builder.py
 Orchestrates the three core BundleCraft stages: fetch → convert → verify
 
 Architecture:
-  1) FETCH: Stage certificate sources (local includes + remote fetches) per bundle config
-  2) CONVERT: Aggregate staged sources into canonical PEM, then convert to requested formats
+  1) FETCH: Stage certificate sources (local includes + remote fetches) per source config
+  2) CONVERT: Aggregate staged sources into canonical PEM, then convert to requested formats per env config
   3) VERIFY: Validate certificates and produce compliance reports
 
-Changes from legacy builder:
-    - Removed --prefetch flag (fetch is now always executed)
-        - Staging directory: cert_sources/staged/<source_name>/(include|repo|fetch/<name>)/
-        - Build output: dist/<craft>/<target>/ (craft display name and target name)
-    - Clearer orchestration: each stage is self-contained with explicit inputs/outputs
 """
 
 from __future__ import annotations
@@ -26,7 +21,6 @@ import tarfile
 from pathlib import Path
 
 import click
-import yaml
 
 from bundlecraft.helpers.atomic_build import AtomicBuildContext
 from bundlecraft.helpers.config_schema import (
@@ -497,7 +491,7 @@ def main(
                 bold=True,
             )
 
-    # Load defaults and craft config with proper precedence
+    # Load defaults and env config with proper precedence
     from bundlecraft.helpers.utils import merge_configs
 
     defaults = (
@@ -568,7 +562,7 @@ def main(
     env_name_for_path = env_cfg.get("name") or env
     safe_env = str(env_name_for_path).replace("/", "-").replace(" ", "-")
 
-    # Settings from craft (needed for cache conversion)
+    # Settings from env (needed for cache conversion)
     pem_cfg = env_cfg.get("pem") or {}
     include_subject_comments = pem_cfg.get("include_subject_comments", True)
     output_formats = env_cfg.get("output_formats") or ["pem"]
@@ -593,11 +587,13 @@ def main(
     if not skip_fetch:
         if not json_output:
             click.secho(
-                f"\n[STAGE 1/3] FETCH - Staging and caching {len(unique_sources)} unique bundle(s)",
+                f"\n[STAGE 1/3] FETCH - Staging and caching {len(unique_sources)} unique certificate source(s)",
                 fg="blue",
                 bold=True,
             )
         for bname in unique_sources:
+            if not json_output:
+                click.secho(f"Staging certificate source: {bname}", fg="cyan")
             try:
                 staging_dir = _stage_bundle_sources(
                     bname, env, ROOT, verbose=verbose, dry_run=dry_run, json_output=json_output
@@ -605,13 +601,13 @@ def main(
                 if dry_run:
                     if not json_output:
                         click.secho(
-                            f"  [cache] [dry-run] Would stage bundle: {bname} → {staging_dir.relative_to(ROOT)}",
+                            f"  [cache] [dry-run] Would stage certificates: {bname} → {staging_dir.relative_to(ROOT)}",
                             fg="yellow",
                         )
                 else:
                     if not json_output:
                         click.secho(
-                            f"  [cache] ✓ Staged bundle: {bname} → {staging_dir.relative_to(ROOT)}",
+                            f"  [cache] ✓ Staged certificates: {bname} → {staging_dir.relative_to(ROOT)}",
                             fg="green",
                         )
 
@@ -738,7 +734,7 @@ def main(
     env_name_for_path = env_cfg.get("name") or env
     safe_env = str(env_name_for_path).replace("/", "-").replace(" ", "-")
 
-    # Settings from craft
+    # Settings from env
     pem_cfg = env_cfg.get("pem") or {}
     include_subject_comments = pem_cfg.get("include_subject_comments", True)
     output_formats = env_cfg.get("output_formats") or ["pem"]
@@ -747,11 +743,11 @@ def main(
     per_bundle_results: dict[str, dict] = {}
     import shutil
 
-    # Process each target atomically
+    # Process each bundle atomically
     for bundle_name, bundle_dirs in staging_map.items():
         final_build_root = (Path(output_root) / safe_env / bundle_name).resolve()
 
-        # Use atomic build context for each target
+        # Use atomic build context for each bundle
         with AtomicBuildContext(
             final_build_root, keep_temp=keep_temp, verbose=verbose, dry_run=dry_run
         ) as build_root:
@@ -820,9 +816,9 @@ def main(
 
                     # Prepare manifest object
                     manifest_obj = {
-                        "craft": env_cfg.get("name") or env,
+                        "env": env_cfg.get("name") or env,
                         "environment": env,  # retained for compatibility
-                        "target": bundle_name,
+                        "bundle": bundle_name,
                         "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime(
                             "%Y-%m-%dT%H:%M:%SZ"
                         ),
@@ -885,7 +881,7 @@ def main(
                             err=True,
                         )
 
-                # Continue to next target (exit atomic context)
+                # Continue to next bundle (exit atomic context)
                 continue
 
             # Multi-bundle target: merge cached canonical PEMs
@@ -906,7 +902,7 @@ def main(
 
             if not merged_blocks:
                 click.secho(
-                    f"  [ERROR] [{bundle_name}] No valid PEM certificates parsed for merged target.",
+                    f"  [ERROR] [{bundle_name}] No valid PEM certificates parsed for merged bundle.",
                     fg="red",
                     err=True,
                 )
@@ -955,7 +951,7 @@ def main(
                     )
                 if not dry_run and not json_output:
                     click.secho(
-                        f"  [{bundle_name}] ✓ Converted merged target to formats: {', '.join(extra_formats)}",
+                        f"  [{bundle_name}] ✓ Converted merged bundle to formats: {', '.join(extra_formats)}",
                         fg="green",
                     )
 
@@ -983,9 +979,9 @@ def main(
 
                 # Prepare manifest object
                 manifest_obj = {
-                    "craft": env_cfg.get("name") or env,
+                    "env": env_cfg.get("name") or env,
                     "environment": env,  # retained for compatibility
-                    "target": bundle_name,
+                    "bundle": bundle_name,
                     "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime(
                         "%Y-%m-%dT%H:%M:%SZ"
                     ),
@@ -1119,13 +1115,10 @@ def main(
             click.secho("\n[STAGE 3/3] VERIFY - Skipped", fg="yellow")
 
     # =========================================================================
-    # Build complete
+    # Build complete - Note: manifest/checksums/SBOM written in OUTPUT RESULTS section below
     # =========================================================================
     if not dry_run:
-        if not json_output:
-            click.secho("\nFinalizing build artifacts...", fg="blue")
-
-        # Build manifest and checksums per target
+        # Package creation (if enabled) happens here, manifest/checksums deferred to OUTPUT RESULTS
         for bundle_name, result in per_bundle_results.items():
             build_root = result["build_root"]
             pem_blocks = result["pem_blocks"]
@@ -1150,9 +1143,9 @@ def main(
             # Prepare manifest object
             timestamp_utc = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             manifest_obj = {
-                "craft": env_cfg.get("name") or env,
+                "env": env_cfg.get("name") or env,
                 "environment": env,  # retained for compatibility
-                "target": bundle_name,
+                "bundle": bundle_name,
                 "timestamp_utc": timestamp_utc,
                 "certificate_count": len(pem_blocks),
                 "output_formats": output_formats,
@@ -1181,70 +1174,11 @@ def main(
                 ]
             )
 
-            # Compute checksums once for all files (including tar if created)
-            manifest_obj["files"] = [
-                {"path": fname, "sha256": sha256_file(build_root / fname)} for fname in output_files
-            ]
-
-            # Write manifest
-            # Add expanded output metadata if configured
-            expanded_metadata = None
-            output_metadata_cfg = env_cfg.get("output_metadata")
-            if output_metadata_cfg:
-                expanded_metadata = expand_output_metadata(
-                    output_metadata_cfg,
-                    bundle=bundle_name,
-                    env=env,
-                    timestamp_utc=timestamp_utc,
-                )
-                if expanded_metadata:
-                    manifest_obj["output_metadata"] = expanded_metadata
-
-            output_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
-            manifest_obj["files"] = [
-                {"path": fname, "sha256": sha256_file(build_root / fname)}
-                for fname in output_files
-                if fname != "manifest.json"
-            ]
-            manifest_path = build_root / "manifest.json"
-            manifest_path.write_text(
-                json.dumps(manifest_obj, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
-            # Use absolute path if outside ROOT, otherwise relative
-            try:
-                display_path = manifest_path.relative_to(ROOT)
-            except ValueError:
-                display_path = manifest_path
-            if not json_output:
-                click.secho(
-                    f"  [{bundle_name}] ✓ Wrote manifest: {display_path}",
-                    fg="green",
-                )
-
-            # Write optional YAML sidecar for Kubernetes ConfigMap/Secret generation
-            if expanded_metadata:
-                sidecar_path = build_root / "metadata.yaml"
-                sidecar_path.write_text(
-                    yaml.dump(expanded_metadata, default_flow_style=False, sort_keys=True),
-                    encoding="utf-8",
-                )
-                click.secho(
-                    f"  [{bundle_name}] ✓ Wrote metadata sidecar: {sidecar_path.relative_to(ROOT)}",
-                    fg="green",
-                )
-
-            all_files = sorted([f.name for f in build_root.glob("*") if f.is_file()])
-            checksum_lines = [f"{sha256_file(build_root / fname)}  {fname}" for fname in all_files]
-            checksum_path = build_root / "checksums.sha256"
-            checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
-            if not json_output:
-                click.secho(
-                    f"  [{bundle_name}] ✓ Wrote checksums: {checksum_path.relative_to(ROOT)}",
-                    fg="green",
-                )
+            # Note: Manifest and checksums are written in OUTPUT RESULTS section below
+            # to ensure all artifacts (including SBOM) are included
 
     # =========================================================================
-    # OUTPUT RESULTS
+    # OUTPUT RESULTS - Write manifest, checksums, SBOM, and optionally sign
     # =========================================================================
     if not dry_run:
         if not json_output:
@@ -1277,9 +1211,9 @@ def main(
 
             # Prepare manifest object
             manifest_obj = {
-                "craft": env_cfg.get("name") or env,
+                "env": env_cfg.get("name") or env,
                 "environment": env,  # retained for compatibility
-                "target": bundle_name,
+                "bundle": bundle_name,
                 "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "certificate_count": len(pem_blocks),
                 "output_formats": output_formats,
@@ -1437,23 +1371,28 @@ def main(
                         fg="green",
                     )
 
+    # First completion message (removed duplicate below)
+    # Build bundle display names with environment context
+    env_display_name = env_cfg.get("name") or env
+    bundle_display_names = [f"{env_display_name}/{bundle}" for bundle in per_bundle_results.keys()]
+
     if dry_run:
         if not json_output:
             click.secho(
-                "\n✅ [DRY RUN] Build simulation complete for target(s): "
-                + ", ".join(per_bundle_results.keys()),
+                "\n✅ [DRY RUN] Build simulation complete for bundle(s): "
+                + ", ".join(bundle_display_names),
                 fg="yellow",
                 bold=True,
             )
     else:
         if not json_output:
             click.secho(
-                "\n✅ Build complete for target(s): " + ", ".join(per_bundle_results.keys()),
+                "\n✅ Build complete for bundle(s): " + ", ".join(bundle_display_names),
                 fg="bright_green",
                 bold=True,
             )
 
-    # Collect target information for JSON output
+    # Collect bundle information for JSON output
     for bundle_name, result in per_bundle_results.items():
         build_root = result["build_root"]
         pem_blocks = result["pem_blocks"]
@@ -1509,21 +1448,10 @@ def main(
         if verification_failed:
             sys.exit(ExitCode.VALIDATION_ERROR)
     else:
-        if dry_run:
+        # Non-JSON mode: show final confirmation (duplicate message removed from above)
+        if not dry_run:
             click.secho(
-                "\n✅ [DRY RUN] Build simulation complete for target(s): "
-                + ", ".join(per_bundle_results.keys()),
-                fg="yellow",
-                bold=True,
-            )
-        else:
-            click.secho(
-                "\n✅ Build complete for target(s): " + ", ".join(per_bundle_results.keys()),
-                fg="bright_green",
-                bold=True,
-            )
-            click.secho(
-                "All targets committed atomically to final locations.",
+                "All bundles committed atomically to final locations.",
                 fg="green",
             )
 
