@@ -23,12 +23,12 @@ class TestRetryIntegration:
             nonlocal call_count
             call_count += 1
             if call_count <= 2:
-                raise urllib.error.HTTPError(
-                    request.full_url, 503, "Service Unavailable", {}, None
-                )
+                raise urllib.error.HTTPError(request.full_url, 503, "Service Unavailable", {}, None)
             # Third attempt succeeds
             mock_response = Mock()
-            mock_response.read.return_value = b"-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n"
+            mock_response.read.return_value = (
+                b"-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n"
+            )
             mock_response.__enter__ = Mock(return_value=mock_response)
             mock_response.__exit__ = Mock(return_value=False)
             return mock_response
@@ -44,7 +44,9 @@ class TestRetryIntegration:
 
         assert result.exists()
         assert call_count == 3  # Failed twice, succeeded on third attempt
-        assert result.read_text() == "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n"
+        assert (
+            result.read_text() == "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n"
+        )
 
     def test_fetch_fails_after_exhausting_retries(self, tmp_path):
         """Test that fetch fails after exhausting all retry attempts."""
@@ -79,7 +81,9 @@ class TestRetryIntegration:
             nonlocal actual_timeout
             actual_timeout = timeout
             mock_response = Mock()
-            mock_response.read.return_value = b"-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n"
+            mock_response.read.return_value = (
+                b"-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n"
+            )
             mock_response.__enter__ = Mock(return_value=mock_response)
             mock_response.__exit__ = Mock(return_value=False)
             return mock_response
@@ -108,7 +112,9 @@ class TestRetryIntegration:
             if call_count == 1:
                 raise urllib.error.HTTPError(request.full_url, 408, "Request Timeout", {}, None)
             mock_response = Mock()
-            mock_response.read.return_value = b"-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n"
+            mock_response.read.return_value = (
+                b"-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n"
+            )
             mock_response.__enter__ = Mock(return_value=mock_response)
             mock_response.__exit__ = Mock(return_value=False)
             return mock_response
@@ -159,4 +165,6 @@ class TestRetryIntegration:
         )
 
         assert result.exists()
-        assert result.read_text() == "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n"
+        assert (
+            result.read_text() == "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n"
+        )

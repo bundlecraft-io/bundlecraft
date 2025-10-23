@@ -280,7 +280,16 @@ def verify_directory(build_dir: Path, verbose: bool = False, check_counts: bool 
     is_flag=True,
     help="Emit machine-readable JSON output (suppresses human-readable output)",
 )
-def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_keyring, dry_run, json_output):
+def main(
+    target,
+    verify_manifest,
+    verify_all,
+    verbose,
+    verify_signatures,
+    gpg_keyring,
+    dry_run,
+    json_output,
+):
     """Verify the integrity and consistency of built trust bundles.
 
     Use --dry-run to preview what would be verified without making any changes.
@@ -321,13 +330,13 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
         logger.info(f"SHA256: {digest}")
         if verbose:
             logger.info(f"Info: {file_info(path)}")
-        
+
         # Check for signature if verify_signatures is enabled
         if verify_signatures:
             sig_path = path.with_suffix(path.suffix + ".asc")
             if sig_path.exists():
                 from bundlecraft.helpers.signing import verify_signature
-                
+
                 try:
                     valid, message = verify_signature(
                         path, sig_path, keyring=Path(gpg_keyring) if gpg_keyring else None
@@ -342,7 +351,7 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
                     exit(ExitCode.VALIDATION_ERROR)
             else:
                 logger.warning(f"⚠️  No signature found for {path.name}")
-        
+
         if not json_output:
             logger.info(f"SHA256: {digest}")
             if verbose:
@@ -409,7 +418,7 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
         show_manifest_info(path, verbose)
     else:
         ok = verify_directory(path, verbose)
-    
+
     # Check for missing checksums file first (for JSON error reporting)
     checksum_path = path / CHECKSUM_FILE
     if not checksum_path.exists():
@@ -418,13 +427,13 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
             logger.error(error_msg)
         json_errors.append(error_msg)
         ok = False
-    
+
     # Verify signatures if requested
     if verify_signatures:
         if not json_output:
             logger.info("\n🔏 Verifying GPG signatures...")
         from bundlecraft.helpers.signing import verify_signature
-        
+
         sig_files = list(path.glob("*.asc"))
         if not sig_files:
             if not json_output:
@@ -438,7 +447,7 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
                     if not json_output:
                         logger.warning(f"⚠️  Signed file not found: {file_path.name}")
                     continue
-                
+
                 try:
                     valid, message = verify_signature(
                         file_path, sig_path, keyring=Path(gpg_keyring) if gpg_keyring else None
@@ -454,10 +463,10 @@ def main(target, verify_manifest, verify_all, verbose, verify_signatures, gpg_ke
                     if not json_output:
                         logger.error(f"❌ {file_path.name}: Verification error: {e}")
                     sig_ok = False
-            
+
             if not sig_ok:
                 ok = False
-    
+
     # If checksums exist, verify directory contents
     if checksum_path.exists():
         checksums = load_checksums(checksum_path)
