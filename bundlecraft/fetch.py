@@ -611,7 +611,8 @@ def main(
     local_count = 0
 
     if not json_output:
-        click.secho("\n🔐 BundleCraft Fetcher\n----------------------", fg="cyan")
+        # Banner with underline sized to title length
+        click.secho("\n🔐 BundleCraft Fetcher\n---------------------", fg="cyan")
 
         if dry_run:
             click.secho(

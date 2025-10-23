@@ -328,6 +328,9 @@ def main(from_path: Path, to_path: Path, output_format: str, output: Path | None
             output.write_text(formatted, encoding="utf-8")
             click.secho(f"✓ Diff report written to: {output}", fg="green")
         else:
+            # Cyan banner for human-readable stdout (keeps in-report title for backward compatibility)
+            if output_format.lower() == "human":
+                click.secho("\n🔐 BundleCraft Differ\n--------------------", fg="cyan")
             click.echo(formatted)
 
         # Exit code based on changes
