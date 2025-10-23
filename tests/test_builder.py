@@ -156,7 +156,7 @@ class TestBuilder:
         self, cli_runner, temp_workspace, sample_bundle_config, monkeypatch
     ):
         """Ensure build writes to dist/<env-name>/<bundle-name> with standard filenames."""
-        # Craft config with two simple targets referencing the sample bundle file name
+        # Env config with two simple targets referencing the sample bundle file name
         craft_dir = temp_workspace / "config" / "envs"
         craft_dir.mkdir(parents=True, exist_ok=True)
         (temp_workspace / "config" / "sources").mkdir(parents=True, exist_ok=True)

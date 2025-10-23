@@ -53,14 +53,14 @@ ______________________________________________________________________
 
 ```
 tests/
-├── conftest.py              # Shared pytest fixtures (test helpers)
-├── pytest.ini               # Pytest configuration (in project root)
-├── data/                    # Test data files
+├── conftest.py             # Shared pytest fixtures (test helpers)
+├── pytest.ini              # Pytest configuration (in project root)
+├── data/                   # Test data files
 │   ├── certs/              # Sample certificates for testing
 │   │   └── sample.pem      # Valid test certificate
 │   └── configs/            # Test configuration YAML files
 │       ├── bundles/        # Bundle configuration examples
-│       └── envs/         # Craft configuration examples
+│       └── envs/           # Env configuration examples
 ├── test_builder.py         # Tests for bundle building (bundlecraft build)
 ├── test_cli.py             # Tests for main CLI interface
 ├── test_commands.py        # Tests for all CLI commands

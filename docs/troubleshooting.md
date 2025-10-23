@@ -122,36 +122,6 @@ fetch.0.url
     - Symptom: `metadata.policy_version: Input should be a valid string`
     - Fix: Allowed now; numeric values are auto-converted to strings by the schema.
 
-### Quick commands while iterating
-
-Validate a single file quickly:
-
-```bash
-# Bundle
-python3 - <<'PY'
-from pathlib import Path
-from bundlecraft.helpers.utils import load_yaml
-from bundlecraft.helpers.config_schema import validate_bundle_config
-load_yaml(Path('config/cert_sources/example-bundle.yaml'), validate=validate_bundle_config)
-print('OK')
-PY
-
-# Craft
-python3 - <<'PY'
-from pathlib import Path
-from bundlecraft.helpers.utils import load_yaml
-from bundlecraft.helpers.config_schema import validate_craft_config
-load_yaml(Path('config/envs/example-env.yaml'), validate=validate_craft_config)
-print('OK')
-PY
-```
-
-Run a focused test and see the exact error text:
-
-```bash
-python3 -m pytest tests/test_config_validation.py::TestBundleConfigValidation::test_insecure_http_url -q
-```
-
 ### Migration tips
 
 - Prefer the `repo:` structure for includes; the legacy top-level `include`/`exclude` still works but is discouraged.

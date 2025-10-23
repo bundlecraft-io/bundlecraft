@@ -83,18 +83,15 @@ ______________________________________________________________________
 ## 📁 Repository Structure
 
 ```shell
-├── cert_sources/                # Certificate sources (roots, intermediates, vendor, etc.)
+├── cert_sources/           # Certificate sources (roots, vendor certs, etc.)
 ├── config/                 # YAML configuration (defaults, envs, sources)
-│   ├── defaults.yaml
-│   ├── envs/
-│   └── sources/
 ├── bundlecraft/            # Python scripts for build, verify, convert, helpers
 ├── dist/                   # Generated outputs (per env/bundle)
 ├── docs/                   # Project documentation
 ├── .github/
 │   └── workflows/
 │       └── bundlecraft.yaml  # CI for builds/verification (see also test workflows)
-├── pyproject.toml        # Project metadata and dependencies
+├── pyproject.toml          # Project metadata and dependencies
 ├── README.md               # This file
 └── LICENSE                 # MIT License
 ```
@@ -121,8 +118,7 @@ BundleCraft provides the building blocks for trust bundle creation, while your C
 
 1. **Sources** (`config/cert_sources/<source>.yaml`):
    Bundle content definition (certificate sources to include/exclude)
-
-- **Fetch** (`fetch:` in `<source>`): Securely fetch and stage certificates under `cert_sources/staged/<source_name>/fetch/<name>/`. Local includes are staged under `cert_sources/staged/<source_name>/<repo_name>/` (or `include/` for legacy). Staging is cleaned each run; no persistent cache.
+    - **Fetch** (`fetch:` in `<source>`): Securely fetch and stage certificates under `cert_sources/staged/<source_name>/fetch/<name>/`. Local includes are staged under `cert_sources/staged/<source_name>/<repo_name>/` (or `include/` for legacy). Staging is cleaned each run; no persistent cache.
 
 **Flow:**
 
@@ -228,8 +224,7 @@ Additional build filters, verification guardrails, packaging settings, and forma
 # Optional, recommended identifiers
 apiVersion: bundlecraft.io/v1alpha1
 kind: EnvConfig
-
-name: Example Craft
+name: Example Environment
 build_path: dist/example/
 package: false
 verify:
@@ -324,7 +319,7 @@ eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 bundlecraft build --env prod --bundle internal-prod
 ```
 
-- Produces artifacts in `dist/prod/internal-prod/`:
+Produces artifacts in `dist/prod/internal-prod/`:
 
 ```text
 bundlecraft-ca-trust.pem
@@ -342,10 +337,11 @@ package.tar.gz  # if enabled
 bundlecraft verify --target dist/prod/internal-prod --verbose --verify-all
 ```
 
-- Checks:
-  - Expiry and soon-to-expire certificates
-  - Empty or missing output files
-  - Certificate count consistency across all formats
+Checks:
+
+- Expiry and soon-to-expire certificates
+- Empty or missing output files
+- Certificate count consistency across all formats
 
 **Exit codes:**
 
@@ -424,7 +420,7 @@ See [SIGNING-AND-SBOM.md](docs/SIGNING-AND-SBOM.md) for the complete guide on:
 
 ______________________________________________________________________
 
-## 🧰 Scripts Reference (selected)
+## 🧰 Core CLI Reference
 
 |Script|Purpose|Example Usage|
 |---|---|---|
@@ -437,135 +433,9 @@ For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/R
 
 ______________________________________________________________________
 
-## 📐 Trust Matrix (Environments × Bundles)
-
-The release pipeline now publishes a trust matrix that shows which envs (rows) trust which cert_sources/bundles (columns), derived from `config/envs/*.yaml` composition (`bundles.<name>.include_sources`).
-
-Artifacts attached to releases:
-
-- `TRUST_MATRIX.md` - Markdown table (human-readable)
-- `trust-matrix.json` - Structured JSON (machine-readable)
-
-Generate locally:
-
-```bash
-# Table (terminal)
-python scripts/trust_matrix.py --config-dir config --format table
-
-# Markdown
-python scripts/trust_matrix.py --config-dir config --format markdown --output TRUST_MATRIX.md
-
-# JSON
-python scripts/trust_matrix.py --config-dir config --format json --output trust-matrix.json
-```
-
-Notes:
-
-- Trust for an environment is the union of all sources included by its bundles
-- Legacy bundle composition is also supported
-
-______________________________________________________________________
-
-## 🏭 CI/CD Pipeline
-
-The included workflows automate builds and fetch tests:
-
-- [bundlecraft.yaml](.github/workflows/bundlecraft.yaml): Build/verify/publish
-
-- [test-bundlecraft-fetch.yaml](.github/workflows/test-bundlecraft-fetch.yaml): Fetch test suite (Vault, HTTP, API)
-
-- Discover → Build → Collect → Verify → Publish
-
-- Build per-env "bundles" declared in `config/envs/<env>.yaml` under `bundles:` (composition-aware)
-
-- For each bundle, the job runs `bundlecraft build` and respects `build_path` via `--output-root`
-
-- Uploads artifacts per bundle using the naming `trust-store-<env>-<bundle>`
-
-- Optionally signs and publishes a release tarball
-
-- Concurrency: only one pipeline per branch at a time
-
-Notes
-
-- Prefer declaring composed bundles in env files (for example: `internal-dev` includes `[internal, mozilla]`).
-- If you want bundles to build offline, pre-stage with `bundlecraft fetch` in a connected job, then run build with `--skip-fetch`.
-
-______________________________________________________________________
-
-## 🧪 CI/CD Pipeline (reference)
-
-The included workflows automate builds and fetch tests:
-
-- [bundlecraft.yaml](.github/workflows/bundlecraft.yaml): Build/verify/publish
-
-- [test-bundlecraft-fetch.yaml](.github/workflows/test-bundlecraft-fetch.yaml): Fetch test suite (Vault, HTTP, API)
-
-- Discover → Build → Collect → Verify → Publish
-
-- Build per-env "bundles" declared in `config/envs/<env>.yaml` under `bundles:` (composition-aware)
-
-- For each bundle, the job runs `bundlecraft build` and respects `build_path` via `--output-root`
-
-- Uploads artifacts per bundle using the naming `trust-store-<env>-<bundle>`
-
-- Optionally signs and publishes a release tarball
-
-- Concurrency: only one pipeline per branch at a time
-
-Notes
-
-- Prefer declaring composed bundles in env files (for example: `internal-dev` includes `[internal, mozilla]`).
-- If you want bundles to build offline, pre-stage with `bundlecraft fetch` in a connected job, then run build with `--skip-fetch`.
-
-The workflow prints a selection summary (selected, available, filtered, bundle count)
-
-- HTTP and API fetch tests start `scripts/test-server-local.py` on port 8443, then trust the ephemeral CA at `<data_dir>/server.crt`.
-- The script prints the data dir path and stores it at `/tmp/test-server-local-latest` to make CI trust setup easy.
-
-More details in [`scripts/README.md`](scripts/README.md).
-
-Manual trigger:
-You can dispatch builds from the Actions tab for custom scenarios.
-
-When triggering manually, you can optionally filter environments:
-
-- Input: environments (comma-separated), e.g. `dev,qa`
-- Default: empty = build all environments
-- The workflow prints a selection summary (selected, available, filtered, bundle count)
-- Validation: unknown environments or an empty result after filtering will fail fast with a clear error
-
-______________________________________________________________________
-
 ## 📝 Documentation
 
-- **CLI reference:** [`bundlecraft/README.md`](bundlecraft/README.md)
-- **Configuration spec:** [`docs/CONFIG-SPEC.md`](docs/CONFIG-SPEC.md)
-- **Exit codes:** [`docs/exit-codes.md`](docs/exit-codes.md) - CI/CD integration guide
-- **Contributing guide:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- **Security policy:** [`SECURITY.md`](SECURITY.md)
-- **Test documentation:** [`tests/README.md`](tests/README.md)
-- **Architecture decisions:** [`docs/`](docs/) (ADRs)
-
-______________________________________________________________________
-
-## 📊 Performance & Limitations
-
-### Known Limitations
-
-- **Certificate Formats**: Only X.509 certificates are supported
-- **Private Keys**: Explicitly NOT supported (certs and public keys only)
-- **Certificate Chains**: No automatic chain building or validation (yet)
-- **Revocation**: No CRL or OCSP checking (verification is signature + expiry only)
-- **Binary Executables**: Requires `openssl` and `keytool` in PATH for some operations
-- **Concurrent Builds**: Safe for parallel CI jobs; no shared state
-
-### Best Practices
-
-- Keep bundles focused (< 200 certs recommended for performance)
-- Use ZIP format for distributing individual certificates
-- Run verification in CI to catch expiry issues early
-- Pin dependencies in production pipelines
+**See: [`docs/README.md`](docs/README.md)**
 
 ______________________________________________________________________
 
@@ -699,15 +569,6 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 🧪 Development Tips
-
-- Run `verifier.py` after each build to validate outputs and manifest.
-- Use `converter.py` directly for ad-hoc conversions or tests.
-- To debug OpenSSL or keytool output, temporarily add `check=False` to subprocess calls.
-- Passwords default to `"changeit"` for local testing; override via environment variables in CI.
-
-______________________________________________________________________
-
 ## ⚡ Quick Reference
 
 ### Common Commands
@@ -763,7 +624,7 @@ bundlecraft verify --target dist/prod/mozilla --json | jq -r '.verified_files'
 ### Configuration Files
 
 - `config/defaults.yaml` - Global baseline settings
-- `config/envs/*.yaml` - Craft-specific configs (dev, qa, prod)
+- `config/envs/*.yaml` - Env-specific configs (dev, qa, prod)
 - `config/cert_sources/*.yaml` - Bundle definitions (what certs to include)
 
 ### Output Artifacts

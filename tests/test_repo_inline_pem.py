@@ -8,7 +8,7 @@ from click.testing import CliRunner
 def test_inline_pem_in_repo_include(temp_workspace, monkeypatch):
     runner = CliRunner()
 
-    # Craft config
+    # Env config
     craft_dir = temp_workspace / "config" / "envs"
     craft_dir.mkdir(parents=True, exist_ok=True)
     (craft_dir / "test.yaml").write_text(
