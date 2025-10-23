@@ -1,53 +1,128 @@
-# Code of Conduct
+# Contributor Covenant Code of Conduct
 
-## Our Philosophy
+## Our Pledge
 
-BundleCraft is built on the principle that **good vibes and good security go hand-in-hand**.
+We as members, contributors, and leaders pledge to make participation in our
+community a harassment-free experience for everyone, regardless of age, body
+size, visible or invisible disability, ethnicity, sex characteristics, gender
+identity and expression, level of experience, education, socio-economic status,
+nationality, personal appearance, race, religion, or sexual identity
+and orientation.
 
-## The Basics
+We pledge to act and interact in ways that contribute to an open, welcoming,
+diverse, inclusive, and healthy community.
 
-### ✅ Do
+## Our Standards
 
-- **Be kind and respectful** – We're all learning, whether it's PKI, Python, or how to write a good issue
-- **Ask questions** – No question is too basic; if you're wondering, someone else probably is too
-- **Share knowledge generously** – Got a solution? Document it. Found a bug? Report it with context
-- **Collaborate openly** – Ideas improve through discussion; feedback makes everything better
-- **Use AI tools responsibly** – AI-assisted contributions are welcome as long as you've reviewed, tested, and understand what you're submitting
-- **Focus on the problem, not the person** – Critique code and ideas, never people
-- **Give credit where it's due** – Acknowledge contributions, inspiration, and prior art
+Examples of behavior that contributes to a positive environment for our
+community include:
 
-### ❌ Don't
+* Demonstrating empathy and kindness toward other people
+* Being respectful of differing opinions, viewpoints, and experiences
+* Giving and gracefully accepting constructive feedback
+* Accepting responsibility and apologizing to those affected by our mistakes,
+  and learning from the experience
+* Focusing on what is best not just for us as individuals, but for the
+  overall community
 
-- **Be dismissive or condescending** – "Just Google it" isn't helpful; a link to good docs is
-- **Judge someone's knowledge level** – Everyone starts somewhere; help them level up
-- **Assume bad intent** – Most mistakes are honest; clarify before escalating
-- **Spam or self-promote** – Keep discussions relevant to BundleCraft and trust infrastructure
-- **Harass, discriminate, or create hostile environments** – Zero tolerance for racism, sexism, homophobia, transphobia, ableism, or any form of exclusion
+Examples of unacceptable behavior include:
+
+* The use of sexualized language or imagery, and sexual attention or
+  advances of any kind
+* Trolling, insulting or derogatory comments, and personal or political attacks
+* Public or private harassment
+* Publishing others' private information, such as a physical or email
+  address, without their explicit permission
+* Other conduct which could reasonably be considered inappropriate in a
+  professional setting
+
+## Enforcement Responsibilities
+
+Community leaders are responsible for clarifying and enforcing our standards of
+acceptable behavior and will take appropriate and fair corrective action in
+response to any behavior that they deem inappropriate, threatening, offensive,
+or harmful.
+
+Community leaders have the right and responsibility to remove, edit, or reject
+comments, commits, code, wiki edits, issues, and other contributions that are
+not aligned to this Code of Conduct, and will communicate reasons for moderation
+decisions when appropriate.
 
 ## Scope
 
-This applies to:
+This Code of Conduct applies within all community spaces, and also applies when
+an individual is officially representing the community in public spaces.
+Examples of representing our community include using an official e-mail address,
+posting via an official social media account, or acting as an appointed
+representative at an online or offline event.
 
-- GitHub issues, PRs, and discussions
-- Code comments and commit messages
-- Community channels (if we add them later)
-- Any interaction representing the BundleCraft project
+## Enforcement
 
-## AI-Assisted Contributions
+Instances of abusive, harassing, or otherwise unacceptable behavior may be
+reported to the community leaders responsible for enforcement at
+contact@bundlecraft.io.
+All complaints will be reviewed and investigated promptly and fairly.
 
-Using AI tools (Copilot, ChatGPT, Claude, etc.) is **totally fine**, but:
+All community leaders are obligated to respect the privacy and security of the
+reporter of any incident.
 
-- **You own the code** – Review it, test it, and ensure it aligns with project goals
-- **Document your design choices** – Explain *why*, not just *what* the code does
-- **Don't blindly copy/paste** – Understand what you're submitting
-- **Respect licenses** – Don't submit code that violates someone else's copyright
+## Enforcement Guidelines
 
-The human behind the contribution is accountable, not the tool.
+Community leaders will follow these Community Impact Guidelines in determining
+the consequences for any action they deem in violation of this Code of Conduct:
 
-## Questions?
+### 1. Correction
 
-Not sure if something's okay? **Just ask.** Open a discussion or send an email. We'd rather clarify than assume.
+**Community Impact**: Use of inappropriate language or other behavior deemed
+unprofessional or unwelcome in the community.
 
-______________________________________________________________________
+**Consequence**: A private, written warning from community leaders, providing
+clarity around the nature of the violation and an explanation of why the
+behavior was inappropriate. A public apology may be requested.
 
-**TL;DR:** Be respectful, ask questions, collaborate openly, and help us build trust infrastructure the right way. ❤️
+### 2. Warning
+
+**Community Impact**: A violation through a single incident or series
+of actions.
+
+**Consequence**: A warning with consequences for continued behavior. No
+interaction with the people involved, including unsolicited interaction with
+those enforcing the Code of Conduct, for a specified period of time. This
+includes avoiding interactions in community spaces as well as external channels
+like social media. Violating these terms may lead to a temporary or
+permanent ban.
+
+### 3. Temporary Ban
+
+**Community Impact**: A serious violation of community standards, including
+sustained inappropriate behavior.
+
+**Consequence**: A temporary ban from any sort of interaction or public
+communication with the community for a specified period of time. No public or
+private interaction with the people involved, including unsolicited interaction
+with those enforcing the Code of Conduct, is allowed during this period.
+Violating these terms may lead to a permanent ban.
+
+### 4. Permanent Ban
+
+**Community Impact**: Demonstrating a pattern of violation of community
+standards, including sustained inappropriate behavior,  harassment of an
+individual, or aggression toward or disparagement of classes of individuals.
+
+**Consequence**: A permanent ban from any sort of public interaction within
+the community.
+
+## Attribution
+
+This Code of Conduct is adapted from the [Contributor Covenant][homepage],
+version 2.0, available at
+https://www.contributor-covenant.org/version/2/0/code_of_conduct.html.
+
+Community Impact Guidelines were inspired by [Mozilla's code of conduct
+enforcement ladder](https://github.com/mozilla/diversity).
+
+[homepage]: https://www.contributor-covenant.org
+
+For answers to common questions about this code of conduct, see the FAQ at
+https://www.contributor-covenant.org/faq. Translations are available at
+https://www.contributor-covenant.org/translations.
