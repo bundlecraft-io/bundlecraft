@@ -26,6 +26,7 @@ from bundlecraft.fetchers.http import fetch_url
 from bundlecraft.fetchers.vault import fetch_vault
 from bundlecraft.helpers.config_schema import validate_source_config
 from bundlecraft.helpers.exit_codes import ExitCode
+from bundlecraft.helpers.ui import print_banner
 from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -611,8 +612,8 @@ def main(
     local_count = 0
 
     if not json_output:
-        # Banner with underline sized to title length
-        click.secho("\n🔐 BundleCraft Fetcher\n---------------------", fg="cyan")
+        # Unified banner
+        print_banner("Fetcher")
 
         if dry_run:
             click.secho(

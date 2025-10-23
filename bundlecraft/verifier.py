@@ -24,6 +24,7 @@ import click
 from cryptography.hazmat.primitives.serialization import pkcs7, pkcs12
 
 from bundlecraft.helpers.exit_codes import ExitCode
+from bundlecraft.helpers.ui import print_banner
 
 # --- logging setup ---
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -295,7 +296,8 @@ def main(
     Use --dry-run to preview what would be verified without making any changes.
     """
     if not json_output:
-        click.secho("\n🔐 BundleCraft Verifier\n----------------------", fg="cyan")
+        # Unified banner
+        print_banner("Verifier")
 
         if dry_run:
             click.secho(

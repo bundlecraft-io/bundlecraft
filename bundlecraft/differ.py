@@ -27,6 +27,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
 from bundlecraft.helpers.exit_codes import ExitCode
+from bundlecraft.helpers.ui import print_banner
 
 
 def _extract_cert_info(pem_block: str) -> dict[str, any] | None:
@@ -330,7 +331,7 @@ def main(from_path: Path, to_path: Path, output_format: str, output: Path | None
         else:
             # Cyan banner for human-readable stdout (keeps in-report title for backward compatibility)
             if output_format.lower() == "human":
-                click.secho("\n🔐 BundleCraft Differ\n--------------------", fg="cyan")
+                print_banner("Differ")
             click.echo(formatted)
 
         # Exit code based on changes

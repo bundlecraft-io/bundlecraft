@@ -483,7 +483,10 @@ def main(
     json_targets = []
 
     if not json_output:
-        click.secho("\n🔐 BundleCraft Builder\n---------------------", fg="cyan")
+        from bundlecraft.helpers.ui import print_banner
+
+        # Unified banner
+        print_banner("Builder")
 
         if dry_run:
             click.secho(
@@ -1470,6 +1473,30 @@ def main(
                 "All bundles committed atomically to final locations.",
                 fg="green",
             )
+
+            # Friendly final summary with bundle locations for manual users
+            # Display paths relative to the current workspace root when possible
+            try:
+                from pathlib import Path as _Path
+
+                _cwd = _Path.cwd()
+            except Exception:
+                _cwd = ROOT
+
+            click.echo("")
+            click.secho("Build successful, bundles built at the following locations:", fg="cyan")
+            for _bundle_name, _result in per_bundle_results.items():
+                _build_root = _result["build_root"]
+                _label = f"{env_display_name}/{_bundle_name}"
+                try:
+                    _rel = _build_root.relative_to(_cwd)
+                    _path_str = f"./{str(_rel).rstrip('/')}"  # prefix with ./ for clarity
+                except Exception:
+                    _path_str = str(_build_root)
+                # Ensure trailing slash for directory display
+                if not _path_str.endswith("/"):
+                    _path_str += "/"
+                click.secho(f" - [{_label}] {_path_str}")
 
 
 if __name__ == "__main__":

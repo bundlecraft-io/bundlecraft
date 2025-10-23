@@ -23,6 +23,7 @@ import click
 
 from bundlecraft.helpers.convert_utils import convert_from_any
 from bundlecraft.helpers.exit_codes import ExitCode
+from bundlecraft.helpers.ui import print_banner
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -133,8 +134,8 @@ def main(
     cert_count = 0
 
     if not json_output:
-        # Banner with underline sized to title length
-        click.secho("\n🔐 BundleCraft Converter\n------------------------", fg="cyan")
+        # Unified banner
+        print_banner("Converter")
 
         if dry_run:
             click.secho(
