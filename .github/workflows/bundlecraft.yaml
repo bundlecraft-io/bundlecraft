@@ -175,7 +175,7 @@ jobs:
           echo "=================================================="
           rm -rf bundlecraft
           mkdir -p bundlecraft
-          shopt -s nullglob dotglob
+          shopt -s nullglob dotglob globstar
           artifact_count=0
           for artifact_dir in dist/*; do
             [ -d "$artifact_dir" ] || continue
@@ -187,25 +187,28 @@ jobs:
               dest="bundlecraft/${env}/${bundle}"
               mkdir -p "$dest"
 
-              # Detect nested layout: artifact may contain env-dir/bundle-dir structure
-              # Look for subdirectories matching the bundle name
-              shopt -s nullglob
-              nested_sources=("${artifact_dir}"/*/"${bundle}")
-              if [ ${#nested_sources[@]} -gt 0 ] && [ -d "${nested_sources[0]}" ]; then
-                # Found nested structure: copy from env-dir/bundle-dir
-                echo "  Detected nested layout; copying from: ${nested_sources[0]}"
-                cp -R "${nested_sources[0]}/"* "$dest"/ || true
-              else
-                # Flat structure or direct bundle content: copy from artifact root
+              # Prefer direct bundle content if artifact uploaded the bundle directory itself
+              if compgen -G "${artifact_dir}/*" > /dev/null && [ -f "${artifact_dir}/checksums.sha256" ]; then
+                echo "  Copying direct bundle contents from artifact root"
                 cp -R "${artifact_dir}/"* "$dest"/ || true
+              else
+                # Detect nested layout at any depth (supports custom build_path like dist/dev/custom/<bundle>)
+                mapfile -t FOUND < <(find "$artifact_dir" -type d -name "$bundle" | sort)
+                if [ ${#FOUND[@]} -gt 0 ]; then
+                  src_dir="${FOUND[-1]}"  # Use the deepest match as most specific
+                  echo "  Detected nested layout; copying from: ${src_dir}"
+                  cp -R "${src_dir}/"* "$dest"/ || true
+                else
+                  # Fallback: copy from artifact root
+                  cp -R "${artifact_dir}/"* "$dest"/ || true
+                fi
               fi
-              shopt -u nullglob
               echo "✓ Rehydrated: $base -> $dest"
             else
               echo "⚠ Skipping unexpected artifact dir name: $base"
             fi
           done
-          shopt -u nullglob dotglob
+          shopt -u nullglob dotglob globstar
           if [ $artifact_count -eq 0 ]; then
             echo "::error::No artifacts were downloaded"
             exit 1
