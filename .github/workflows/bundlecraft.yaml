@@ -443,8 +443,8 @@ jobs:
           total_added=0
           total_removed=0
 
-          # Compare each bundle
-          find current/bundlecraft -mindepth 2 -maxdepth 2 -type d | sort | while read current_bundle; do
+          # Compare each bundle (using process substitution to avoid subshell)
+          while read current_bundle; do
             # Extract env and bundle name
             env=$(basename "$(dirname "$current_bundle")")
             bundle=$(basename "$current_bundle")
@@ -514,7 +514,7 @@ jobs:
                 echo "" >> "diff-reports/details-${env}-${bundle}.md"
               fi
             fi
-          done
+          done < <(find current/bundlecraft -mindepth 2 -maxdepth 2 -type d | sort)
 
           # Add totals to summary
           echo "" >> diff-summary.md
