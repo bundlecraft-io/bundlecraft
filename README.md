@@ -152,9 +152,10 @@ Commands:
 
 ```bash
 # Build all configured bundles (composed from sources)
+# --env references the config file stem (config/envs/dev.yaml)
 bundlecraft build --env dev
 
-# Build one bundle from the dev environment
+# Build one bundle
 bundlecraft build --env dev --bundle mozilla
 ```
 

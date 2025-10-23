@@ -72,10 +72,10 @@ jobs:
           MISSING=$(comm -23 <(printf '%s\n' "${!SEL_MAP[@]}" | sort -u) "$ALL_ENVS_FILE" | paste -sd ', ' - || true)
           echo '::group::BundleCraft selection summary'
           echo "Selected environments: ${SELECTED_SORTED:-'(all)'}"
-          echo -n "Available environments: "
+          echo -n "Available environment identifiers: "
           paste -sd ', ' "$ALL_ENVS_FILE" || echo '(none)'
-          echo "Filtered environments (file ids): ${FILTERED_ENVS:-'(none)'}"
-          echo "Filtered environment names: ${FILTERED_ENV_NAMES:-'(none)'}"
+          echo "Filtered config identifiers: ${FILTERED_ENVS:-'(none)'}"
+          echo "Filtered display names: ${FILTERED_ENV_NAMES:-'(none)'}"
           echo "Bundles count: ${TARGETS_COUNT}"
           echo '::endgroup::'
           if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
@@ -83,9 +83,9 @@ jobs:
               echo '## Build selection'
               echo
               echo "- Selected environments: ${SELECTED_SORTED:-'(all)'}"
-              echo -n "- Available environments: "
+              echo -n "- Available environment identifiers: "
               paste -sd ', ' "$ALL_ENVS_FILE" || echo '(none)'
-              echo "- Filtered environments: ${FILTERED_ENVS:-'(none)'}"
+              echo "- Environment display names: ${FILTERED_ENV_NAMES:-'(none)'}"
               echo "- Bundles count: ${TARGETS_COUNT}"
               if [ "$TARGETS_COUNT" -gt 0 ]; then
                 echo

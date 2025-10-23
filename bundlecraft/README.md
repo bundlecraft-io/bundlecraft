@@ -192,7 +192,7 @@ bundlecraft build --env <env>  [OPTIONS]
 
 | Option | Description |
 | ----------------- | ----------- |
-| `--env` | Env name (e.g., `dev`, `prod`). Required. |
+| `--env` | Environment identifier matching a config file in `config/envs/<env>.yaml` (e.g., `dev`, `prod`). Required. |
 | `--bundle` | Bundle name to build (from env `bundles`). If omitted, builds all bundles|
 | `--verify-only` | Skip build; only verify existing output or staged sources. |
 | `--skip-fetch` | Skip the fetch stage; use existing staged inputs (offline-friendly). |

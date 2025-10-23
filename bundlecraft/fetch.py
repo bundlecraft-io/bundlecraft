@@ -279,6 +279,9 @@ def run_fetch(
 ) -> list[Path]:
     """Programmatic entrypoint to fetch-and-stage.
 
+    Args:
+        env: Environment config file identifier (e.g., 'dev' for config/envs/dev.yaml)
+
     Returns list of staged file paths. No-op (empty list) if no fetch section.
     Raises ClickException on validation errors.
     """
@@ -290,13 +293,10 @@ def run_fetch(
     ensure_dir(sources_dir)
 
     # Load config
-    logger.info(f"Loading config for env={env}, bundle={bundle}")
-    cfg_path = (
-        (config_dir / "envs" / f"{env}.yaml")
-        if (config_dir / "envs" / f"{env}.yaml").exists()
-        else (config_dir / "envs" / f"{env}.yaml")
-    )
-    _ = load_yaml(cfg_path, required=True)
+    cfg_path = config_dir / "envs" / f"{env}.yaml"
+    env_cfg = load_yaml(cfg_path, required=True)
+    env_name = env_cfg.get("name") or env
+    logger.info(f"Loading config for environment '{env_name}', bundle '{bundle}'")
     bundle_cfg = load_yaml(
         config_dir / "bundles" / f"{bundle}.yaml", required=True, validate=validate_source_config
     )

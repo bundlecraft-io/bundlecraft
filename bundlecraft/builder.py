@@ -75,6 +75,9 @@ def _stage_bundle_sources(
 ) -> Path:
     """Stage a bundle's sources (includes + fetch) into cert_sources/staged/<source_name>/.
 
+    Args:
+        env: Environment config file identifier (e.g., 'dev' for config/envs/dev.yaml)
+
     This mirrors the fetch CLI behavior but writes to a staging area for build.
     Returns the staging directory path.
     """
@@ -366,7 +369,7 @@ def _verify_certificates(
     "--env",
     "env",
     required=True,
-    help="Environment name (e.g., dev, prod)",
+    help="Environment identifier from config/envs/<env>.yaml (e.g., dev, prod). References the config file stem, not the display name.",
 )
 @click.option(
     "--bundle",
@@ -506,7 +509,7 @@ def main(
     env_path = CONFIG_DIR / "envs" / f"{env}.yaml"
 
     if not env_path.exists():
-        error_msg = f"Environment config not found: {env} (expected: {env_path})"
+        error_msg = f"Environment config file not found: config/envs/{env}.yaml"
         if json_output:
             json_errors.append(error_msg)
             from bundlecraft.helpers.json_output import create_build_response, emit_json
