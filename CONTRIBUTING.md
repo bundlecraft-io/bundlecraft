@@ -199,7 +199,7 @@ bundlecraft/
 
 - `config/defaults.yaml` – Global defaults for all envs/sources
 - `config/envs/*.yaml` – Environment definitions (bundles, filters, verify policies)
-- `config/cert_sources/*.yaml` – Bundle definitions (sources, fetch specs)
+- `config/sources/*.yaml` – Bundle definitions (sources, fetch specs)
 
 ______________________________________________________________________
 
@@ -214,10 +214,10 @@ Once you have bundle and environment configs, test the CLI directly:
 bundlecraft build --env dev
 
 # Individual stages
-bundlecraft fetch --source-config-file config/cert_sources/internal.yaml
+bundlecraft fetch --source-config-file config/sources/internal.yaml
 bundlecraft convert --input dist/dev/internal/bundlecraft-ca-trust.pem --output-dir dist/dev/internal
 bundlecraft verify --target dist/dev/internal --verify-all
-bundlecraft diff --from cert_sources/staged/internal/rootCA.pem --to dist/dev/internal/bundlecraft-ca-trust.pem
+bundlecraft diff --from sources/staged/internal/rootCA.pem --to dist/dev/internal/bundlecraft-ca-trust.pem
 ```
 
 Get help on any command:
