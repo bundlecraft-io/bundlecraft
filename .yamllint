@@ -12,7 +12,7 @@ rules:
   # Keep line length reasonable but don't error on long lines
   # Multiline strings (like GitHub Actions body) can exceed this
   line-length:
-    max: 200
+    max: 215
     level: warning
     allow-non-breakable-inline-mappings: true
 

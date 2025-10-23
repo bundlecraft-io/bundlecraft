@@ -287,9 +287,7 @@ pip install -e .
 pip install -e ".[dev]"
 ```
 
-### 1.5 Shell completion (optional)
-
-BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags:
+Shell completion (optional): BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags:
 
 ```bash
 # Bash - run in your current shell (or add to ~/.bashrc for persistence)
@@ -349,7 +347,35 @@ Checks:
 - `1`: Warnings (certs expiring soon)
 - `5`: Failure (expired certs, parse errors, empty/mismatched outputs)
 
-### 5. Convert Bundles Ad-hoc (if needed)
+### 5. Compare Bundles (Track Changes)
+
+```bash
+# Compare two bundle builds to identify certificate changes
+bundlecraft diff --from dist/prod/v1/internal-prod --to dist/prod/v2/internal-prod
+
+# Generate JSON diff report for CI/CD
+bundlecraft diff \
+  --from dist/prod/v1/internal-prod \
+  --to dist/prod/v2/internal-prod \
+  --output-format json
+```
+
+Shows:
+
+- Added certificates (new roots/CAs)
+- Removed certificates (deprecated/expired)
+- Unchanged certificates
+- Summary statistics
+
+Use cases:
+
+- **Release auditing** - Track certificate changes between versions
+- **Change validation** - Verify expected updates before deployment
+- **Compliance reporting** - Document trust policy evolution
+
+📖 **Full documentation:** [docs/bundlecraft-diff.md](docs/bundlecraft-diff.md)
+
+### 6. Convert Bundles Ad-hoc (if needed)
 
 ```bash
 # Convert DER to PEM
@@ -582,6 +608,9 @@ bundlecraft build --env prod --bundle internal
 
 # Verify a bundle
 bundlecraft verify --target dist/prod/internal --verify-all
+
+# Compare two bundles (identify certificate changes)
+bundlecraft diff --from dist/prod/v1/internal --to dist/prod/v2/internal
 
 # Convert formats
 bundlecraft convert --input bundlecraft-ca-trust.pem --output-dir ./ --output-format jks

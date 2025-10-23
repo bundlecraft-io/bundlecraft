@@ -133,14 +133,60 @@ Verifies integrity of built bundles:
 
 ### 5. Publish Release
 
-Creates GitHub Release with signed artifacts:
+Creates GitHub Release with signed artifacts and certificate diff:
 
 - Generates timestamped release tag (`bundlecraft-truststore-v<YYYY.MM.DD-HHMM>`)
+- **Compares with previous release to generate certificate diff report**
+- **Includes detailed summary of added/removed certificates in release notes**
 - Optionally signs artifacts with GPG (if `GPG_PRIVATE_KEY` secret is configured)
 - Attaches all tarballs, checksums, and signatures
 - Includes trust matrix (certificate inventory by environment/bundle)
+- Includes certificate diff report (CERT_DIFF.md)
 - Provides verification instructions in release notes
 - Supports both signed and unsigned releases
+
+**Certificate Diff in Release:**
+
+The release automatically includes a detailed comparison with the previous release showing:
+
+- Summary table of changes per bundle (added/removed/unchanged counts)
+- Collapsible sections with full certificate details for added certificates
+- Collapsible sections with full certificate details for removed certificates
+- Overall totals across all bundles
+- First release detection (no comparison if this is the first release)
+
+**Example Release Notes Section:**
+
+```markdown
+## 📊 Certificate Changes Summary
+
+Compared to previous release: `bundlecraft-truststore-v2025.10.20-1500`
+
+| Environment | Bundle | Added | Removed | Unchanged |
+|------------|--------|-------|---------|-----------|
+| `production` | `internal` | 2 | 1 | 41 |
+| `production` | `mozilla` | 0 | 0 | 142 |
+
+**Overall:** 2 certificates added, 1 certificates removed across all bundles.
+
+## 📋 Detailed Changes by Bundle
+
+### 📦 production/internal
+
+**Changes:** 2 added, 1 removed, 41 unchanged
+
+<details>
+<summary>➕ Added Certificates (2)</summary>
+
+[Certificate details...]
+</details>
+
+<details>
+<summary>➖ Removed Certificates (1)</summary>
+
+[Certificate details...]
+</details>
+```
 
 **Workflow inputs:**
 
@@ -176,11 +222,80 @@ Creates GitHub Release with signed artifacts:
 
 ______________________________________________________________________
 
+## 🔍 Certificate Bundle Diff on PR
+
+**Workflow:** `.github/workflows/pr-cert-diff.yaml`
+
+**Purpose:** Automatically compare certificate bundles between PR branch and base branch, posting detailed diff reports as PR comments.
+
+**Trigger:**
+
+- Automatic on pull requests to `main` or `develop` branches
+- Only when certificate sources or configs are modified
+
+**What it does:**
+
+1. Builds bundles from both PR branch and base branch
+1. Compares bundles using `bundlecraft diff`
+1. Generates human-readable and JSON diff reports
+1. Posts formatted comment to PR with certificate changes
+1. Uploads full diff reports as workflow artifacts
+
+**Features:**
+
+- **Smart detection** - Automatically identifies which environments/bundles to compare
+- **Change summary** - Shows added, removed, and unchanged certificate counts
+- **Detailed reports** - Collapsible sections with full certificate details
+- **Artifact upload** - Complete diff reports available for download
+- **Update existing comments** - Edits previous bot comments instead of creating new ones
+- **Optional validation** - Can be configured to fail builds on unexpected changes
+
+**PR Comment Example:**
+
+```markdown
+## 🔐 Certificate Bundle Changes
+
+This PR modifies certificate bundles. Review the changes below:
+
+### 📦 Environment: `production` / Bundle: `internal`
+
+**Summary:**
+- ➕ Added: 2
+- ➖ Removed: 1
+- ↔️ Unchanged: 41
+
+<details>
+<summary>➕ Added Certificates (2)</summary>
+
+Subject: CN=New Corporate Root CA 2025,O=Example Corp,C=US
+Fingerprint: a1b2c3d4e5f6...
+Valid: 2025-01-01T00:00:00+00:00 to 2045-01-01T00:00:00+00:00
+</details>
+
+⚠️ **Action Required:** Review the certificate changes above before merging.
+```
+
+**Configuration options:**
+
+- Customize validation rules (e.g., max certificates removed)
+- Filter specific environments to compare
+- Adjust artifact retention period
+
+**Use cases:**
+
+- Pre-merge review of certificate changes
+- Automated change documentation
+- Compliance and audit trail for trust policy modifications
+- Prevent accidental certificate removals
+
+______________________________________________________________________
+
 ## Best Practices
 
 ### For Development
 
 1. Run **PyTest Suite** automatically on all branches via push/PR
+1. Use **Certificate Bundle Diff on PR** to review certificate changes before merging
 1. Use **Fetch Test Suite** manually when testing new fetch sources or configurations
 1. Test locally before pushing with `pytest` and `bundlecraft build --dry-run`
 

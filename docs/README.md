@@ -11,6 +11,7 @@ ______________________________________________________________________
 ### Configuration & Usage
 
 - **[Configuration Specification](CONFIG-SPEC.md)** - Complete schema and usage guide for source configs, environment configs, and defaults
+- **[BundleCraft Diff](bundlecraft-diff.md)** - Compare certificate bundles between builds and releases
 - **[JSON Output Schemas](JSON-OUTPUT.md)** - Machine-readable output formats for all CLI commands (--json flag)
 - **[Exit Codes](exit-codes.md)** - Standardized exit codes for CI/CD integration and error handling
 - **[Signing and SBOM](SIGNING-AND-SBOM.md)** - GPG signing of releases and automatic CycloneDX SBOM generation
