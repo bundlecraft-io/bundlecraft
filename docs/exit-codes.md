@@ -5,28 +5,33 @@ BundleCraft uses standardized exit codes to communicate command outcomes to call
 ## Exit Code Reference
 
 ### Success
+
 | Code | Name | Description |
 |------|------|-------------|
 | `0` | `SUCCESS` | Operation completed successfully |
 
 ### General Errors
+
 | Code | Name | Description |
 |------|------|-------------|
 | `1` | `GENERAL_ERROR` | Unspecified error (catch-all for unexpected failures) |
 
 ### Configuration Errors (2-9)
+
 | Code | Name | Description |
 |------|------|-------------|
 | `2` | `CONFIG_ERROR` | Invalid configuration (schema validation failed, syntax error, or invalid values) |
 | `3` | `CONFIG_NOT_FOUND` | Missing required configuration file |
 
 ### Input/Output Errors (10-19)
+
 | Code | Name | Description |
 |------|------|-------------|
 | `10` | `INPUT_ERROR` | Invalid input arguments or missing required input |
 | `11` | `OUTPUT_ERROR` | Cannot write output files (permissions, disk space, etc.) |
 
 ### Network/Fetch Errors (20-29)
+
 | Code | Name | Description |
 |------|------|-------------|
 | `20` | `NETWORK_ERROR` | Network connection failure (timeout, DNS resolution, etc.) |
@@ -34,6 +39,7 @@ BundleCraft uses standardized exit codes to communicate command outcomes to call
 | `22` | `FETCH_ERROR` | Remote fetch failed (non-network issue, e.g., resource not found) |
 
 ### Validation Errors (30-39)
+
 | Code | Name | Description |
 |------|------|-------------|
 | `30` | `VALIDATION_ERROR` | Certificate or bundle validation failed |
@@ -41,18 +47,20 @@ BundleCraft uses standardized exit codes to communicate command outcomes to call
 | `32` | `INVALID_CERT` | Certificate is malformed or cannot be parsed |
 
 ### Build/Conversion Errors (40-49)
+
 | Code | Name | Description |
 |------|------|-------------|
 | `40` | `BUILD_ERROR` | Build process failed (general build failure) |
 | `41` | `CONVERSION_ERROR` | Format conversion failed (PEM ↔ P7B/JKS/P12) |
 
 ### Runtime Errors (50-59)
+
 | Code | Name | Description |
 |------|------|-------------|
 | `50` | `DEPENDENCY_ERROR` | Missing required system dependency (openssl, keytool, etc.) |
 | `51` | `PERMISSION_ERROR` | Insufficient permissions to perform operation |
 
----
+______________________________________________________________________
 
 ## Command-Specific Exit Codes
 
@@ -68,6 +76,7 @@ BundleCraft uses standardized exit codes to communicate command outcomes to call
 | `40` | Build failed (cannot write output, conversion failure) |
 
 **Example:**
+
 ```bash
 bundlecraft build --env-config-file env.yaml
 echo $?  # Check exit code
@@ -85,6 +94,7 @@ echo $?  # Check exit code
 | `32` | Invalid/malformed certificates |
 
 **Example:**
+
 ```bash
 bundlecraft verify --target dist/my-env/production/
 if [ $? -eq 31 ]; then
@@ -103,6 +113,7 @@ fi
 | `41` | Conversion failed (format error, openssl/keytool failure) |
 
 **Example:**
+
 ```bash
 bundlecraft convert --input bundle.pem --output-dir ./output --output-format p7b
 if [ $? -ne 0 ]; then
@@ -121,6 +132,7 @@ fi
 | `22` | Fetch failed (resource not found, invalid response) |
 
 **Example:**
+
 ```bash
 bundlecraft fetch --source-config-file bundle.yaml
 if [ $? -eq 20 ]; then
@@ -137,7 +149,7 @@ fi
 | `0` | Diff completed (changes detected or no changes) |
 | `1` | Diff failed (invalid arguments, error reading files) |
 
----
+______________________________________________________________________
 
 ## CI/CD Integration
 
@@ -215,7 +227,7 @@ pipeline {
 }
 ```
 
----
+______________________________________________________________________
 
 ## Troubleshooting Guide
 
@@ -241,6 +253,7 @@ pipeline {
 ### Common Patterns
 
 #### Network Retry Logic
+
 ```bash
 #!/bin/bash
 MAX_RETRIES=3
@@ -264,6 +277,7 @@ done
 ```
 
 #### Expired Certificate Handling
+
 ```bash
 #!/bin/bash
 bundlecraft build --env-config-file env.yaml
@@ -287,30 +301,34 @@ case $EXIT_CODE in
 esac
 ```
 
----
+______________________________________________________________________
 
 ## Best Practices
 
 1. **Always check exit codes in automation:**
+
    ```bash
    bundlecraft build --env-config-file env.yaml || exit $?
    ```
 
-2. **Use exit codes for conditional logic:**
+1. **Use exit codes for conditional logic:**
+
    ```bash
    if [ $? -eq 31 ]; then
        # Handle expired certs
    fi
    ```
 
-3. **Log exit codes for debugging:**
+1. **Log exit codes for debugging:**
+
    ```bash
    bundlecraft verify --target dist/
    EXIT_CODE=$?
    echo "Verification exit code: $EXIT_CODE" >> build.log
    ```
 
-4. **Test failure scenarios in CI:**
+1. **Test failure scenarios in CI:**
+
    ```yaml
    - name: Test exit codes
      run: |
@@ -320,7 +338,8 @@ esac
        bundlecraft fetch --source-config-file bundle.yaml || true
    ```
 
-5. **Document expected exit codes in your CI/CD pipeline:**
+1. **Document expected exit codes in your CI/CD pipeline:**
+
    ```yaml
    # Expected exit codes:
    #   0  - Success
@@ -328,7 +347,7 @@ esac
    #   2  - Config error (fail build)
    ```
 
----
+______________________________________________________________________
 
 ## Backward Compatibility
 
@@ -339,7 +358,7 @@ esac
 
 Existing CI/CD pipelines checking only for `$? -eq 0` (success) or `$? -ne 0` (failure) will continue to work without modification.
 
----
+______________________________________________________________________
 
 ## Related Documentation
 
@@ -348,7 +367,7 @@ Existing CI/CD pipelines checking only for `$? -eq 0` (success) or `$? -ne 0` (f
 - [Troubleshooting Guide](./troubleshooting.md)
 - [GitHub Actions Integration](./.github/workflows/bundlecraft.yaml)
 
----
+______________________________________________________________________
 
 ## Feedback
 

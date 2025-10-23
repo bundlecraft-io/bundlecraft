@@ -48,6 +48,6 @@ The human behind the contribution is accountable, not the tool.
 
 Not sure if something's okay? **Just ask.** Open a discussion or send an email. We'd rather clarify than assume.
 
----
+______________________________________________________________________
 
 **TL;DR:** Be respectful, ask questions, collaborate openly, and help us build trust infrastructure the right way. ❤️

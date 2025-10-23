@@ -12,13 +12,14 @@ BundleCraft supports GPG/OpenPGP signing of release artifacts and automatic SBOM
 - ✅ **Verification Tooling**: Built-in verification commands for signed releases
 - ✅ **CI/CD Ready**: Environment variable support for secure key management in pipelines
 
----
+______________________________________________________________________
 
 ## GPG Signing
 
 ### Prerequisites
 
 **Install GPG:**
+
 ```bash
 # Ubuntu/Debian
 sudo apt-get install gnupg
@@ -58,6 +59,7 @@ gpg --list-secret-keys --keyid-format=long
 ```
 
 **Export your public key for verification:**
+
 ```bash
 # Export to share with others for verification
 gpg --armor --export ABCD1234EFGH5678 > public-key.asc
@@ -66,6 +68,7 @@ gpg --armor --export ABCD1234EFGH5678 > public-key.asc
 ### Sign Release Artifacts
 
 **Basic signing during build:**
+
 ```bash
 # Sign with key ID specified
 bundlecraft build --env prod --bundle mozilla \
@@ -77,6 +80,7 @@ bundlecraft build --env prod --bundle mozilla --sign
 ```
 
 **With passphrase (optional):**
+
 ```bash
 # Provide passphrase via environment variable (for CI/CD)
 export GPG_KEY_ID=ABCD1234EFGH5678
@@ -88,6 +92,7 @@ bundlecraft build --env prod --bundle mozilla --sign
 
 **What gets signed:**
 When `--sign` is used, BundleCraft creates detached signatures (.asc files) for:
+
 - `manifest.json` - Build metadata
 - `checksums.sha256` - File integrity checksums
 - `bundlecraft-ca-trust.pem` - Canonical PEM bundle
@@ -98,6 +103,7 @@ When `--sign` is used, BundleCraft creates detached signatures (.asc files) for:
 - `sbom.json` - Software Bill of Materials
 
 **Example output structure:**
+
 ```
 dist/Production/mozilla/
 ├── bundlecraft-ca-trust.pem
@@ -121,6 +127,7 @@ dist/Production/mozilla/
 ### Verify Signed Artifacts
 
 **Using BundleCraft's built-in verification:**
+
 ```bash
 # Import the public key (one-time setup)
 gpg --import public-key.asc
@@ -139,6 +146,7 @@ bundlecraft verify --target dist/Production/mozilla/bundlecraft-ca-trust.pem \
 ```
 
 **Manual verification with GPG:**
+
 ```bash
 # Verify individual files
 gpg --verify dist/Production/mozilla/manifest.json.asc \
@@ -151,6 +159,7 @@ gpg --verify dist/Production/mozilla/manifest.json.asc \
 ```
 
 **Trust the signing key:**
+
 ```bash
 # After importing, you may need to trust the key
 gpg --edit-key ABCD1234EFGH5678
@@ -159,13 +168,14 @@ gpg --edit-key ABCD1234EFGH5678
 # Type: quit
 ```
 
----
+______________________________________________________________________
 
 ## SBOM (Software Bill of Materials)
 
 ### Overview
 
 BundleCraft automatically generates a CycloneDX JSON SBOM for every build, providing:
+
 - Certificate metadata (serial, issuer, subject, fingerprints, validity dates)
 - Fetch provenance (source URLs, verification hashes)
 - Tooling metadata (Python version, cryptography version, dependencies)
@@ -174,18 +184,21 @@ BundleCraft automatically generates a CycloneDX JSON SBOM for every build, provi
 ### SBOM Generation
 
 **Enabled by default:**
+
 ```bash
 # SBOM is generated automatically
 bundlecraft build --env prod --bundle mozilla
 ```
 
 **Disable SBOM generation:**
+
 ```bash
 # Skip SBOM if not needed
 bundlecraft build --env prod --bundle mozilla --no-sbom
 ```
 
 **SBOM output location:**
+
 ```
 dist/Production/mozilla/
 ├── sbom.json                         # ← CycloneDX SBOM
@@ -195,6 +208,7 @@ dist/Production/mozilla/
 ### SBOM Contents
 
 **Example SBOM structure:**
+
 ```json
 {
   "bomFormat": "CycloneDX",
@@ -242,25 +256,27 @@ dist/Production/mozilla/
 ### SBOM Use Cases
 
 1. **Supply Chain Security**: Track all certificates and their origins
-2. **Compliance**: Provide auditable records of bundle contents
-3. **Vulnerability Management**: Identify and track certificate lifecycles
-4. **Provenance Tracking**: Verify where certificates were fetched from
+1. **Compliance**: Provide auditable records of bundle contents
+1. **Vulnerability Management**: Identify and track certificate lifecycles
+1. **Provenance Tracking**: Verify where certificates were fetched from
 
 ### SBOM Tools
 
 **Validate SBOM:**
+
 ```bash
 # Using cyclonedx-cli (install separately)
 cyclonedx validate --input-file dist/Production/mozilla/sbom.json
 ```
 
 **Convert SBOM formats:**
+
 ```bash
 # Convert to SPDX (if needed, using third-party tools)
 # Note: SPDX format support in BundleCraft is planned for Phase 2
 ```
 
----
+______________________________________________________________________
 
 ## CI/CD Integration
 
@@ -319,51 +335,55 @@ jobs:
 ### Secret Management
 
 **GitHub Actions Secrets:**
+
 1. `GPG_PRIVATE_KEY`: Base64-encoded GPG private key
+
    ```bash
    gpg --armor --export-secret-keys ABCD1234EFGH5678 | base64 > gpg-key.b64
    # Add contents of gpg-key.b64 to GitHub Secrets
    ```
 
-2. `GPG_KEY_ID`: Your GPG key ID (e.g., `ABCD1234EFGH5678`)
+1. `GPG_KEY_ID`: Your GPG key ID (e.g., `ABCD1234EFGH5678`)
 
-3. `GPG_PASSPHRASE`: Passphrase for the GPG key
+1. `GPG_PASSPHRASE`: Passphrase for the GPG key
 
 **Other CI Systems:**
+
 - **GitLab CI**: Use GitLab CI/CD variables (masked)
 - **Jenkins**: Use Jenkins Credentials Plugin
 - **Azure DevOps**: Use Azure Key Vault or Pipeline Variables
 
----
+______________________________________________________________________
 
 ## Best Practices
 
 ### Key Management
 
 1. **Use dedicated signing keys**: Don't use your personal GPG key for automated signing
-2. **Set key expiration**: Keys should expire after 1-2 years for security
-3. **Rotate keys regularly**: Update to new keys before old ones expire
-4. **Store keys securely**: Use secrets management (HashiCorp Vault, AWS Secrets Manager, etc.)
-5. **Backup private keys**: Securely backup your private key in case of loss
-6. **Publish public keys**: Make your public key available for verification (e.g., in GitHub repo or on keyserver)
+1. **Set key expiration**: Keys should expire after 1-2 years for security
+1. **Rotate keys regularly**: Update to new keys before old ones expire
+1. **Store keys securely**: Use secrets management (HashiCorp Vault, AWS Secrets Manager, etc.)
+1. **Backup private keys**: Securely backup your private key in case of loss
+1. **Publish public keys**: Make your public key available for verification (e.g., in GitHub repo or on keyserver)
 
 ### Signing in Production
 
 1. **Always sign production releases**: Use `--sign` for all production builds
-2. **Generate SBOMs**: Keep SBOM enabled (default) for supply chain transparency
-3. **Verify before distribution**: Always verify signatures before distributing bundles
-4. **Document your key**: Include key ID and public key location in release notes
-5. **Maintain key registry**: Keep a registry of all signing keys used over time
+1. **Generate SBOMs**: Keep SBOM enabled (default) for supply chain transparency
+1. **Verify before distribution**: Always verify signatures before distributing bundles
+1. **Document your key**: Include key ID and public key location in release notes
+1. **Maintain key registry**: Keep a registry of all signing keys used over time
 
 ### Release Workflow
 
 **Recommended release process:**
+
 1. Build with signing enabled
-2. Verify all signatures locally
-3. Review SBOM for accuracy
-4. Upload signed artifacts to release storage
-5. Publish public key for verification
-6. Include verification instructions in release notes
+1. Verify all signatures locally
+1. Review SBOM for accuracy
+1. Upload signed artifacts to release storage
+1. Publish public key for verification
+1. Include verification instructions in release notes
 
 ### Security Considerations
 
@@ -373,13 +393,14 @@ jobs:
 - **Monitor key usage**: Track when and where signing keys are used
 - **Revoke compromised keys**: If a key is compromised, revoke it immediately and generate a new one
 
----
+______________________________________________________________________
 
 ## Troubleshooting
 
 ### Common Issues
 
 **"GPG key ID not provided"**
+
 ```bash
 # Solution: Set the key ID
 export GPG_KEY_ID=ABCD1234EFGH5678
@@ -388,6 +409,7 @@ bundlecraft build --env prod --bundle mozilla --sign --gpg-key-id ABCD1234EFGH56
 ```
 
 **"Key not found in keyring"**
+
 ```bash
 # Solution: Verify key is imported
 gpg --list-secret-keys --keyid-format=long
@@ -396,6 +418,7 @@ gpg --import private-key.asc
 ```
 
 **"Bad passphrase"**
+
 ```bash
 # Solution: Check GPG_PASSPHRASE environment variable
 echo $GPG_PASSPHRASE
@@ -404,6 +427,7 @@ unset GPG_PASSPHRASE
 ```
 
 **"Signature verification failed"**
+
 ```bash
 # Solution: Import the correct public key
 gpg --import public-key.asc
@@ -413,6 +437,7 @@ bundlecraft verify --target dist/Production/mozilla \
 ```
 
 **"SBOM generation failed"**
+
 ```bash
 # Check for dependency issues
 pip install cyclonedx-bom
@@ -420,7 +445,7 @@ pip install cyclonedx-bom
 bundlecraft build --env prod --bundle mozilla --no-sbom
 ```
 
----
+______________________________________________________________________
 
 ## References
 
@@ -429,10 +454,11 @@ bundlecraft build --env prod --bundle mozilla --no-sbom
 - [Supply Chain Security Best Practices](https://slsa.dev/)
 - [NIST Guidelines for Key Management](https://csrc.nist.gov/publications/detail/sp/800-57-part-1/rev-5/final)
 
----
+______________________________________________________________________
 
 ## Support
 
 For questions or issues:
+
 - Open an [issue](https://github.com/bundlecraft-io/bundlecraft/issues)
 - Join [GitHub Discussions](https://github.com/bundlecraft-io/bundlecraft/discussions)

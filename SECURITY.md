@@ -10,17 +10,17 @@ All trust inputs are user-configured and staged via the Fetch layer or provided 
 
 The security model of BundleCraft focuses on the *integrity, reproducibility, and transparency* of trust store builds - not the issuance, endorsement, or global distribution of CA material.
 
----
+______________________________________________________________________
 
 ## Guiding Principles
 
 1. **Code, not trust** - BundleCraft builds trust stores but never defines what is trusted.
-2. **Local authority** - Users retain full control and accountability for certificate sources.
-3. **Reproducibility** - Builds are deterministic and traceable to their input files and configurations, including fetch provenance (`provenance.fetch.json`).
-4. **Separation of concerns** - Trust material and application code are isolated to prevent unintended trust propagation.
-5. **Transparency** - All generated artifacts include manifests, checksums, and optional signatures for verification.
+1. **Local authority** - Users retain full control and accountability for certificate sources.
+1. **Reproducibility** - Builds are deterministic and traceable to their input files and configurations, including fetch provenance (`provenance.fetch.json`).
+1. **Separation of concerns** - Trust material and application code are isolated to prevent unintended trust propagation.
+1. **Transparency** - All generated artifacts include manifests, checksums, and optional signatures for verification.
 
----
+______________________________________________________________________
 
 ## Threat Model
 
@@ -74,7 +74,7 @@ The security model of BundleCraft focuses on the *integrity, reproducibility, an
 - Optional GPG signing of bundles during CI/CD.
 - End-users can re-run `bundlecraft verify` for local verification.
 
----
+______________________________________________________________________
 
 ## Out of Scope
 
@@ -88,7 +88,7 @@ BundleCraft does **not**:
 
 The project’s scope ends at **secure trust store generation** and **artifact verification**.
 
----
+______________________________________________________________________
 
 ## Reporting a Vulnerability
 
@@ -97,12 +97,12 @@ We welcome responsible disclosure of any security issues found in BundleCraft.
 **To report a vulnerability:**
 
 1. Email the maintainers at: **<security@bundlecraft.io>**
-2. Include:
+1. Include:
    - A clear description of the issue and potential impact.
    - Steps to reproduce (if applicable).
    - Any mitigation or workaround suggestions.
 
----
+______________________________________________________________________
 
 ## Responsible Disclosure Policy
 
@@ -110,7 +110,7 @@ We welcome responsible disclosure of any security issues found in BundleCraft.
 - Do **not** test against production CI/CD or shared repositories without authorization.
 - Coordinated disclosure timelines are supported (e.g., via CERT/CC or GitHub Security Advisories).
 
----
+______________________________________________________________________
 
 ## Secure Development Practices
 
@@ -122,7 +122,7 @@ Developers and contributors are expected to:
 - Treat all external configuration and source data as untrusted input.
 - Keep development environments patched and isolated.
 
----
+______________________________________________________________________
 
 ## Cryptographic Practices
 
@@ -133,7 +133,7 @@ Developers and contributors are expected to:
 - MD5 is prohibited.
 - No private keys are handled, stored, or transmitted by BundleCraft.
 
----
+______________________________________________________________________
 
 ## Security Review and Audit
 
@@ -146,7 +146,7 @@ BundleCraft’s codebase is periodically reviewed for:
 
 Formal third-party audits may be commissioned before major version releases.
 
----
+______________________________________________________________________
 
 ## Contact
 
@@ -170,6 +170,6 @@ For key fingerprint verification and additional keyserver locations, see [`docs/
 
 To the security, devops, and open source communities. 🙏🏽
 
----
+______________________________________________________________________
 
 **Last Updated:** October 2025

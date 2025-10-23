@@ -4,7 +4,7 @@ This folder contains technical and conceptual documentation for the **BundleCraf
 
 Each document describes a specific layer of the system - from design philosophy and architecture to implementation details and operational guidance.
 
----
+______________________________________________________________________
 
 ## 📚 Core Documentation
 
@@ -40,4 +40,4 @@ Each document describes a specific layer of the system - from design philosophy 
 
 - **[public-gpg-key.asc](public-gpg-key.asc)** - Public GPG key for verifying signed releases
 
----
+______________________________________________________________________

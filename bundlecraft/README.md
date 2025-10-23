@@ -2,24 +2,24 @@
 
 BundleCraft is a unified command-line toolkit for fetching, building, verifying, and converting CA trust bundles. It provides a single, consistent interface for PKI engineers and CI/CD systems to manage certificate trust stores across environments.
 
----
+______________________________________________________________________
 
 ## 📦 Overview
 
 The BundleCraft framework consists of four primary components (Fetch → Build → Verify → Convert):
 
-| Component                      | Description                                                                 | Invocation            |
+| Component | Description | Invocation |
 | ------------------------------ | --------------------------------------------------------------------------- | --------------------- |
-| **Fetcher** (`fetch.py`)       | Securely fetches remote certificate sources and stages them for build.      | `bundlecraft fetch`   |
-| **Builder** (`builder.py`)     | Builds trust bundles from configured certificate sources.                   | `bundlecraft build`   |
-| **Verifier** (`verifier.py`)   | Verifies integrity, consistency, and certificate validity of built bundles. | `bundlecraft verify`  |
+| **Fetcher** (`fetch.py`) | Securely fetches remote certificate sources and stages them for build. | `bundlecraft fetch` |
+| **Builder** (`builder.py`) | Builds trust bundles from configured certificate sources. | `bundlecraft build` |
+| **Verifier** (`verifier.py`) | Verifies integrity, consistency, and certificate validity of built bundles. | `bundlecraft verify` |
 | **Converter** (`converter.py`) | Converts certificate bundles between any supported formats (PEM, P7B, JKS, P12, ZIP). Accepts DER as input. | `bundlecraft convert` |
-| **Differ** (`differ.py`)       | Compares two bundle builds to identify added, removed, and unchanged certificates. | `bundlecraft diff`    |
-| **CLI Wrapper** (`cli.py`)     | Aggregates tools into a single cohesive interface.                          | `bundlecraft`         |
+| **Differ** (`differ.py`) | Compares two bundle builds to identify added, removed, and unchanged certificates. | `bundlecraft diff` |
+| **CLI Wrapper** (`cli.py`) | Aggregates tools into a single cohesive interface. | `bundlecraft` |
 
 Once installed via `pip install -e .`, the command `bundlecraft` becomes available system-wide.
 
----
+______________________________________________________________________
 
 ## 🚀 Installation and Invocation
 
@@ -174,7 +174,7 @@ Troubleshooting highlights:
 - `hvac` missing → install extras `.[fetchers]`.
 - Offline builds → pre-stage inputs using `bundlecraft fetch` in a connected environment, commit or package them, then run `bundlecraft build --skip-fetch`.
 
----
+______________________________________________________________________
 
 ## ⚙️ Subcommands
 
@@ -190,23 +190,23 @@ bundlecraft build --env <env>  [OPTIONS]
 
 **Options:**
 
-| Option            | Description |
+| Option | Description |
 | ----------------- | ----------- |
-| `--env`           | Env name (e.g., `dev`, `prod`). Required. |
-| `--bundle`        | Bundle name to build (from env `bundles`). If omitted, builds all bundles|
-| `--verify-only`   | Skip build; only verify existing output or staged sources. |
-| `--skip-fetch`    | Skip the fetch stage; use existing staged inputs (offline-friendly). |
-| `--skip-verify`   | Skip verification (not recommended for production). |
-| `--output-root`   | Root directory for outputs (default: `./dist`). |
-| `--verbose`       | Enable verbose logging. |
-| `--force`         | Overwrite existing output files. |
-| `--dry-run`       | Show actions without writing files or executing external tools. |
-| `--sign`          | GPG-sign release artifacts. |
-| `--gpg-key-id`    | GPG key ID to use for signing. |
+| `--env` | Env name (e.g., `dev`, `prod`). Required. |
+| `--bundle` | Bundle name to build (from env `bundles`). If omitted, builds all bundles|
+| `--verify-only` | Skip build; only verify existing output or staged sources. |
+| `--skip-fetch` | Skip the fetch stage; use existing staged inputs (offline-friendly). |
+| `--skip-verify` | Skip verification (not recommended for production). |
+| `--output-root` | Root directory for outputs (default: `./dist`). |
+| `--verbose` | Enable verbose logging. |
+| `--force` | Overwrite existing output files. |
+| `--dry-run` | Show actions without writing files or executing external tools. |
+| `--sign` | GPG-sign release artifacts. |
+| `--gpg-key-id` | GPG key ID to use for signing. |
 | `--generate-sbom` | Generate CycloneDX SBOM (default). |
-| `--no-sbom`       | Disable SBOM generation. |
-| `--json`          | Emit machine-readable JSON. |
-| `--keep-temp`     | Preserve temporary build directories on failure. |
+| `--no-sbom` | Disable SBOM generation. |
+| `--json` | Emit machine-readable JSON. |
+| `--keep-temp` | Preserve temporary build directories on failure. |
 
 **Outputs:**
 
@@ -255,7 +255,7 @@ repo:
           -----END CERTIFICATE-----
 ```
 
----
+______________________________________________________________________
 
 ### 🔍 `bundlecraft verify`
 
@@ -269,13 +269,13 @@ bundlecraft verify --target <build_dir_or_file> [OPTIONS]
 
 **Options:**
 
-| Option              | Description                                                  |
+| Option | Description |
 | ------------------- | ------------------------------------------------------------ |
-| `--target`          | Path to a build directory or a single file. Required.        |
-| `--verify-manifest` | Display manifest info only (no verification).                |
-| `--verify-all`      | Verify all bundle files and display manifest in one run.     |
-| `--verbose`         | Show detailed file metadata, hashes, and certificate counts. |
-| `--output-root`     | Root directory for build outputs (default: `./dist`).       |
+| `--target` | Path to a build directory or a single file. Required. |
+| `--verify-manifest` | Display manifest info only (no verification). |
+| `--verify-all` | Verify all bundle files and display manifest in one run. |
+| `--verbose` | Show detailed file metadata, hashes, and certificate counts. |
+| `--output-root` | Root directory for build outputs (default: `./dist`). |
 
 **Verification Features:**
 
@@ -294,7 +294,7 @@ bundlecraft verify --target dist/prod/internal
 bundlecraft verify --target dist/prod/internal --verify-all --verbose
 ```
 
----
+______________________________________________________________________
 
 ### 🔄 `bundlecraft convert`
 
@@ -308,15 +308,15 @@ bundlecraft convert --input <input_file> --output-dir <output_path> --output-for
 
 **Options:**
 
-| Option            | Description                                                                 |
+| Option | Description |
 | ----------------- | --------------------------------------------------------------------------- |
-| `--input`         | Input file (PEM, DER, P7B, JKS, P12). Required.                             |
-| `--output-dir`    | Directory to write converted output. Required.                              |
-| `--output-format` | Output format to produce (one of: pem, p7b, jks, p12, zip). Required.       |
-| `--force`         | Overwrite output files if they already exist. Default: false.               |
-| `--password`      | Password for protected input formats (JKS, P12). Prefer env vars.           |
-| `--verbose`       | Enable detailed logging during conversion.                                  |
-| `--output-root`   | Root directory for build outputs (default: `./dist`).                      |
+| `--input` | Input file (PEM, DER, P7B, JKS, P12). Required. |
+| `--output-dir` | Directory to write converted output. Required. |
+| `--output-format` | Output format to produce (one of: pem, p7b, jks, p12, zip). Required. |
+| `--force` | Overwrite output files if they already exist. Default: false. |
+| `--password` | Password for protected input formats (JKS, P12). Prefer env vars. |
+| `--verbose` | Enable detailed logging during conversion. |
+| `--output-root` | Root directory for build outputs (default: `./dist`). |
 
 **Examples:**
 
@@ -355,7 +355,7 @@ All outputs use standardized naming: `bundlecraft-ca-trust.[FORMAT]`
 - Any supported input format (PEM, DER, P7B, JKS, P12) can be converted to any supported output format (PEM, P7B, JKS, P12, ZIP).
 - DER is accepted as input only; use P7B for binary bundle output (DER is typically single-cert, not suitable for trust stores).
 
----
+______________________________________________________________________
 
 ### 📊 `bundlecraft diff`
 
@@ -369,12 +369,12 @@ bundlecraft diff --from <old_bundle_dir> --to <new_bundle_dir> [OPTIONS]
 
 **Options:**
 
-| Option            | Description                                                                 |
+| Option | Description |
 | ----------------- | --------------------------------------------------------------------------- |
-| `--from`          | Path to the first (old) bundle directory. Required.                        |
-| `--to`            | Path to the second (new) bundle directory. Required.                       |
-| `--output-format` | Output format: `human` (default) or `json`.                                |
-| `-o, --output`    | Write output to file instead of stdout.                                    |
+| `--from` | Path to the first (old) bundle directory. Required. |
+| `--to` | Path to the second (new) bundle directory. Required. |
+| `--output-format` | Output format: `human` (default) or `json`. |
+| `-o, --output` | Write output to file instead of stdout. |
 
 **Examples:**
 
@@ -419,7 +419,7 @@ Certificates are uniquely identified by their SHA256 fingerprints, ensuring accu
 - Exit code 0 for both changes detected and no changes (success cases)
 - Exit code 1 for errors (missing files, parsing errors, etc.)
 
----
+______________________________________________________________________
 
 ### 🧩 `bundlecraft` (the CLI root)
 
@@ -446,7 +446,7 @@ Each subcommand supports `--help`, e.g.:
 bundlecraft verify --help
 ```
 
----
+______________________________________________________________________
 
 ## 🧱 Project Structure
 
@@ -468,7 +468,7 @@ bundlecraft/
     └── verify_utils.py
 ```
 
----
+______________________________________________________________________
 
 ## 🧠 Best Practices for Referencing in Docs and Scripts
 
@@ -488,7 +488,7 @@ not:
 python bundlecraft/builder.py ...
 ```
 
----
+______________________________________________________________________
 
 ## 🧪 Testing and Validation
 
@@ -508,7 +508,7 @@ bundlecraft build --env prod --bundle internal
 bundlecraft verify --target dist/prod/internal --verify-all
 ```
 
----
+______________________________________________________________________
 
 ## 📘 Notes for Contributors
 
@@ -516,7 +516,7 @@ bundlecraft verify --target dist/prod/internal --verify-all
 - Use `pip install -e .` for iterative local testing.
 - The project expects Python 3.9+ and system utilities `openssl` + `keytool`.
 
----
+______________________________________________________________________
 
 ## 🧾 License
 

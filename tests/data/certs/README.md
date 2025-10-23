@@ -67,6 +67,7 @@ openssl x509 -in sample.pem -noout -subject
 ## Usage in Tests
 
 These certificates are used by test fixtures in `tests/conftest.py`:
+
 - `sample_cert_path` - Points to sample.pem
 - `intermediate_cert_path` - Points to intermediate.pem
 - `multi_cert_bundle` - Combines both into a single bundle

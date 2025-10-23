@@ -5,7 +5,7 @@ Date: October 18, 2025
 Owner: BundleCraft maintainers
 Related: ADR-0001, README, SECURITY.md, RELEASE.md, CI/CD workflows
 
----
+______________________________________________________________________
 
 ## 1) Context update
 
@@ -13,7 +13,7 @@ ADR-0001 recommended distributing BundleCraft primarily as an OCI-compliant cont
 
 The goal: keep trust-sensitive workflows safe and reproducible while making local adoption and CI integration simple.
 
----
+______________________________________________________________________
 
 ## 2) Problem restated
 
@@ -24,7 +24,7 @@ We need a distribution strategy for the BundleCraft engine (the Python CLI and c
 - Avoids any implication that BundleCraft “installs CA certificates” on hosts
 - Keeps organization-specific configs and certs outside the engine artifact
 
----
+______________________________________________________________________
 
 ## 3) Options considered (revisited)
 
@@ -35,7 +35,7 @@ We need a distribution strategy for the BundleCraft engine (the Python CLI and c
 - First-class GitHub Action - simple CI integration that wraps the engine
 - Template repo - onboarding and reference patterns
 
----
+______________________________________________________________________
 
 ## 4) Evaluation highlights
 
@@ -46,38 +46,38 @@ We need a distribution strategy for the BundleCraft engine (the Python CLI and c
 
 PyPI itself is not inherently insecure, but it requires additional process controls (signing, hashes, locked deps) to meet our bar.
 
----
+______________________________________________________________________
 
 ## 5) Recommended distribution strategy
 
 We adopt a multi-channel approach, ranked by recommendation:
 
-1) Primary: OCI image on GHCR
+1. Primary: OCI image on GHCR
 
-    - Signed with cosign; SBOM and SLSA-style provenance attached as OCI attestations
-    - Multi-arch (linux/amd64, linux/arm64)
-    - Inputs/outputs mounted at runtime; image contains engine only (no certs/configs)
+   - Signed with cosign; SBOM and SLSA-style provenance attached as OCI attestations
+   - Multi-arch (linux/amd64, linux/arm64)
+   - Inputs/outputs mounted at runtime; image contains engine only (no certs/configs)
 
-2) Secondary: pipx-installed CLI via PyPI (optional)
+1. Secondary: pipx-installed CLI via PyPI (optional)
 
-    - Publish a minimal, engine-only package designed for pipx (isolated venv)
-    - Strong controls: Sigstore signing of wheels/sdist; pinned, minimal dependencies; reproducible build with hash-locked requirements; publish SBOM in releases
-    - Clear docs: “engine only - does not install system trust; provide your own config/certs”
-    - Recommended usage: pipx install bundlecraft==X.Y.Z (pin exact version)
+   - Publish a minimal, engine-only package designed for pipx (isolated venv)
+   - Strong controls: Sigstore signing of wheels/sdist; pinned, minimal dependencies; reproducible build with hash-locked requirements; publish SBOM in releases
+   - Clear docs: “engine only - does not install system trust; provide your own config/certs”
+   - Recommended usage: pipx install bundlecraft==X.Y.Z (pin exact version)
 
-3) Secondary: Single-file artifact (zipapp or PEX) in GitHub Releases
+1. Secondary: Single-file artifact (zipapp or PEX) in GitHub Releases
 
-    - Self-contained executable with vendored dependencies for offline/air-gapped usage
-    - Publish checksums, signatures, and SBOM alongside
+   - Self-contained executable with vendored dependencies for offline/air-gapped usage
+   - Publish checksums, signatures, and SBOM alongside
 
-4) Optional convenience wrappers
+1. Optional convenience wrappers
 
-    - GitHub Action: bundlecraft/action that wraps the OCI image
-    - Homebrew/Nix shells (community-supported) that either call the image or install the pipx package
+   - GitHub Action: bundlecraft/action that wraps the OCI image
+   - Homebrew/Nix shells (community-supported) that either call the image or install the pipx package
 
 Template repository remains part of onboarding: directory layout, example envs/bundles, and a CI workflow calling the OCI image or Action.
 
----
+______________________________________________________________________
 
 ## 6) Guardrails for the PyPI channel
 
@@ -91,7 +91,7 @@ If we offer a PyPI package, we will:
 
 Rationale: This gives developer convenience while preserving the core security posture and composability of BundleCraft.
 
----
+______________________________________________________________________
 
 ## 7) Security measures across all channels
 
@@ -101,13 +101,13 @@ Rationale: This gives developer convenience while preserving the core security p
 - Continuous scanning of images; regular rebuilds for CVE churn
 - No embedded CA trust; all certs/configs remain external inputs
 
----
+______________________________________________________________________
 
 ## 8) Migration and compatibility
 
 Existing usage (Python directly, template repo, OCI image) remains valid. The additional channels are additive. Docs will present “OCI-first”, then pipx/PyPI, then zipapp/PEX as alternatives.
 
----
+______________________________________________________________________
 
 ## 9) Decision
 
@@ -120,12 +120,12 @@ Adopt a multi-channel distribution model:
 
 This supersedes ADR-0001’s “no PyPI” stance by allowing a tightly controlled, pipx-first PyPI channel for developer convenience without compromising trust posture.
 
----
+______________________________________________________________________
 
 ## 10) Next steps
 
 1. Add a container build-and-release workflow with cosign, syft (SBOM), provenance
-2. Prepare packaging metadata for a minimal engine-only PyPI package; integrate Sigstore signing; document pipx usage
-3. Add a zipapp/PEX build step to Releases; publish checksums and signatures
-4. Create bundlecraft/action repository that wraps the OCI image for CI
-5. Update README/SECURITY/RELEASE with channel guidance and digest-pinning examples
+1. Prepare packaging metadata for a minimal engine-only PyPI package; integrate Sigstore signing; document pipx usage
+1. Add a zipapp/PEX build step to Releases; publish checksums and signatures
+1. Create bundlecraft/action repository that wraps the OCI image for CI
+1. Update README/SECURITY/RELEASE with channel guidance and digest-pinning examples

@@ -9,9 +9,9 @@ BundleCraft implements **atomic builds** to ensure reliability and consistency. 
 ### Build Process
 
 1. **Temporary Build**: Each target builds to a unique temporary directory (`/tmp/bundlecraft-build-<uuid>/`)
-2. **Complete Build**: All stages (fetch, convert, verify, finalize) execute in the temp location
-3. **Atomic Commit**: On success, temp directory atomically moves to final location
-4. **Cleanup**: On failure, temp directory is removed, final location preserved
+1. **Complete Build**: All stages (fetch, convert, verify, finalize) execute in the temp location
+1. **Atomic Commit**: On success, temp directory atomically moves to final location
+1. **Cleanup**: On failure, temp directory is removed, final location preserved
 
 ```
 Build Flow:
@@ -40,6 +40,7 @@ Build Flow:
 ### Failure Handling
 
 If build fails at any stage:
+
 - Temp directory is automatically cleaned up
 - Existing final directory (if any) is preserved
 - No partial artifacts remain
@@ -97,6 +98,7 @@ ls -la /tmp/bundlecraft-build-abc123/
 ```
 
 **Remember to manually clean up preserved temp directories:**
+
 ```bash
 rm -rf /tmp/bundlecraft-build-*
 ```
@@ -133,6 +135,7 @@ Temp directories are not moved in dry-run mode but are cleaned up automatically.
 ### Cross-Filesystem
 
 If temp and final are on different filesystems (rare):
+
 - Falls back to copy + verify + remove
 - Logs when non-atomic fallback is used
 
@@ -199,11 +202,13 @@ for target_name, bundle_dirs in staging_map.items():
 **Symptom**: `/tmp/bundlecraft-build-*` directories remain after builds
 
 **Causes**:
+
 1. Used `--keep-temp` flag (intentional)
-2. Process killed with SIGKILL (uncatchable signal)
-3. System crash during build
+1. Process killed with SIGKILL (uncatchable signal)
+1. System crash during build
 
 **Solution**:
+
 ```bash
 # Safe cleanup (no active builds)
 rm -rf /tmp/bundlecraft-build-*
@@ -221,6 +226,7 @@ ps aux | grep bundlecraft
 **Impact**: Build still succeeds but uses copy instead of atomic rename (slower)
 
 **Solution**: Not required (fallback works), but you can:
+
 - Use same filesystem for temp and output
 - Set `TMPDIR` environment variable to output filesystem
 
@@ -231,6 +237,7 @@ ps aux | grep bundlecraft
 **Cause**: Insufficient permissions to write to final location
 
 **Solution**:
+
 ```bash
 # Check permissions
 ls -ld dist/env/bundle/

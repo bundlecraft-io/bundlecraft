@@ -328,9 +328,9 @@ bundlecraft fetch --source-config-file config/cert_sources/mozilla.yaml --json
 When a command fails, the JSON response will:
 
 1. Set `success` to `false`
-2. Include an `errors` array with one or more error messages
-3. Still include all command-specific fields (some may be empty or have default values)
-4. Exit with a non-zero exit code
+1. Include an `errors` array with one or more error messages
+1. Still include all command-specific fields (some may be empty or have default values)
+1. Exit with a non-zero exit code
 
 ## Using JSON Output in Scripts
 

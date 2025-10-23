@@ -6,7 +6,7 @@
 
 > ⚠️ **Important:** BundleCraft is in early pre-release (v0.1.0). The API, CLI, and docs may change as we iterate toward a stable v1.0.0. This is an independent, passion-driven project developed in off-hours with a focus on practical PKI automation, secure engineering practices, and contributing back to the PKI community.
 
----
+______________________________________________________________________
 
 ## ℹ️ Overview
 
@@ -14,7 +14,7 @@
 
 > In short: BundleCraft lets you define how trust is built-not just what to trust.
 
----
+______________________________________________________________________
 
 ## 🎯 Problems Solved
 
@@ -61,7 +61,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 - **SBOM (Software Bill of Materials)** in CycloneDX format (optional, on by default)
 - **GPG signatures (.asc)** for all artifacts (optional, when `--sign`)
 
----
+______________________________________________________________________
 
 ## ✨ Features
 
@@ -78,7 +78,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 - **CI/CD ready:** Designed for (but not exclusive to) GitHub Actions, supports concurrency and artifact management
 - **Flexible bundle and environment definitions**: Easily add new trust bundles or environments
 
----
+______________________________________________________________________
 
 ## 📁 Repository Structure
 
@@ -99,7 +99,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 └── LICENSE                 # MIT License
 ```
 
----
+______________________________________________________________________
 
 ## 🏗️ How It Works – Pipeline
 
@@ -116,11 +116,11 @@ BundleCraft provides the building blocks for trust bundle creation, while your C
 1. **Defaults** (`config/defaults.yaml`):
    Global settings (verification, filters, formats)
 
-2. **Environments** (`config/envs/<env>.yaml`):
-  Contextual overrides (paths, secrets, output formats, targets)
+1. **Environments** (`config/envs/<env>.yaml`):
+   Contextual overrides (paths, secrets, output formats, targets)
 
-3. **Sources** (`config/cert_sources/<source>.yaml`):
-Bundle content definition (certificate sources to include/exclude)
+1. **Sources** (`config/cert_sources/<source>.yaml`):
+   Bundle content definition (certificate sources to include/exclude)
 
 - **Fetch** (`fetch:` in `<source>`): Securely fetch and stage certificates under `cert_sources/staged/<source_name>/fetch/<name>/`. Local includes are staged under `cert_sources/staged/<source_name>/<repo_name>/` (or `include/` for legacy). Staging is cleaned each run; no persistent cache.
 
@@ -136,7 +136,7 @@ Bundle content definition (certificate sources to include/exclude)
 - Verify all outputs and cross-format consistency
 - Optionally sign and publish release artifacts
 
----
+______________________________________________________________________
 
 ### ⚙️ Bundle Composition in Environment Config Files
 
@@ -167,7 +167,7 @@ Outputs:
 - `dist/dev/internal-dev/` contains both internal and mozilla certs (bundle name)
 - `dist/dev/mozilla/` contains only mozilla certs
 
----
+______________________________________________________________________
 
 ## 📦 Configuration Deep Dive
 
@@ -266,7 +266,7 @@ metadata:
 Baseline settings for verification, filters, output formats, and metadata.
 These can be overridden by environment or source configs.
 
----
+______________________________________________________________________
 
 ## 🚀 Quickstart – Fetching, Building, and Verifying Trust Bundles
 
@@ -371,20 +371,20 @@ bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --o
   - `TRUST_JKS_PASSWORD` (default `"changeit"`)
   - `TRUST_P12_PASSWORD` (default `"changeit"`)
 
----
+______________________________________________________________________
 
 ## ⚙️ Environment Variables
 
 BundleCraft supports the following environment variables for configuration:
 
-| Variable               | Purpose                                       | Default Value  | Used By          |
+| Variable | Purpose | Default Value | Used By |
 |------------------------|-----------------------------------------------|----------------|------------------|
-| `TRUST_JKS_PASSWORD`   | Password for Java KeyStore operations         | `"changeit"`   | Convert, Verify  |
-| `TRUST_P12_PASSWORD`   | Password for PKCS#12 operations               | `"changeit"`   | Convert, Verify  |
+| `TRUST_JKS_PASSWORD` | Password for Java KeyStore operations | `"changeit"` | Convert, Verify |
+| `TRUST_P12_PASSWORD` | Password for PKCS#12 operations | `"changeit"` | Convert, Verify |
 
 **Note:** These are used as fallback values. You can override them via CLI options or config files.
 
----
+______________________________________________________________________
 
 ## 🔐 Security & Verification
 
@@ -422,7 +422,7 @@ See [SIGNING-AND-SBOM.md](docs/SIGNING-AND-SBOM.md) for the complete guide on:
 - SBOM usage and validation
 - Key management best practices
 
----
+______________________________________________________________________
 
 ## 🧰 Scripts Reference (selected)
 
@@ -435,7 +435,7 @@ See [SIGNING-AND-SBOM.md](docs/SIGNING-AND-SBOM.md) for the complete guide on:
 
 For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/README.md).
 
----
+______________________________________________________________________
 
 ## 📐 Trust Matrix (Environments × Bundles)
 
@@ -464,20 +464,26 @@ Notes:
 - Trust for an environment is the union of all sources included by its bundles
 - Legacy bundle composition is also supported
 
----
+______________________________________________________________________
 
 ## 🏭 CI/CD Pipeline
 
 The included workflows automate builds and fetch tests:
 
 - [bundlecraft.yaml](.github/workflows/bundlecraft.yaml): Build/verify/publish
+
 - [test-bundlecraft-fetch.yaml](.github/workflows/test-bundlecraft-fetch.yaml): Fetch test suite (Vault, HTTP, API)
 
 - Discover → Build → Collect → Verify → Publish
+
 - Build per-env "bundles" declared in `config/envs/<env>.yaml` under `bundles:` (composition-aware)
+
 - For each bundle, the job runs `bundlecraft build` and respects `build_path` via `--output-root`
+
 - Uploads artifacts per bundle using the naming `trust-store-<env>-<bundle>`
+
 - Optionally signs and publishes a release tarball
+
 - Concurrency: only one pipeline per branch at a time
 
 Notes
@@ -485,20 +491,26 @@ Notes
 - Prefer declaring composed bundles in env files (for example: `internal-dev` includes `[internal, mozilla]`).
 - If you want bundles to build offline, pre-stage with `bundlecraft fetch` in a connected job, then run build with `--skip-fetch`.
 
----
+______________________________________________________________________
 
 ## 🧪 CI/CD Pipeline (reference)
 
 The included workflows automate builds and fetch tests:
 
 - [bundlecraft.yaml](.github/workflows/bundlecraft.yaml): Build/verify/publish
+
 - [test-bundlecraft-fetch.yaml](.github/workflows/test-bundlecraft-fetch.yaml): Fetch test suite (Vault, HTTP, API)
 
 - Discover → Build → Collect → Verify → Publish
+
 - Build per-env "bundles" declared in `config/envs/<env>.yaml` under `bundles:` (composition-aware)
+
 - For each bundle, the job runs `bundlecraft build` and respects `build_path` via `--output-root`
+
 - Uploads artifacts per bundle using the naming `trust-store-<env>-<bundle>`
+
 - Optionally signs and publishes a release tarball
+
 - Concurrency: only one pipeline per branch at a time
 
 Notes
@@ -523,7 +535,7 @@ When triggering manually, you can optionally filter environments:
 - The workflow prints a selection summary (selected, available, filtered, bundle count)
 - Validation: unknown environments or an empty result after filtering will fail fast with a clear error
 
----
+______________________________________________________________________
 
 ## 📝 Documentation
 
@@ -535,7 +547,7 @@ When triggering manually, you can optionally filter environments:
 - **Test documentation:** [`tests/README.md`](tests/README.md)
 - **Architecture decisions:** [`docs/`](docs/) (ADRs)
 
----
+______________________________________________________________________
 
 ## 📊 Performance & Limitations
 
@@ -555,7 +567,7 @@ When triggering manually, you can optionally filter environments:
 - Run verification in CI to catch expiry issues early
 - Pin dependencies in production pipelines
 
----
+______________________________________________________________________
 
 ## 🧭 Troubleshooting & FAQ
 
@@ -591,7 +603,7 @@ When triggering manually, you can optionally filter environments:
 
 See also: [Troubleshooting Guide](docs/troubleshooting.md)
 
----
+______________________________________________________________________
 
 ## 🔮 Philosophy & Best Practices
 
@@ -652,22 +664,31 @@ Core principles:
 Best config practices
 
 - Always use HTTPS; never `http://`
+
 - Pin content (`verify.sha256`) for static/public bundles when possible (e.g., Mozilla)
+
 - For APIs/services, prefer TLS CA pinning and optionally leaf fingerprint pinning during rollout windows
+
 - Keep tokens in env vars (`*_TOKEN`) and never in YAML
+
 - Commit sample configs but not secrets; use CI secret stores for tokens
+
 - Treat `cert_sources/staged/` as ephemeral; do not rely on it as a cache
 
 - Chain validation (issuer/subject path building)
+
 - Test suite + CI templates
+
 - Dynamic certificate fetching from committed trusted sources (i.e. KeyFactor collection, Mozilla public bundle, etc) upon build
 
----
+______________________________________________________________________
 
 ## ⏳ Release & Signing (initial release)
 
 - **Release artifacts** are published automatically via GitHub Actions.
+
 - **GPG signing** is supported if a key is provided via GitHub Secrets.
+
 - **Verification instructions** are included in release notes:
 
   ```bash
@@ -676,7 +697,7 @@ Best config practices
   gpg --verify truststore_bundle.tar.gz.asc truststore_bundle.tar.gz
   ```
 
----
+______________________________________________________________________
 
 ## 🧪 Development Tips
 
@@ -685,7 +706,7 @@ Best config practices
 - To debug OpenSSL or keytool output, temporarily add `check=False` to subprocess calls.
 - Passwords default to `"changeit"` for local testing; override via environment variables in CI.
 
----
+______________________________________________________________________
 
 ## ⚡ Quick Reference
 
@@ -757,7 +778,7 @@ Every build produces:
 - `checksums.sha256` - File integrity hashes
 - `package.tar.gz` - Complete bundle archive (if `--package` used)
 
----
+______________________________________________________________________
 
 ## 🤝 Contributing
 
@@ -765,13 +786,13 @@ Every build produces:
 - Please ensure all changes are reflected in relevant docs in [`docs/`](docs/).
 - For more info, see: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 
----
+______________________________________________________________________
 
 ## 🏷️ Tags & Metadata
 
 - **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, openssl, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, keytool, certificates, pki-tools
 
----
+______________________________________________________________________
 
 ## 🔗 Related Projects & References
 
@@ -782,7 +803,7 @@ Every build produces:
 - Java keytool documentation: [keytool](https://docs.oracle.com/javase/8/docs/technotes/tools/unix/keytool.html)
 - OpenSSL Cookbook (practical guide): <https://www.feistyduck.com/library/openssl-cookbook/online/>
 
----
+______________________________________________________________________
 
 ## 🙏 Acknowledgements
 
@@ -790,14 +811,14 @@ Certificates are easy. Certificate management is hard.
 
 Special thanks to all the security and infrastructure teams out there, whose collective experience and guidance has fueled this project.
 
----
+______________________________________________________________________
 
 ## 📣 Questions?
 
 Open an [issue](https://github.com/bundlecraft-io/bundlecraft/issues)
 or reach out via [GitHub Discussions](https://github.com/bundlecraft-io/bundlecraft/discussions)
 
----
+______________________________________________________________________
 
 © 2025 BundleCraft.io
 Licensed under the [MIT License](./LICENSE).

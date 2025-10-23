@@ -2,7 +2,7 @@
 
 This document provides comprehensive guidance for running, understanding, and maintaining the BundleCraft test suite.
 
----
+______________________________________________________________________
 
 ## 📋 Table of Contents
 
@@ -18,7 +18,7 @@ This document provides comprehensive guidance for running, understanding, and ma
 - [CI/CD Integration](#-cicd-integration)
 - [Maintenance Tips](#-maintenance-tips)
 
----
+______________________________________________________________________
 
 ## 🚀 Quick Start
 
@@ -42,11 +42,12 @@ pytest tests/test_cli.py -v
 ```
 
 **Exit Codes:**
+
 - `0` = All tests passed ✅
 - `1` = Some tests failed ❌
 - `2` = Test execution was interrupted (syntax errors, import errors) 🚫
 
----
+______________________________________________________________________
 
 ## 🧪 Test Structure
 
@@ -79,7 +80,7 @@ tests/
 | `test_commands.py` | All subcommands | Integration of all CLI commands |
 | `test_helpers.py` | Utility functions | File operations, YAML loading, checksums |
 
----
+______________________________________________________________________
 
 ## 🏃 Running Tests
 
@@ -150,7 +151,7 @@ pytest --cov=bundlecraft --cov-report=html
 # Open htmlcov/index.html in your browser
 ```
 
----
+______________________________________________________________________
 
 ## 📊 Understanding Test Output
 
@@ -163,6 +164,7 @@ tests/test_cli.py::TestCLI::test_cli_version PASSED        [ 40%]
 ```
 
 **What this means:**
+
 - `PASSED` = Test succeeded ✅
 - `[ 20%]` = Progress indicator (20% of tests completed)
 - `32 passed in 5.23s` = Summary: 32 tests passed, took 5.23 seconds
@@ -178,6 +180,7 @@ E    +  where False = exists()
 ```
 
 **What this means:**
+
 - `FAILED` = Test failed ❌
 - `AssertionError` = The test made an assertion that wasn't true
 - `assert False` = The specific assertion that failed
@@ -191,6 +194,7 @@ SKIPPED (TODO: Refactor to use CLI runner instead of build_trust_store function)
 ```
 
 **What this means:**
+
 - `SKIPPED` = Test was intentionally skipped ⏭️
 - The message explains why (usually marked TODO for future work)
 - Skipped tests don't count as failures
@@ -203,30 +207,34 @@ ImportError: cannot import name 'build_trust_store' from 'bundlecraft.builder'
 ```
 
 **What this means:**
+
 - `ERROR collecting` = pytest couldn't even load the test file 🚫
 - This is worse than a failed test - the code has syntax or import errors
 - **Fix these first** before worrying about test failures
 
----
+______________________________________________________________________
 
 ## 🔧 Common Issues & Solutions
 
 ### Issue 1: Import Errors
 
 **Error:**
+
 ```
 ImportError: cannot import name 'some_function' from 'bundlecraft.module'
 ```
 
 **Causes:**
+
 - Function was renamed or deleted in the source code
 - Typo in the import statement
 - Module doesn't exist
 
 **Fix:**
+
 1. Check if the function exists: `grep -r "def some_function" bundlecraft/`
-2. Update the import in the test file to use the correct name
-3. If the function is gone, mark the test as skipped:
+1. Update the import in the test file to use the correct name
+1. If the function is gone, mark the test as skipped:
    ```python
    pytest.skip("TODO: Function removed, needs refactor")
    ```
@@ -234,15 +242,18 @@ ImportError: cannot import name 'some_function' from 'bundlecraft.module'
 ### Issue 2: Fixture Errors
 
 **Error:**
+
 ```
 FileExistsError: [Errno 17] File exists: '/tmp/tmp32ftxx__/sources'
 ```
 
 **Causes:**
+
 - Fixture trying to create a directory that already exists
 - Missing `dirs_exist_ok=True` parameter
 
 **Fix:**
+
 ```python
 # In conftest.py, use:
 shutil.copytree(src, dst, dirs_exist_ok=True)
@@ -251,54 +262,63 @@ shutil.copytree(src, dst, dirs_exist_ok=True)
 ### Issue 3: Syntax Errors
 
 **Error:**
+
 ```
 IndentationError: unexpected indent
 ```
 
 **Causes:**
+
 - Mixed tabs and spaces
 - Incorrect indentation level
 - Missing indentation
 
 **Fix:**
+
 1. Check the line number in the error message
-2. Ensure consistent indentation (4 spaces per level)
-3. Use your editor's "show whitespace" feature
+1. Ensure consistent indentation (4 spaces per level)
+1. Use your editor's "show whitespace" feature
 
 ### Issue 4: Assertion Failures
 
 **Error:**
+
 ```
 AssertionError: assert (output_dir / "ca-trust.jks").exists()
 ```
 
 **Causes:**
+
 - Expected file wasn't created
 - Wrong filename (e.g., standardized name changed)
 - Function failed silently
 
 **Fix:**
+
 1. Check if filename changed (look for `bundlecraft-ca-trust.*` naming)
-2. Add debug output:
+1. Add debug output:
    ```python
    print(f"Files in output_dir: {list(output_dir.glob('*'))}")
    assert (output_dir / "bundlecraft-ca-trust.jks").exists()
    ```
-3. Run test with `-s` flag to see print statements
+1. Run test with `-s` flag to see print statements
 
 ### Issue 5: Deprecated Options
 
 **Error:**
+
 ```
 Error: No such option: --formats
 (Possible options: --force, --input-format, --output-format)
 ```
 
 **Causes:**
+
 - Test is using an old CLI option name
 - CLI interface was updated but test wasn't
 
 **Fix:**
+
 ```python
 # Update test from:
 ["--formats", "p7b"]
@@ -307,7 +327,7 @@ Error: No such option: --formats
 ["--output-format", "p7b"]
 ```
 
----
+______________________________________________________________________
 
 ## ✍️ Writing New Tests
 
@@ -349,11 +369,13 @@ class TestClassName:
 ### Test Naming Conventions
 
 ✅ **Good:**
+
 - `test_converter_creates_jks_file()`
 - `test_build_fails_with_expired_cert()`
 - `test_cli_help_displays_version()`
 
 ❌ **Bad:**
+
 - `test1()` - Not descriptive
 - `test_conversion()` - Too vague
 - `test_works()` - Doesn't say what works
@@ -413,7 +435,7 @@ def test_multiple_formats(self, format, expected_ext):
     assert result.endswith(expected_ext)
 ```
 
----
+______________________________________________________________________
 
 ## 🛠️ Test Fixtures Explained
 
@@ -422,6 +444,7 @@ Fixtures are defined in `conftest.py` and provide reusable test setup.
 ### Available Fixtures
 
 #### `temp_dir`
+
 Creates a temporary directory that's automatically cleaned up.
 
 ```python
@@ -433,6 +456,7 @@ def test_with_temp_dir(self, temp_dir):
 ```
 
 #### `temp_workspace`
+
 Creates a complete workspace with standard directory structure and test data.
 
 ```python
@@ -448,6 +472,7 @@ def test_with_workspace(self, temp_workspace):
 ```
 
 #### `sample_cert_path`
+
 Path to a valid test certificate.
 
 ```python
@@ -457,6 +482,7 @@ def test_with_cert(self, sample_cert_path):
 ```
 
 #### `cli_runner`
+
 Click CLI test runner for testing command-line interfaces.
 
 ```python
@@ -482,7 +508,7 @@ def my_custom_fixture():
     cleanup_test_data()
 ```
 
----
+______________________________________________________________________
 
 ## 🐛 Debugging Failed Tests
 
@@ -499,6 +525,7 @@ pytest tests/test_converter.py::TestConverter::test_convert_to_jks -s
 ```
 
 Add debug output to your test:
+
 ```python
 def test_something(self):
     result = function()
@@ -544,13 +571,14 @@ pytest --timeout=60
 pytest --capture=no
 ```
 
----
+______________________________________________________________________
 
 ## ⏰ When to Run Tests
 
 ### TL;DR - Quick Answer
 
 **Best Practice Summary:**
+
 - ✅ **Before commit:** Run affected tests (fast, < 10 seconds)
 - ✅ **Before push:** Run full test suite with pre-commit hooks
 - ✅ **On PR creation:** Automatic - GitHub Actions runs tests
@@ -596,6 +624,7 @@ git commit -m "feat: add new feature"
 ```
 
 **Manual test run before commit:**
+
 ```bash
 # Quick test run (recommended minimum)
 pytest -x  # Stop at first failure
@@ -605,6 +634,7 @@ pytest tests/test_converter.py -v  # If you modified converter
 ```
 
 **Why not auto-run pytest on every commit?**
+
 - Tests can take 10-15 seconds (slows down your workflow)
 - You might make multiple commits while working on a feature
 - Better to run full suite before push instead
@@ -625,6 +655,7 @@ git push origin your-branch
 **Value:** Prevents pushing broken code that will fail in CI
 
 **Pro tip:** Create a git alias:
+
 ```bash
 # Add to ~/.gitconfig
 [alias]
@@ -639,10 +670,12 @@ git pushtest origin your-branch
 When you create a PR, GitHub Actions automatically runs tests.
 
 **Current setup:** BundleCraft has a GitHub Actions workflow (`.github/workflows/bundlecraft.yaml`) that:
+
 - ✅ Runs on `workflow_dispatch` (manual trigger)
 - ⚠️ **Does NOT automatically run on PR** (you should add this - see CI/CD section below)
 
 **What you'll see:**
+
 - Green checkmark ✅ = All tests passed
 - Red X ❌ = Some tests failed (click to see details)
 - Yellow circle 🟡 = Tests are still running
@@ -650,10 +683,12 @@ When you create a PR, GitHub Actions automatically runs tests.
 #### 5. **Before Merging** (Automatic + Manual Check)
 
 **Automatic protection:**
+
 - If you enable branch protection rules on GitHub, PRs can't be merged unless CI passes
 - This prevents broken code from entering your main branch
 
 **Manual check:**
+
 ```bash
 # Before clicking "Merge PR", verify:
 # 1. All CI checks are green ✅
@@ -693,18 +728,20 @@ pytest --lf
 pytest --ff
 ```
 
----
+______________________________________________________________________
 
 ## 🤖 CI/CD Integration
 
 ### Current Setup
 
 BundleCraft uses **GitHub Actions** for CI/CD. The workflow file is located at:
+
 ```
 .github/workflows/bundlecraft.yaml
 ```
 
 **Current capabilities:**
+
 - ✅ Multi-stage pipeline (Discover → Build → Collect → Verify → Publish)
 - ✅ Matrix builds (multiple bundles × environments)
 - ✅ Artifact uploads
@@ -787,6 +824,7 @@ Enable these settings in your GitHub repository to enforce testing:
 **Settings → Branches → Add branch protection rule**
 
 For `main` branch:
+
 - ✅ **Require pull request before merging**
 - ✅ **Require status checks to pass before merging**
   - Select: `test` (your test job name)
@@ -802,6 +840,7 @@ For `main` branch:
 BundleCraft uses **pre-commit.ci** (free for public repos):
 
 **Already configured in `.pre-commit-config.yaml`:**
+
 ```yaml
 ci:
   autofix_prs: true  # Auto-fix style issues in PRs
@@ -810,6 +849,7 @@ ci:
 ```
 
 **What it does:**
+
 - Runs on every PR
 - Automatically fixes formatting issues
 - Commits fixes back to your PR branch
@@ -835,21 +875,25 @@ Add to `.pre-commit-config.yaml`:
 ```
 
 **Pros:**
+
 - Catches issues immediately
 - Enforces test discipline
 
 **Cons:**
+
 - Slows down commits (10-15 seconds)
 - Can be frustrating during rapid development
 
 **Recommendation:** Don't add pytest to pre-commit hooks. Instead:
+
 1. Run tests manually before pushing
-2. Let GitHub Actions run tests on PR
-3. Use branch protection to prevent merging failing PRs
+1. Let GitHub Actions run tests on PR
+1. Use branch protection to prevent merging failing PRs
 
 ### Continuous Integration Best Practices
 
 #### ✅ DO:
+
 - Run full test suite on every PR
 - Block merges if tests fail
 - Run tests on multiple Python versions (3.10, 3.11, 3.12)
@@ -858,6 +902,7 @@ Add to `.pre-commit-config.yaml`:
 - Show test coverage trends
 
 #### ❌ DON'T:
+
 - Skip tests to "save time" (you'll pay later)
 - Merge PRs with failing tests
 - Ignore flaky tests (fix them or remove them)
@@ -895,12 +940,14 @@ test:
 ### Monitoring Test Health
 
 **Key metrics to track:**
+
 - **Pass rate:** Should be > 95%
 - **Flaky test rate:** Should be 0%
 - **Test execution time:** Should be < 30 seconds
 - **Code coverage:** Should be > 80%
 
 **GitHub Actions insights:**
+
 - Go to "Actions" tab → Select workflow → "..." menu → "View workflow runs"
 - Check success rate over time
 - Identify slow or flaky tests
@@ -910,7 +957,9 @@ test:
 **Test passes locally but fails in CI:**
 
 Common causes:
+
 1. **Different Python version**
+
    ```bash
    # Test locally with same version as CI
    pyenv install 3.11
@@ -918,13 +967,15 @@ Common causes:
    pytest -v
    ```
 
-2. **Missing dependencies**
+1. **Missing dependencies**
+
    ```bash
    # Check CI logs for "ModuleNotFoundError"
    # Add missing package to pyproject.toml [project.dependencies]
    ```
 
-3. **Path differences** (Windows vs Linux)
+1. **Path differences** (Windows vs Linux)
+
    ```python
    # Use pathlib.Path for cross-platform compatibility
    from pathlib import Path
@@ -932,7 +983,8 @@ Common causes:
    path = "dir/file.txt"  # ❌ Breaks on Windows
    ```
 
-4. **Timezone issues**
+1. **Timezone issues**
+
    ```python
    # Always use UTC or timezone-aware datetimes
    from datetime import datetime, timezone
@@ -940,13 +992,15 @@ Common causes:
    now = datetime.now()  # ❌ Ambiguous
    ```
 
-5. **File system case sensitivity** (macOS is case-insensitive, Linux is case-sensitive)
+1. **File system case sensitivity** (macOS is case-insensitive, Linux is case-sensitive)
+
    ```bash
    # Make sure file names match exactly
    # CI may fail if you have: File.py but import: file.py
    ```
 
 **Quick fix workflow:**
+
 ```bash
 # 1. Pull the exact commit that failed in CI
 git checkout <commit-sha>
@@ -966,26 +1020,29 @@ git commit -m "fix: resolve CI test failure"
 git push
 ```
 
----
+______________________________________________________________________
 
 ## 🔄 Maintenance Tips
 
 ### When Code Changes
 
 **If you rename a function:**
+
 1. Search for the old name in tests: `grep -r "old_function_name" tests/`
-2. Update all test imports and calls
-3. Run affected tests: `pytest -k "function_name" -v`
+1. Update all test imports and calls
+1. Run affected tests: `pytest -k "function_name" -v`
 
 **If you change CLI options:**
+
 1. Find tests using old option: `grep -r "\-\-old-option" tests/`
-2. Update to new option name
-3. Run CLI tests: `pytest tests/test_cli.py tests/test_commands.py -v`
+1. Update to new option name
+1. Run CLI tests: `pytest tests/test_cli.py tests/test_commands.py -v`
 
 **If you change output filenames:**
+
 1. Search for old patterns: `grep -r "old-filename-pattern" tests/`
-2. Update assertions to match new naming
-3. Run converter tests: `pytest tests/test_converter.py -v`
+1. Update assertions to match new naming
+1. Run converter tests: `pytest tests/test_converter.py -v`
 
 ### Dealing with Skipped Tests
 
@@ -997,15 +1054,17 @@ def test_something(self):
 ```
 
 **When to fix them:**
+
 - Before a major release
 - When you're working on related code
 - When you have time for test maintenance
 
 **How to fix them:**
+
 1. Read the TODO comment to understand why it was skipped
-2. Update the test to work with current code
-3. Remove the `pytest.skip()` line
-4. Run the test to verify it passes
+1. Update the test to work with current code
+1. Remove the `pytest.skip()` line
+1. Run the test to verify it passes
 
 ### Test Coverage Goals
 
@@ -1040,6 +1099,7 @@ pytest --durations=10
 ```
 
 Mark slow tests:
+
 ```python
 @pytest.mark.slow
 def test_large_bundle_processing(self):
@@ -1047,20 +1107,23 @@ def test_large_bundle_processing(self):
 ```
 
 Skip slow tests during development:
+
 ```bash
 pytest -m "not slow"
 ```
 
----
+______________________________________________________________________
 
 ## 📚 Additional Resources
 
 ### pytest Documentation
+
 - Official docs: https://docs.pytest.org/
 - Fixtures guide: https://docs.pytest.org/en/stable/fixture.html
 - Parametrize guide: https://docs.pytest.org/en/stable/parametrize.html
 
 ### Click Testing
+
 - Click testing docs: https://click.palletsprojects.com/en/stable/testing/
 
 ### Quick Reference Card
@@ -1080,18 +1143,18 @@ pytest -s                      # Show print statements
 pytest --collect-only          # Show what tests would run
 ```
 
----
+______________________________________________________________________
 
 ## ❓ Getting Help
 
 **Test failing and you're stuck?**
 
 1. **Read the error message carefully** - It usually tells you exactly what's wrong
-2. **Run with `-vv`** - Get maximum detail
-3. **Add print statements** - Debug what's happening
-4. **Check git history** - See what changed: `git log tests/test_file.py`
-5. **Isolate the test** - Run just one test to focus
-6. **Check fixtures** - Make sure `conftest.py` fixtures are working
+1. **Run with `-vv`** - Get maximum detail
+1. **Add print statements** - Debug what's happening
+1. **Check git history** - See what changed: `git log tests/test_file.py`
+1. **Isolate the test** - Run just one test to focus
+1. **Check fixtures** - Make sure `conftest.py` fixtures are working
 
 **Common Questions:**
 
@@ -1119,7 +1182,7 @@ A: Yes! Add a test job to `.github/workflows/bundlecraft.yaml`. See the "CI/CD I
 **Q: What if tests are too slow?**
 A: Use `pytest -x` (stop on first failure), `pytest -n auto` (parallel), or `pytest -m "not slow"` (skip slow tests).
 
----
+______________________________________________________________________
 
 **Remember:** Tests are your friends! They catch bugs before users do. When a test fails, it's protecting you from shipping broken code. 🛡️
 

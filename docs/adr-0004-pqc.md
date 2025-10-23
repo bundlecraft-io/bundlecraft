@@ -5,7 +5,7 @@ Date: 2025-10-18
 Owner: Chris J. Pich
 Related: ADR-0001 (Containers), ADR-0003 (Distribution), README, SECURITY.md
 
----
+______________________________________________________________________
 
 ## Context
 
@@ -13,7 +13,7 @@ NIST is standardizing post-quantum signature algorithms (e.g., Dilithium, Falcon
 
 BundleCraft builds, verifies, and converts CA trust bundles from configuration-defined sources into reproducible, auditable artifacts. This ADR answers: what must BundleCraft do to help PKI administration before, during, and after PQC - within its scope as a trust bundle toolkit?
 
----
+______________________________________________________________________
 
 ## Problem statement
 
@@ -27,19 +27,19 @@ The PQC transition requires BundleCraft to:
 
 Out of scope: issuance/renewal, automated AIA discovery, rotation/monitoring systems, or client runtime modifications.
 
----
+______________________________________________________________________
 
 ## Decision (high level)
 
 BundleCraft will become PQC-aware by enhancing existing operations:
 
-1) Build: accept PQC-containing inputs; add policy-driven filtering and metadata enrichment.
+1. Build: accept PQC-containing inputs; add policy-driven filtering and metadata enrichment.
 
-2) Verify: detect PQC algorithms; attempt validation when possible; report capability gaps; enforce algorithm policies.
+1. Verify: detect PQC algorithms; attempt validation when possible; report capability gaps; enforce algorithm policies.
 
-3) Convert: keep existing formats and document PQC-related considerations so admins can choose appropriate formats. Format choice matters for PQC readiness; adding new formats is covered by separate ADRs.
+1. Convert: keep existing formats and document PQC-related considerations so admins can choose appropriate formats. Format choice matters for PQC readiness; adding new formats is covered by separate ADRs.
 
----
+______________________________________________________________________
 
 ## Scope and non-goals
 
@@ -57,7 +57,7 @@ Not in scope:
 - Automated intermediate discovery or rotation/monitoring.
 - Introducing new output formats.
 
----
+______________________________________________________________________
 
 ## Detailed design
 
@@ -131,7 +131,7 @@ Example output:
 
 Document PQC-relevant behavior of existing supported formats so admins can pick the right target for their platforms. Some formats and runtimes are classical-only today; others may gain PQC support over time. This ADR does not introduce new formats; it states that format selection is a key part of PQC readiness and that guidance will be included in manifests and docs.
 
----
+______________________________________________________________________
 
 ## Rollout (phased)
 
@@ -153,7 +153,7 @@ Phase 2: Optional validation integrations
 
 Exit criteria for ADR acceptance: Phase 1 complete (policy enforcement) and documentation updated with format considerations and migration guidance.
 
----
+______________________________________________________________________
 
 ## Risks and mitigations
 
@@ -162,7 +162,7 @@ Exit criteria for ADR acceptance: Phase 1 complete (policy enforcement) and docu
 - Policy complexity: provide preset policies (classical-only, hybrid-ready, pqc-preferred) and examples.
 - Misinterpretation of verify: clearly distinguish “not validated” from “invalid”.
 
----
+______________________________________________________________________
 
 ## How this helps PKI admins
 

@@ -6,7 +6,7 @@ This document defines the configuration schema for BundleCraft, clearly separati
 - **Environment configs** (`config/envs/*.yaml`) - Build, output, and deployment configuration
 - **Defaults** (`config/defaults.yaml`) - Global fallback settings
 
----
+______________________________________________________________________
 
 ## Configuration Philosophy
 
@@ -38,7 +38,7 @@ This document defines the configuration schema for BundleCraft, clearly separati
 
 **Forbidden:** Certificate sources, fetch entries, include/exclude paths
 
----
+______________________________________________________________________
 
 ## 1) Source Configuration: `config/cert_sources/<bundle>.yaml`
 
@@ -62,7 +62,7 @@ You can declare local certificate sources in two ways. The new preferred schema 
 
 - Preferred: named repositories under `repo:`
 
-  ```yaml
+  ````yaml
   repo:
     - name: roots
       include:  # "include" items support both path and inline entries
@@ -96,9 +96,11 @@ You can declare local certificate sources in two ways. The new preferred schema 
 
   Staging layout (repos): `cert_sources/staged/<source_name>/<name>/...`
 
+  ````
+
 - Legacy: flat `include`/`exclude` keys at the top level
 
-  ```yaml
+  ````yaml
   include:
     - cert_sources/internal/rootCA.pem
     - cert_sources/partners/
@@ -107,6 +109,8 @@ You can declare local certificate sources in two ways. The new preferred schema 
   ```yaml
 
   Staging layout (legacy include): `cert_sources/staged/<source_name>/include/...`
+
+  ````
 
 Validation rules for names:
 
@@ -118,7 +122,7 @@ Validation rules for names:
 
 Repo with both path and inline entries:
 
-```yaml
+````yaml
 repo:
   - name: roots
     include:
@@ -253,7 +257,7 @@ output_formats:  # Which formats to produce
 
 # Outputs are written by default to: dist/<env-name>/<bundle-name>/
 package: true  # Create .tar.gz of outputs
-```
+````
 
 ### Verification & Filtering
 
@@ -332,7 +336,7 @@ output_metadata:
 **Output:**
 
 1. **manifest.json** - Expanded metadata is always included in the `output_metadata` field
-2. **metadata.yaml** - Optional YAML sidecar for Kubernetes ConfigMap/Secret generation
+1. **metadata.yaml** - Optional YAML sidecar for Kubernetes ConfigMap/Secret generation
 
 **Example manifest.json snippet:**
 
@@ -495,7 +499,7 @@ metadata:
   contact: security@bundlecraft.io
 ```
 
----
+______________________________________________________________________
 
 ## 3) Defaults: `config/defaults.yaml`
 
@@ -552,7 +556,7 @@ metadata:
   policy_version: 1.0
 ```
 
----
+______________________________________________________________________
 
 ## Configuration Precedence
 
@@ -563,11 +567,13 @@ metadata:
 **For composed bundles:**
 
 - Env defines `bundles.<name>.include_sources: [bundle1, bundle2]`
+
 <!-- Tag-based bundle composition is intentionally not supported at this time to reduce complexity. -->
+
 - Builder loads each source config and merges their `include` + `exclude` lists
 - Env config controls ALL build behavior (formats, verification, etc.)
 
----
+______________________________________________________________________
 
 ## FAQ: Why don't env configs reference `repo`/`fetch` names?
 
@@ -590,7 +596,7 @@ Future extension (optional):
 
 This keeps env files free from addressing nested names while enabling targeted, env-wide adjustments when necessary.
 
----
+______________________________________________________________________
 
 ## CLI Integration
 
@@ -628,7 +634,7 @@ bundlecraft build --env prod --bundle internal-prod --skip-fetch
 
 - Uses existing staged sources at `cert_sources/staged/*` and does not perform network fetches
 
----
+______________________________________________________________________
 
 ## Distribution Bundle Types
 
@@ -643,7 +649,7 @@ Supported values for `distribution_metadata.targets[].type`:
 
 **Note:** BundleCraft itself does NOT perform publishing. The `distribution_metadata` section provides hints for downstream CI/CD pipelines (e.g., GitHub Actions, GitLab CI).
 
----
+______________________________________________________________________
 
 ## Reserved Fields
 
@@ -651,7 +657,7 @@ Supported values for `distribution_metadata.targets[].type`:
 - `craft_cfg.publish_targets`: deprecated, use `distribution.targets` instead
 - `craft_cfg.build_path`: deprecated; prefer CLI `--output-root`
 
----
+______________________________________________________________________
 
 ## Schema Validation
 
@@ -748,7 +754,7 @@ bundle_name: my-bundle
 description: My bundle description
 ```
 
----
+______________________________________________________________________
 
 #### Error: Empty string
 
@@ -764,7 +770,7 @@ description
 description: Internal CA roots for production
 ```
 
----
+______________________________________________________________________
 
 #### Error: Invalid output format
 
@@ -780,7 +786,7 @@ output_formats
 output_formats: [pem, jks, p7b, p12]  # Fixed: jsk → jks
 ```
 
----
+______________________________________________________________________
 
 #### Error: Insecure HTTP URL
 
@@ -799,7 +805,7 @@ fetch:
     url: https://curl.se/ca/cacert.pem  # Changed from http:// to https://
 ```
 
----
+______________________________________________________________________
 
 #### Error: Reserved name
 
@@ -815,7 +821,7 @@ bundle_name
 bundle_name: mozilla-fetch  # Changed from 'fetch'
 ```
 
----
+______________________________________________________________________
 
 #### Error: Duplicate names
 
@@ -834,7 +840,7 @@ repo:
     include: [cert_sources/internal/intermediate/]
 ```
 
----
+______________________________________________________________________
 
 #### Error: No sources defined
 
@@ -851,7 +857,7 @@ repo:
     include: [cert_sources/internal/]
 ```
 
----
+______________________________________________________________________
 
 #### Error: Missing type-specific field
 
@@ -870,7 +876,7 @@ fetch:
     url: https://curl.se/ca/cacert.pem  # Added missing url field
 ```
 
----
+______________________________________________________________________
 
 #### Error: Key size too small
 
@@ -888,7 +894,7 @@ filters:
   minimum_key_size_ecc: 256   # Changed from 128
 ```
 
----
+______________________________________________________________________
 
 #### Error: Numeric policy_version
 
@@ -924,19 +930,19 @@ Comprehensive validation tests are located in `tests/test_config_validation.py` 
 - Type-specific requirements
 - Valid configurations (positive tests)
 
----
+______________________________________________________________________
 
 ## Security Best Practices
 
 1. **Fetch verification**: Always pin `sha256` for public/static sources (Mozilla)
-2. **TLS pinning**: Use `ca_file` and/or `tls_fingerprint_sha256` for API fetches
-3. **Secrets**: Never hardcode passwords; always use `*_env` keys to reference environment variables
-4. **Distribution**: Use `enabled: false` to disable distribution targets in lower environments
-5. **Tags**: Use environment tags to control CI/CD pipeline routing (e.g., only sign/publish `production` tagged envs)
-6. **HTTPS enforcement**: The schema automatically rejects insecure HTTP URLs (except localhost)
-7. **Key sizes**: Configure minimum key size requirements to enforce cryptographic standards
+1. **TLS pinning**: Use `ca_file` and/or `tls_fingerprint_sha256` for API fetches
+1. **Secrets**: Never hardcode passwords; always use `*_env` keys to reference environment variables
+1. **Distribution**: Use `enabled: false` to disable distribution targets in lower environments
+1. **Tags**: Use environment tags to control CI/CD pipeline routing (e.g., only sign/publish `production` tagged envs)
+1. **HTTPS enforcement**: The schema automatically rejects insecure HTTP URLs (except localhost)
+1. **Key sizes**: Configure minimum key size requirements to enforce cryptographic standards
 
----
+______________________________________________________________________
 
 ## Related Documentation
 

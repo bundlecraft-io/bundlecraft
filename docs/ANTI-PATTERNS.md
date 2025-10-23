@@ -8,7 +8,7 @@ It is **not** a live updater, background agent, or dynamic trust injector!
 
 Instead, it is a **deterministic build system** that produces auditable, reproducible, and policy-driven CA bundles as part of a provisioning or CI/CD workflow.
 
----
+______________________________________________________________________
 
 ## ✅ How BundleCraft Prevents Anti-Patterns
 
@@ -22,7 +22,7 @@ Instead, it is a **deterministic build system** that produces auditable, reprodu
 | **Non-Deterministic Builds** | Build outputs varying due to timestamps or metadata | BundleCraft normalizes and produces deterministic tarballs for identical inputs, ensuring reproducibility and auditability. |
 | **Uncontrolled Trust Expansion** | Including intermediates or subordinates “just to make it work” | Default philosophy is **root-only trust**. Intermediates are considered out-of-scope for trust anchors and are handled separately when required by rare legacy use cases. |
 
----
+______________________________________________________________________
 
 ## ⚠️ Anti-Patterns Users Could Introduce
 
@@ -39,7 +39,7 @@ While BundleCraft itself enforces good practice, users could still misuse it in 
 
 BundleCraft assumes a **deliberate and controlled build process**, not an “auto-sync” trust distribution model.
 
----
+______________________________________________________________________
 
 ## 🔒 Revocation Design Philosophy
 
@@ -55,7 +55,7 @@ Revocation should be enforced by **end-entity certificate validation systems** (
 
 BundleCraft's role is to ensure that the trust anchors themselves are correct, verified, and deterministic - not to police revocation of certificates that should never have been trusted in the first place.
 
----
+______________________________________________________________________
 
 ## 📃 Configuration Checklist: Avoiding Common Misuse Patterns
 

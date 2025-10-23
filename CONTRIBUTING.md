@@ -2,7 +2,7 @@
 
 Thanks for your interest in BundleCraft! This guide walks you through the entire contribution process: from cloning the repo to getting your changes merged.
 
----
+______________________________________________________________________
 
 ## 🚀 Quick Start: Your First Contribution
 
@@ -128,7 +128,7 @@ Go to GitHub and open a PR from your branch to `main`. In your PR description:
 
 Maintainers will review, provide feedback, and merge when ready. PRs are squash-merged to keep history clean.
 
----
+______________________________________________________________________
 
 ## 📚 Understanding the Codebase
 
@@ -201,7 +201,7 @@ bundlecraft/
 - `config/envs/*.yaml` – Environment definitions (bundles, filters, verify policies)
 - `config/cert_sources/*.yaml` – Bundle definitions (sources, fetch specs)
 
----
+______________________________________________________________________
 
 ## 🧪 Testing Your Changes
 
@@ -257,7 +257,7 @@ ruff check .
 ruff check . --fix  # Auto-fix what's possible
 ```
 
----
+______________________________________________________________________
 
 ## 🧾 Coding Standards
 
@@ -278,7 +278,7 @@ We keep things simple and consistent:
 - Include small, non-sensitive PEM fixtures for functional tests
 - Test happy paths and error cases
 
----
+______________________________________________________________________
 
 ## 🔐 Security Guidelines
 
@@ -303,7 +303,7 @@ We keep things simple and consistent:
 - No persistent caches; staging is cleaned per run (`cert_sources/staged/<source_name>/`)
 - Update `docs/adr-0002-fetch.md` and `docs/troubleshooting.md` for behavior changes
 
----
+______________________________________________________________________
 
 ## 🚀 Release Process
 
@@ -312,7 +312,7 @@ We keep things simple and consistent:
 > **Note:** BundleCraft's release process is defined in `docs/adr-0006-corerelease.md`. The current CI workflow in `.github/workflows/bundlecraft.yaml` will become the basis for:
 >
 > 1. A **GitHub template repo** for users to publish their own trust bundles
-> 2. A **bundlecraft-demo** repo with prebuilt certs and configs for quick evaluation
+> 1. A **bundlecraft-demo** repo with prebuilt certs and configs for quick evaluation
 
 ```text
 TODO: this will need to be expanded to cover:
@@ -341,7 +341,7 @@ git push origin v0.1.0
 
 See `docs/adr-0006-corerelease.md` for the full distribution strategy.
 
----
+______________________________________________________________________
 
 ## 🌐 Notes on the Fetch Layer
 
@@ -354,42 +354,42 @@ See `docs/adr-0006-corerelease.md` for the full distribution strategy.
 - Provider integrations should live under `bundlecraft/fetchers/` and optional dependencies declared in `pyproject.toml` extras.
 - Update `docs/adr-0002-fetch.md` and `docs/troubleshooting.md` when behavior changes.
 
----
+______________________________________________________________________
 
 ## ✅ Quick Command Reference
 
 Handy commands for common tasks:
 
-| Action               | Command                                                       |
+| Action | Command |
 | -------------------- | ------------------------------------------------------------- |
-| Install for dev      | `pip install -e ".[dev]"`                                     |
-| Format code          | `black .`                                                     |
-| Lint code            | `ruff check . --fix`                                          |
-| Run tests            | `pytest -v`                                                   |
-| Build bundle         | `bundlecraft build --env dev --bundle internal`             |
-| Verify bundle        | `bundlecraft verify --target dist/dev/internal --verify-all`  |
+| Install for dev | `pip install -e ".[dev]"` |
+| Format code | `black .` |
+| Lint code | `ruff check . --fix` |
+| Run tests | `pytest -v` |
+| Build bundle | `bundlecraft build --env dev --bundle internal` |
+| Verify bundle | `bundlecraft verify --target dist/dev/internal --verify-all` |
 | Fetch remote sources | `bundlecraft fetch --source-config-file config/cert_sources/*.yaml` |
-| Build Python package | `python -m build`                                             |
-| Validate package     | `twine check dist/*`                                          |
+| Build Python package | `python -m build` |
+| Validate package | `twine check dist/*` |
 
----
+______________________________________________________________________
 
 ## 🤝 Pull Request Guidelines
 
 We keep it simple for small projects:
 
 1. **Fork or branch** from `main`
-2. **Test your changes** – Run `pytest`, `black`, and `ruff` locally
-3. **Update docs** – If behavior changes, update relevant docs
-4. **Write a clear description**:
+1. **Test your changes** – Run `pytest`, `black`, and `ruff` locally
+1. **Update docs** – If behavior changes, update relevant docs
+1. **Write a clear description**:
    - What changed and why
    - How to test/verify
    - Link related issues or ADRs
-5. **Expect feedback** – Reviews happen quickly; we're here to help
-6. **Squash-merge** – Maintainers will squash commits to keep history clean
+1. **Expect feedback** – Reviews happen quickly; we're here to help
+1. **Squash-merge** – Maintainers will squash commits to keep history clean
 
 **Commit signing is encouraged but not required.**
 
----
+______________________________________________________________________
 
 > **Thank you for helping make BundleCraft better. 🎉**

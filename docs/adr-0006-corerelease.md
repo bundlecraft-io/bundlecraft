@@ -5,7 +5,7 @@
 **Owner:** Chris J. Pich
 **Related:** SECURITY.md, README, CI/CD workflows, ADR-0007 (future enhancements)
 
----
+______________________________________________________________________
 
 ## 1) Context
 
@@ -13,63 +13,63 @@ ADR-0001 established an OCI-only distribution model for BundleCraft, while ADR-0
 
 As a security-focused PKI tool, we need trustworthy distribution without over-engineering or creating maintenance burden.
 
----
+______________________________________________________________________
 
 ## 2) Problem Statement
 
 We need a **simple, secure release strategy** that:
 
-* Provides **OCI container** for CI/CD workflows (primary use case)
-* Offers **PyPI package** for local development and testing
-* Includes **template repository** for user onboarding
-* Keeps trust materials **separate** from distributed artifacts
-* Is **maintainable by one person** without complex tooling
+- Provides **OCI container** for CI/CD workflows (primary use case)
+- Offers **PyPI package** for local development and testing
+- Includes **template repository** for user onboarding
+- Keeps trust materials **separate** from distributed artifacts
+- Is **maintainable by one person** without complex tooling
 
----
+______________________________________________________________________
 
 ## 3) Goals & Non-Goals
 
 ### Goals (MVP)
 
-* Publish a **signed OCI image** to GHCR with basic provenance
-* Publish an **engine-only PyPI package** for pipx/pip installation
-* Provide a **template repository** showing best practices
-* Exclude trust data from all distributed artifacts
-* Use GitHub's native signing capabilities (Sigstore integration)
-* Single-source versioning from git tags
+- Publish a **signed OCI image** to GHCR with basic provenance
+- Publish an **engine-only PyPI package** for pipx/pip installation
+- Provide a **template repository** showing best practices
+- Exclude trust data from all distributed artifacts
+- Use GitHub's native signing capabilities (Sigstore integration)
+- Single-source versioning from git tags
 
 ### Non-Goals (Deferred to ADR-0007)
 
-* PEX/zipapp artifacts (niche use case, adds complexity)
-* Custom GitHub Action wrapper (users can call OCI directly)
-* Advanced SLSA provenance levels
-* Weekly CVE scanning automation
-* Multi-architecture builds (start with amd64, add arm64 later if needed)
-* Hash-locked dependency files (use standard pyproject.toml constraints)
+- PEX/zipapp artifacts (niche use case, adds complexity)
+- Custom GitHub Action wrapper (users can call OCI directly)
+- Advanced SLSA provenance levels
+- Weekly CVE scanning automation
+- Multi-architecture builds (start with amd64, add arm64 later if needed)
+- Hash-locked dependency files (use standard pyproject.toml constraints)
 
----
+______________________________________________________________________
 
 ## 4) Simplified Distribution Model (MVP)
 
-| Channel              | Description                                            | Use Case                        | Security                      | Status |
+| Channel | Description | Use Case | Security | Status |
 | -------------------- | ------------------------------------------------------ | ------------------------------- | ----------------------------- | ------ |
-| **OCI image (GHCR)** | Signed container image with attestation               | CI/CD pipelines, automation     | GitHub-native Sigstore/cosign | MVP    |
-| **PyPI package**     | Engine-only Python package for pipx/pip installation  | Local dev, testing, exploration | PyPI Trusted Publishing       | MVP    |
-| **Template Repo**    | Reference implementation showing best practices       | User onboarding                 | Documentation only            | MVP    |
+| **OCI image (GHCR)** | Signed container image with attestation | CI/CD pipelines, automation | GitHub-native Sigstore/cosign | MVP |
+| **PyPI package** | Engine-only Python package for pipx/pip installation | Local dev, testing, exploration | PyPI Trusted Publishing | MVP |
+| **Template Repo** | Reference implementation showing best practices | User onboarding | Documentation only | MVP |
 
 **Deferred to ADR-0007 (Future):** PEX/zipapp artifacts, GitHub Action wrapper, advanced SBOM/SLSA levels, multi-arch builds, weekly CVE automation.
 
----
+______________________________________________________________________
 
 ## 5) Security Principles (Simplified)
 
-* **Trust separation:** certs/configs are always mounted or fetched, never bundled in artifacts
-* **Native signing:** leverage GitHub's built-in Sigstore integration for both OCI and PyPI
-* **Version from tags:** single source of truth using git tags
-* **No secrets in CI:** use OIDC for PyPI Trusted Publishing and GHCR
-* **Clear documentation:** explain security model and verification steps
+- **Trust separation:** certs/configs are always mounted or fetched, never bundled in artifacts
+- **Native signing:** leverage GitHub's built-in Sigstore integration for both OCI and PyPI
+- **Version from tags:** single source of truth using git tags
+- **No secrets in CI:** use OIDC for PyPI Trusted Publishing and GHCR
+- **Clear documentation:** explain security model and verification steps
 
----
+______________________________________________________________________
 
 ## 6) Implementation Details
 
@@ -77,17 +77,17 @@ We need a **simple, secure release strategy** that:
 
 **Build:**
 
-* Simple Dockerfile with `python:3.12-slim` base
-* Multi-stage build: dependencies → application → minimal runtime
-* Non-root user, minimal attack surface
-* Entrypoint runs BundleCraft CLI
+- Simple Dockerfile with `python:3.12-slim` base
+- Multi-stage build: dependencies → application → minimal runtime
+- Non-root user, minimal attack surface
+- Entrypoint runs BundleCraft CLI
 
 **Release:**
 
-* GitHub Actions build on tag push
-* Push to `ghcr.io/bundlecraft-io/bundlecraft:vX.Y.Z` and `:latest`
-* Automatic signing via GitHub's Sigstore integration (no manual cosign setup needed)
-* Basic attestation with build provenance
+- GitHub Actions build on tag push
+- Push to `ghcr.io/bundlecraft-io/bundlecraft:vX.Y.Z` and `:latest`
+- Automatic signing via GitHub's Sigstore integration (no manual cosign setup needed)
+- Basic attestation with build provenance
 
 **Usage:**
 
@@ -99,15 +99,15 @@ docker run --rm -v $(pwd)/config:/config ghcr.io/bundlecraft-io/bundlecraft:late
 
 **Build:**
 
-* Use `hatchling` with version from git tags (`hatch-vcs`)
-* `MANIFEST.in` excludes: `config/`, `build_cache/`, `cert_sources/`, `tests/`, `*.jks`, `*.pem`
-* `pyproject.toml` defines entry point for CLI
+- Use `hatchling` with version from git tags (`hatch-vcs`)
+- `MANIFEST.in` excludes: `config/`, `build_cache/`, `cert_sources/`, `tests/`, `*.jks`, `*.pem`
+- `pyproject.toml` defines entry point for CLI
 
 **Release:**
 
-* GitHub Actions builds wheel on tag push
-* PyPI Trusted Publishing (OIDC) - no API tokens needed
-* Automatic Sigstore signing via PyPI's native integration
+- GitHub Actions builds wheel on tag push
+- PyPI Trusted Publishing (OIDC) - no API tokens needed
+- Automatic Sigstore signing via PyPI's native integration
 
 **Usage:**
 
@@ -136,23 +136,23 @@ bundlecraft-template/
 
 **Purpose:**
 
-* Show best-practice directory layout
-* Demonstrate OCI workflow integration
-* Emphasize trust material separation in docs
-* Provide working example users can clone and adapt
+- Show best-practice directory layout
+- Demonstrate OCI workflow integration
+- Emphasize trust material separation in docs
+- Provide working example users can clone and adapt
 
----
+______________________________________________________________________
 
 ## 7) Release Process (Simplified)
 
 ### Manual Steps
 
 1. Update version if needed (or rely on git tag)
-2. Create and push tag: `git tag v1.0.0 && git push origin v1.0.0`
-3. GitHub Actions automatically:
-   * Builds OCI image → pushes to GHCR → signs
-   * Builds Python wheel → publishes to PyPI → signs
-   * Creates GitHub Release with notes
+1. Create and push tag: `git tag v1.0.0 && git push origin v1.0.0`
+1. GitHub Actions automatically:
+   - Builds OCI image → pushes to GHCR → signs
+   - Builds Python wheel → publishes to PyPI → signs
+   - Creates GitHub Release with notes
 
 ### Automated Workflow
 
@@ -182,7 +182,7 @@ docker buildx imagetools inspect ghcr.io/bundlecraft-io/bundlecraft:v1.0.0 --for
 
 **PyPI:** Sigstore signatures automatically available via PyPI's transparency log
 
----
+______________________________________________________________________
 
 ## 8) What This Achieves
 
@@ -191,27 +191,27 @@ docker buildx imagetools inspect ghcr.io/bundlecraft-io/bundlecraft:v1.0.0 --for
 ✅ **Maintainability:** GitHub-native features, well-documented, no complex dependencies
 ✅ **Usability:** Container for automation, pip/pipx for developers, template for onboarding
 
----
+______________________________________________________________________
 
 ## 9) Decision
 
 BundleCraft will adopt a **pragmatic two-channel distribution** (OCI + PyPI) plus a template repository for MVP:
 
 1. **OCI image** as primary distribution for CI/CD (signed via GitHub native Sigstore)
-2. **PyPI package** for developer convenience (engine-only, Trusted Publishing)
-3. **Template repo** for user onboarding and best practices
+1. **PyPI package** for developer convenience (engine-only, Trusted Publishing)
+1. **Template repo** for user onboarding and best practices
 
 Advanced features (PEX, GitHub Action, multi-arch, weekly scans) deferred to **ADR-0007** to maintain solo-developer sustainability.
 
----
+______________________________________________________________________
 
 ## 10) Next Steps
 
 1. Create `Dockerfile` with secure multi-stage build
-2. Add `MANIFEST.in` and configure `hatch-vcs` in `pyproject.toml`
-3. Create `.github/workflows/release.yml` with OCI and PyPI jobs
-4. Set up PyPI Trusted Publishing in PyPI settings
-5. Create template repository with working example
-6. Update README and SECURITY docs with usage and verification guidance
+1. Add `MANIFEST.in` and configure `hatch-vcs` in `pyproject.toml`
+1. Create `.github/workflows/release.yml` with OCI and PyPI jobs
+1. Set up PyPI Trusted Publishing in PyPI settings
+1. Create template repository with working example
+1. Update README and SECURITY docs with usage and verification guidance
 
----
+______________________________________________________________________
