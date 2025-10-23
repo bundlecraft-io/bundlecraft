@@ -11,6 +11,7 @@ ______________________________________________________________________
 ### Configuration & Usage
 
 - **[Configuration Specification](CONFIG-SPEC.md)** - Complete schema and usage guide for source configs, environment configs, and defaults
+- **[Build Paths and Reserved Directories](build-paths-and-dist.md)** - How output paths are determined, customizing env.build_path safely, and reserved files under dist/
 - **[BundleCraft Diff](bundlecraft-diff.md)** - Compare certificate bundles between builds and releases
 - **[JSON Output Schemas](JSON-OUTPUT.md)** - Machine-readable output formats for all CLI commands (--json flag)
 - **[Exit Codes](exit-codes.md)** - Standardized exit codes for CI/CD integration and error handling

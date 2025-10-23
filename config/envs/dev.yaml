@@ -24,6 +24,7 @@ bundles:
 # ---------------------------------------------------------------------
 # Output Configuration
 # ---------------------------------------------------------------------
+build_path: dist/dev/custom
 output_formats:
   - pem  # Canonical PEM bundle
   - p7b  # PKCS#7 DER format

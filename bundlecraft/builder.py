@@ -269,6 +269,7 @@ def _create_deterministic_tar(build_root: Path, output_name: str = "package") ->
         "checksums.sha256",
         "metadata.yaml",
         "sbom.json",
+        "README.md",  # Exclude any user-facing README from packaging
     }
 
     # Collect files to add with deterministic ordering
@@ -744,12 +745,43 @@ def main(
     output_formats = env_cfg.get("output_formats") or ["pem"]
     fmt_overrides = env_cfg.get("format_overrides") or {}
 
+    # Determine the build output directory with build_path override support
+    # Ensure build_path is always rooted to dist/ for safety
+    build_path_cfg = env_cfg.get("build_path")
+    if build_path_cfg:
+        # Strip any leading slashes or ../ attempts and ensure it's under dist/
+        build_path_clean = str(build_path_cfg).strip("/").replace("..", "")
+        # If user provides a path starting with "dist/", strip it first
+        if build_path_clean.startswith("dist/"):
+            build_path_clean = build_path_clean[5:]  # Remove "dist/" prefix
+        # Construct final path: ROOT/dist/<user_path>/<bundle_name>
+        build_output_base = (ROOT / "dist" / build_path_clean).resolve()
+        # Validate that the resolved path is still under dist/
+        dist_root = (ROOT / "dist").resolve()
+        if not str(build_output_base).startswith(str(dist_root)):
+            error_msg = f"build_path must remain under dist/ directory (got: {build_path_cfg})"
+            if json_output:
+                json_errors.append(error_msg)
+                from bundlecraft.helpers.json_output import create_build_response, emit_json
+
+                emit_json(
+                    create_build_response(
+                        success=False, environment=env, bundles=[], errors=json_errors
+                    )
+                )
+            else:
+                click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
+            sys.exit(ExitCode.CONFIG_ERROR)
+    else:
+        # Default: dist/<env>/<bundle>
+        build_output_base = (Path(output_root) / safe_env).resolve()
+
     per_bundle_results: dict[str, dict] = {}
     import shutil
 
     # Process each bundle atomically
     for bundle_name, bundle_dirs in staging_map.items():
-        final_build_root = (Path(output_root) / safe_env / bundle_name).resolve()
+        final_build_root = (build_output_base / bundle_name).resolve()
 
         # Use atomic build context for each bundle
         with AtomicBuildContext(

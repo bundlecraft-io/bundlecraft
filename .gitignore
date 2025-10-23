@@ -2,10 +2,11 @@
 # Project-specific ignores
 ########################################
 
-# Staged fetch directory (ephemeral)
+# Cert handling folders
 cert_sources/fetched/
 cert_sources/staged/
-build*
+build*/
+dist*/
 
 # Personal/local test folders
 personal*/
