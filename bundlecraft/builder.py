@@ -509,7 +509,9 @@ def main(
     env_path = CONFIG_DIR / "envs" / f"{env}.yaml"
 
     if not env_path.exists():
-        error_msg = f"Environment config file not found: config/envs/{env}.yaml"
+        # Preserve the phrase "environment config not found" for test compatibility,
+        # while still showing the expected path explicitly.
+        error_msg = f"Environment config not found: config/envs/{env}.yaml"
         if json_output:
             json_errors.append(error_msg)
             from bundlecraft.helpers.json_output import create_build_response, emit_json
