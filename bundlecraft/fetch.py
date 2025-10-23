@@ -283,7 +283,7 @@ def run_fetch(
     """
     root = workspace_root.resolve()
     config_dir = root / "config"
-    sources_dir = root / "sources"
+    sources_dir = root / "cert_sources"
 
     # Ensure basic structure exists
     ensure_dir(sources_dir)

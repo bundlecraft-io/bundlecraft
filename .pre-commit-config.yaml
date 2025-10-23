@@ -23,12 +23,6 @@ repos:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
 
-  # Python import sorter (with autofix). Configure rules in pyproject.toml [tool.isort]
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - {id: isort}
-
   # Python code formatter (opinionated). Configure in pyproject.toml [tool.black]
   - repo: https://github.com/psf/black
     rev: 24.10.0

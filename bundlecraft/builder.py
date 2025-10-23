@@ -10,7 +10,7 @@ Architecture:
 
 Changes from legacy builder:
     - Removed --prefetch flag (fetch is now always executed)
-        - Staging directory: sources/staged/<source_name>/(include|repo|fetch/<name>)/
+        - Staging directory: cert_sources/staged/<source_name>/(include|repo|fetch/<name>)/
         - Build output: dist/<craft>/<target>/ (craft display name and target name)
     - Clearer orchestration: each stage is self-contained with explicit inputs/outputs
 """
@@ -46,7 +46,7 @@ from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 CURRENT_DIR = Path(__file__).resolve().parent
 ROOT = CURRENT_DIR.parent
 CONFIG_DIR = ROOT / "config"
-SOURCES_DIR = ROOT / "sources"
+SOURCES_DIR = ROOT / "cert_sources"
 STAGED_DIR = SOURCES_DIR / "staged"
 DIST_DIR = ROOT / "dist"
 # (no tag-based bundle composition helpers)
@@ -78,7 +78,7 @@ def _stage_bundle_sources(
     dry_run: bool = False,
     json_output: bool = False,
 ) -> Path:
-    """Stage a bundle's sources (includes + fetch) into sources/staged/<source_name>/.
+    """Stage a bundle's sources (includes + fetch) into cert_sources/staged/<source_name>/.
 
     This mirrors the fetch CLI behavior but writes to a staging area for build.
     Returns the staging directory path.
