@@ -55,6 +55,7 @@ jobs:
           ALL_ENVS_FILE=$(mktemp)
           echo "$ALL_JSON" | jq -r '.[].env' | sort -u > "$ALL_ENVS_FILE"
           FILTERED_ENVS=$(echo "$FILTERED_JSON" | jq -r '.[].env' | sort -u | paste -sd ', ' - || true)
+          FILTERED_ENV_NAMES=$(echo "$FILTERED_JSON" | jq -r '.[].env_name // .[].env' | sort -u | paste -sd ', ' - || true)
           TARGETS_COUNT=$(echo "$FILTERED_JSON" | jq 'length')
 
           # Parse selected environments (comma-separated), trim spaces, unique + sorted
@@ -73,7 +74,8 @@ jobs:
           echo "Selected environments: ${SELECTED_SORTED:-'(all)'}"
           echo -n "Available environments: "
           paste -sd ', ' "$ALL_ENVS_FILE" || echo '(none)'
-          echo "Filtered environments: ${FILTERED_ENVS:-'(none)'}"
+          echo "Filtered environments (file ids): ${FILTERED_ENVS:-'(none)'}"
+          echo "Filtered environment names: ${FILTERED_ENV_NAMES:-'(none)'}"
           echo "Bundles count: ${TARGETS_COUNT}"
           echo '::endgroup::'
           if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
@@ -163,10 +165,23 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist/
+      - name: Setup Python (for YAML parsing)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PyYAML for detection
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+      - name: Detect all env targets (for mapping env_name/target_path)
+        run: |
+          python scripts/detect_env_targets.py > env_bundles_all.json
       - name: Rehydrate to bundlecraft/<env>/<bundle> and package
         run: |
           set -euo pipefail
@@ -182,9 +197,14 @@ jobs:
             artifact_count=$((artifact_count + 1))
             base="$(basename "$artifact_dir")"
             if [[ "$base" =~ ^trust-store-([^-/]+)-(.+)$ ]]; then
-              env="${BASH_REMATCH[1]}"
-              bundle="${BASH_REMATCH[2]}"
-              dest="bundlecraft/${env}/${bundle}"
+              env="${BASH_REMATCH[1]}"  # config file stem
+              bundle="${BASH_REMATCH[2]}"  # bundle key
+              # Look up env_name and target_path from detection JSON (fallbacks to env/bundle)
+              env_name=$(jq -r --arg env "$env" --arg bundle "$bundle" 'first(.[] | select(.env==$env and .bundle==$bundle) | .env_name) // empty' env_bundles_all.json || true)
+              target_path=$(jq -r --arg env "$env" --arg bundle "$bundle" 'first(.[] | select(.env==$env and .bundle==$bundle) | .target_path) // empty' env_bundles_all.json || true)
+              if [ -z "$env_name" ]; then env_name="$env"; fi
+              if [ -z "$target_path" ]; then target_path="$bundle"; fi
+              dest="bundlecraft/${env_name}/${target_path}"
               mkdir -p "$dest"
 
               # Prefer direct bundle content if artifact uploaded the bundle directory itself
@@ -221,13 +241,13 @@ jobs:
           echo "Created tarball and checksum:"
           sha256sum bundlecraft-trust.tar.gz
           echo "=== Creating per-env-bundle tarballs (flat contents) ==="
-          mapfile -t BUNDLES < <(find bundlecraft -mindepth 2 -maxdepth 2 -type d | sort)
-          for dir in "${BUNDLES[@]}"; do
-            env="$(echo "$dir" | awk -F/ '{print $2}')"
-            bundle="$(echo "$dir" | awk -F/ '{print $3}')"
+          mapfile -t BUNDLE_DIRS < <(find bundlecraft -type f -name 'checksums.sha256' -print0 | xargs -0 -n1 dirname | sort -u)
+          for dir in "${BUNDLE_DIRS[@]}"; do
+            env="$(echo "$dir" | awk -F/ '{print $2}')"  # env_name directory
+            bundle="$(basename "$dir")"  # last path segment
             name="bundlecraft-trust-env-${env}-bundle-${bundle}.tar.gz"
             # Create a flat tarball with the contents of the bundle at the archive root
-            tar -czf "$name" -C "bundlecraft/${env}/${bundle}" .
+            tar -czf "$name" -C "$dir" .
             sha256sum "$name" > "${name%.tar.gz}.sha256"
             echo "Created per-bundle tarball: $name"
           done
@@ -280,12 +300,12 @@ jobs:
           echo "=== Directory structure before verify ==="
           find bundlecraft -maxdepth 3 -type d || true
           echo "========================================"
-          dirs=$(find bundlecraft -mindepth 2 -maxdepth 2 -type d)
-          if [ -z "$dirs" ]; then
-            echo "No bundle directories found under bundlecraft/. Check collect stage output."
+          mapfile -t DIRS < <(find bundlecraft -type f -name 'checksums.sha256' -print0 | xargs -0 -n1 dirname | sort -u)
+          if [ ${#DIRS[@]} -eq 0 ]; then
+            echo "No bundle directories (with checksums.sha256) found under bundlecraft/. Check collect stage output."
             exit 1
           fi
-          for dir in $dirs; do
+          for dir in "${DIRS[@]}"; do
             echo "Verifying $dir"
             bundlecraft verify --target "$dir" --verbose --json
           done
@@ -298,12 +318,12 @@ jobs:
           find . -maxdepth 3 -type d || true
           echo "=========================="
           cd ..
-          dirs=$(find verify-tarball/bundlecraft -mindepth 2 -maxdepth 2 -type d 2>/dev/null)
-          if [ -z "$dirs" ]; then
-            echo "No bundle directories found in extracted tarball."
+          mapfile -t DIRS < <(find verify-tarball/bundlecraft -type f -name 'checksums.sha256' -print0 2>/dev/null | xargs -0 -n1 dirname | sort -u)
+          if [ ${#DIRS[@]} -eq 0 ]; then
+            echo "No bundle directories (with checksums.sha256) found in extracted tarball."
             exit 1
           fi
-          for dir in $dirs; do
+          for dir in "${DIRS[@]}"; do
             echo "Verifying $dir"
             bundlecraft verify --target "$dir" --verbose --json
           done
@@ -370,9 +390,9 @@ jobs:
             echo "Tarball not found: $TAR" >&2
             exit 1
           fi
-          # Find unique bundlecraft/<env>/<bundle>/ directories inside the tarball
-          mapfile -t DIRS < <(tar -tzf "$TAR" | awk -F/ 'NF>=3 {print $1"/"$2"/"$3"/"}' | sort -u)
-          mapfile -t BUNDLES < <(printf "%s\n" "${DIRS[@]}" | grep -E '^bundlecraft/[^/]+/[^/]+/$' | sed -E 's#^bundlecraft/([^/]+)/([^/]+)/$#\1/\2#' | sort)
+          # Find unique bundle directories inside the tarball by presence of checksums.sha256
+          mapfile -t BUNDLE_CHECKSUMS < <(tar -tzf "$TAR" | grep -E '^bundlecraft/.+/checksums\.sha256$' | sort -u || true)
+          mapfile -t BUNDLES < <(printf "%s\n" "${BUNDLE_CHECKSUMS[@]}" | sed -E 's#^bundlecraft/([^/]+)/(.*)/checksums\.sha256$#\1/\2#' | sort)
           count=${#BUNDLES[@]}
           echo "bundle_count=$count" >> "$GITHUB_OUTPUT"
           {
@@ -456,12 +476,15 @@ jobs:
           total_added=0
           total_removed=0
 
-          # Compare each bundle (using process substitution to avoid subshell)
-          while read current_bundle; do
-            # Extract env and bundle name
-            env=$(basename "$(dirname "$current_bundle")")
-            bundle=$(basename "$current_bundle")
-            previous_bundle="previous/bundlecraft/${env}/${bundle}"
+          # Compare each bundle (detected by checksums.sha256 in current tar)
+          while read -r current_dir; do
+            # current_dir like current/bundlecraft/<env_name>/<target_path>
+            env=$(echo "$current_dir" | awk -F/ '{print $3}')
+            # target_path is the subpath after bundlecraft/<env_name>/
+            target_path="${current_dir#current/bundlecraft/${env}/}"
+            # Use the last segment of target_path as bundle display name for filenames
+            bundle="$(basename "$current_dir")"
+            previous_bundle="previous/bundlecraft/${env}/${target_path}"
             if [ ! -d "$previous_bundle" ]; then
               echo "| \`$env\` | \`$bundle\` | NEW | - | - |" >> diff-summary.md
               echo "## 🆕 New Bundle: $env/$bundle" >> diff-reports/new-bundles.md
@@ -476,7 +499,7 @@ jobs:
             # Generate JSON diff for processing
             bundlecraft diff \
               --from "$previous_bundle" \
-              --to "$current_bundle" \
+              --to "$current_dir" \
               --output-format json \
               --output "diff-reports/diff-${env}-${bundle}.json" || continue
 
@@ -527,7 +550,7 @@ jobs:
                 echo "" >> "diff-reports/details-${env}-${bundle}.md"
               fi
             fi
-          done < <(find current/bundlecraft -mindepth 2 -maxdepth 2 -type d | sort)
+          done < <(find current/bundlecraft -type f -name 'checksums.sha256' -print0 | xargs -0 -n1 dirname | sort -u)
 
           # Add totals to summary
           echo "" >> diff-summary.md

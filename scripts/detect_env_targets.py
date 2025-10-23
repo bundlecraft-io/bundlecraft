@@ -2,7 +2,13 @@
 """
 Detect environment bundles from config/envs/*.yaml and emit JSON for CI matrix.
 
-Output format: a JSON array of objects with keys { env, bundle, output_root }.
+Output format: a JSON array of objects with keys {
+    env,            # config filename stem; passed to CLI --env
+    env_name,       # human-friendly name from config[name] (fallback to env)
+    bundle,         # bundle key/name in config
+    output_root,    # dist/ or dist/<build_path_clean>
+    target_path     # build_path_clean + "/" + bundle (or just bundle if no build_path)
+}.
 """
 from __future__ import annotations
 
@@ -58,6 +64,8 @@ def main() -> None:
         # Use the filename stem (without .yaml) as the environment identifier for CLI
         # This is what the CLI expects in --env parameter to locate config/envs/<env>.yaml
         env = file_stem_env
+        # Human-friendly display name (fallback to env if missing)
+        env_name = str((cfg or {}).get("name") or env)
 
         # If a subset of environments was specified, filter here using the resolved name
         if sel_envs and env not in sel_envs:
@@ -91,13 +99,36 @@ def main() -> None:
         else:
             # Default: dist (builder will append env/bundle)
             output_root = "dist"
+            build_path_clean = ""
+
+        def make_entry(
+            b: str,
+            env: str = env,
+            env_name: str = env_name,
+            output_root: str = output_root,
+            build_path_cfg: str | None = build_path_cfg,
+            build_path_clean: str = build_path_clean,
+        ) -> dict[str, str]:
+            # Compute target_path used for final packaging under bundlecraft/<env_name>/<target_path>
+            if build_path_cfg:
+                target_path = f"{build_path_clean}/{b}".strip("/")
+            else:
+                # No build_path configured; default to just the bundle name
+                target_path = str(b)
+            return {
+                "env": env,
+                "env_name": env_name,
+                "bundle": str(b),
+                "output_root": output_root,
+                "target_path": target_path,
+            }
 
         if isinstance(bundles, dict):
             for b in sorted(bundles.keys()):
-                env_bundles.append({"env": env, "bundle": str(b), "output_root": output_root})
+                env_bundles.append(make_entry(str(b)))
         elif isinstance(bundles, list):
             for b in sorted(bundles):
-                env_bundles.append({"env": env, "bundle": str(b), "output_root": output_root})
+                env_bundles.append(make_entry(str(b)))
 
     print(json.dumps(env_bundles))
 
