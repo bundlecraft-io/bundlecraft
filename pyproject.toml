@@ -1,10 +1,10 @@
 [project]
 name = "bundlecraft"
-version = "0.1.0"
-description = "Unified CLI for building, verifying, and converting CA trust bundles."
+version = "0.1.1"
+description = "Modern tool for building and managing CA trust bundles."
 readme = "README.md"
 requires-python = ">=3.9"
-authors = [{ name = "Chris Pich" }]
+authors = [{ name = "BundleCraft.io" }]
 dependencies = [
   "click>=8.0",
   "cryptography>=42.0",
