@@ -55,8 +55,9 @@ def main() -> None:
             print(f"::warning::Failed to parse {path}: {e}")
             cfg = {}
 
-        # Prefer the human-friendly environment name from config, fallback to filename stem
-        env = str(cfg.get("name") or file_stem_env)
+        # Use the filename stem (without .yaml) as the environment identifier for CLI
+        # This is what the CLI expects in --env parameter to locate config/envs/<env>.yaml
+        env = file_stem_env
 
         # If a subset of environments was specified, filter here using the resolved name
         if sel_envs and env not in sel_envs:

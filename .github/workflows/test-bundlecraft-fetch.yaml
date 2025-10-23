@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           cat > ci-test-vault.yaml <<'YAML'
-          bundle_name: ci-vault-test
+          source_name: ci-vault-test
           description: CI test bundle for Vault K/V fetcher validation
           fetch:
             - name: from_vault
@@ -98,7 +98,7 @@ jobs:
           cp "$DATA_DIR/server.crt" ci-http-test/ca.crt
           CA_FILE="$(pwd)/ci-http-test/ca.crt"
           cat > ci-test-http.yaml <<YAML
-          bundle_name: ci-http-test
+          source_name: ci-http-test
           description: CI test bundle for HTTPS fetcher with TLS pinning
           fetch:
             - name: from_https
@@ -175,7 +175,7 @@ jobs:
           cp "$DATA_DIR/server.crt" ci-api-test/api.crt
           CA_FILE="$(pwd)/ci-api-test/api.crt"
           cat > ci-test-api.yaml <<YAML
-          bundle_name: ci-api-test
+          source_name: ci-api-test
           description: CI test bundle for API fetcher (Keyfactor mock)
           fetch:
             - name: from_keyfactor_mock
