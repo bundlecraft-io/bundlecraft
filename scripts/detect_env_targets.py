@@ -78,8 +78,19 @@ def main() -> None:
             if not enabled:
                 continue
         bundles = cfg.get("bundles") or {}
-        output_root = cfg.get("build_path") or "dist"
-        output_root = str(output_root).rstrip("/")
+        # Resolve output_root with same logic as builder:
+        # build_path is always rooted under dist/, and normalized
+        build_path_cfg = cfg.get("build_path")
+        if build_path_cfg:
+            # Strip leading slashes, ../, and dist/ prefix if present
+            build_path_clean = str(build_path_cfg).strip("/").replace("..", "")
+            if build_path_clean.startswith("dist/"):
+                build_path_clean = build_path_clean[5:]
+            # Root under dist/
+            output_root = f"dist/{build_path_clean}".rstrip("/")
+        else:
+            # Default: dist (builder will append env/bundle)
+            output_root = "dist"
 
         if isinstance(bundles, dict):
             for b in sorted(bundles.keys()):

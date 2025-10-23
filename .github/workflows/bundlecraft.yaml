@@ -136,17 +136,27 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          matches=("${{ matrix.item.output_root }}"/*/"${{ matrix.item.bundle }}")
-          if [ ${#matches[@]} -eq 0 ]; then
-            echo "::error::No build output found at ${{ matrix.item.output_root }}/*/${{ matrix.item.bundle }}/"
-            exit 1
+          # Check for build output at output_root/bundle/ (with build_path support)
+          # Try exact path first (for custom build_path), then fallback to env wildcard (default)
+          bundle_path="${{ matrix.item.output_root }}/${{ matrix.item.bundle }}"
+          if [ -d "$bundle_path" ]; then
+            echo "Found build output: $bundle_path"
+          else
+            # Fallback: try with env wildcard (default case: dist/*/bundle)
+            matches=("${{ matrix.item.output_root }}"/*/"${{ matrix.item.bundle }}")
+            if [ ${#matches[@]} -eq 0 ]; then
+              echo "::error::No build output found at ${{ matrix.item.output_root }}/${{ matrix.item.bundle }}/ or ${{ matrix.item.output_root }}/*/${{ matrix.item.bundle }}/"
+              exit 1
+            fi
+            echo "Found build output: ${matches[0]}"
           fi
-          echo "Found build output: ${matches[0]}"
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
           name: trust-store-${{ matrix.item.env }}-${{ matrix.item.bundle }}
-          path: ${{ matrix.item.output_root }}/*/${{ matrix.item.bundle }}/
+          path: |
+            ${{ matrix.item.output_root }}/${{ matrix.item.bundle }}/
+            ${{ matrix.item.output_root }}/*/${{ matrix.item.bundle }}/
           if-no-files-found: error
   collect:
     name: Collect and package all builds
