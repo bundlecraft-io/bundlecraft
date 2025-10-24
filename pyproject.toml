@@ -1,53 +1,69 @@
 [project]
 name = "bundlecraft"
-version = "0.1.1"
-description = "Modern tool for building and managing CA trust bundles."
+dynamic = ["version"]
+description = "BundleCraft - A tool for configuring, building, and packaging PKI trust stores."
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.9"
 authors = [{ name = "BundleCraft.io" }]
+keywords = ["pki", "certificates", "trust-store", "ca-bundle", "security", "cryptography"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Security :: Cryptography",
+    "Topic :: System :: Systems Administration",
+]
 dependencies = [
-  "click>=8.0",
-  "cryptography>=42.0",
-  "pyOpenSSL>=23.0",
-  "PyYAML>=6.0",
-  "pydantic>=2.0",
-  "python-gnupg>=0.5.0",
-  "cyclonedx-bom>=4.0.0",
+  "click>=8.0,<9.0",
+  "cryptography>=42.0,<50.0",
+  "pyOpenSSL>=23.0,<26.0",
+  "PyYAML>=6.0,<7.0",
+  "pydantic>=2.0,<3.0",
+  "python-gnupg>=0.5.0,<1.0",
+  "cyclonedx-bom>=4.0.0,<8.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-"pytest>=8.0.0",
-"pytest-cov>=4.1.0",
-"pytest-mock>=3.11.1",
-"black>=24.0.0",
-"ruff>=0.14.0",
-"build>=1.2.2",
-"twine>=5.0.0",
-"pre-commit>=3.7.0",
-"yamllint>=1.35.0",
-"yamlfix>=1.17.0",
-"Flask>=3.0.0",
-"flasgger>=0.9.7",
+  "pytest>=8.0.0",
+  "pytest-cov>=4.1.0",
+  "pytest-mock>=3.11.1",
+  "black>=24.0.0",
+  "ruff>=0.14.0",
+  "build>=1.2.2",
+  "twine>=5.0.0",
+  "pre-commit>=3.7.0",
+  "yamllint>=1.35.0",
+  "yamlfix>=1.17.0",
+  "Flask>=3.0.0",
+  "flasgger>=0.9.7",
 ]
 fetchers = [
   "hvac>=2.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/bundlecraft-io/bundlecraft"
+Documentation = "https://github.com/bundlecraft-io/bundlecraft#readme"
+Repository = "https://github.com/bundlecraft-io/bundlecraft"
+Issues = "https://github.com/bundlecraft-io/bundlecraft/issues"
+Changelog = "https://github.com/bundlecraft-io/bundlecraft/releases"
+
 [project.scripts]
 bundlecraft = "bundlecraft.cli:cli"
 
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-py-modules = []
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["bundlecraft*"]
-namespaces = false
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
 [tool.ruff]
 target-version = "py310"
@@ -68,3 +84,15 @@ ignore = [
 [tool.black]
 target-version = ["py310"]
 line-length = 100
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["bundlecraft"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "bundlecraft/*.py",
+    "README.md",
+]

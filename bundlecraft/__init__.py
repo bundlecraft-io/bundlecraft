@@ -1,3 +1,9 @@
 # BundleCraft package metadata
-__version__ = "0.1.1"
+try:
+    from importlib.metadata import version
+
+    __version__ = version("bundlecraft")
+except Exception:
+    __version__ = "unknown"
+
 __all__ = ["__version__"]
