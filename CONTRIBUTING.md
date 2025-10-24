@@ -2,6 +2,16 @@
 
 Thanks for your interest in BundleCraft! This guide walks you through the entire contribution process: from cloning the repo to getting your changes merged.
 
+**Quick Navigation:**
+
+- [Quick Start](#-quick-start-your-first-contribution) - Get up and running in 5 minutes
+- [Understanding the Codebase](#-understanding-the-codebase) - Architecture and structure
+- [Testing Your Changes](#-testing-your-changes) - How to test locally
+- [Release Process](#-release-process) - Building and releasing to PyPI
+  - [Testing Releases Locally](#testing-releases-locally) - Local testing before release
+  - [Release Security](#release-security) - Security setup and best practices
+- [Pull Request Guidelines](#-pull-request-guidelines) - How to submit PRs
+
 ______________________________________________________________________
 
 ## 🚀 Quick Start: Your First Contribution
@@ -462,16 +472,26 @@ make build
 make verify-package
 # Should show: "PASSED" for both .whl and .tar.gz
 
-# 5. Test on Test PyPI (recommended first time)
-make release-test
-# Test install: pip install -i https://test.pypi.org/simple/ bundlecraft
+# 5. Test the package locally (recommended)
+make test-install
+# Creates isolated venv, installs, tests, cleans up automatically
 
-# 6. Release to production PyPI
+# 6. Optional: Test on Test PyPI (for major releases)
+# See "Testing Releases Locally" section below for setup
+make release-test          # Upload to Test PyPI
+make release-test-install  # Install and test
+
+# 7. Push tag to trigger automated release (recommended)
+git tag v0.2.0
+git push origin v0.2.0
+# GitHub Actions will build, wait for approval, then publish
+
+# 8. Manual PyPI release (only if GitHub Actions unavailable)
 make release
-# WARNING: This is irreversible! Can't delete/re-upload same version.
+# ⚠️  This bypasses environment approvals!
 ```
 
-#### Automated Release via GitHub Actions
+#### Automated Release via GitHub Actions (Recommended)
 
 **Trigger:** Pushing a version tag (`v*`) to GitHub automatically:
 
@@ -583,6 +603,418 @@ make clean              # Remove build artifacts
 ```
 
 See `docs/adr-0006-corerelease.md` for the full distribution strategy.
+
+### Testing Releases Locally
+
+Since the automated release workflow requires environment approval (human review), you need to test package builds locally before pushing a release tag.
+
+#### Quick Test (Recommended for All Releases)
+
+```bash
+# Test that package builds and installs correctly
+make test-install
+
+# What it does:
+# ✅ Builds wheel and sdist
+# ✅ Creates temporary isolated venv
+# ✅ Installs from built wheel
+# ✅ Runs version check
+# ✅ Auto-cleans up
+```
+
+#### Interactive Testing (For Manual Exploration)
+
+```bash
+# Create persistent test environment
+make test-install-interactive
+
+# Use it
+source /tmp/test-bundlecraft/bin/activate
+bundlecraft --version
+bundlecraft build --help
+# ... test whatever you need ...
+deactivate
+
+# Clean up when done
+rm -rf /tmp/test-bundlecraft
+```
+
+#### Test PyPI Testing (For Major Releases)
+
+Test the complete upload/download cycle without affecting production:
+
+**One-time setup:**
+
+1. Create account at <https://test.pypi.org/account/register/>
+2. Generate API token at <https://test.pypi.org/manage/account/token/>
+3. Configure credentials:
+
+```bash
+cat > ~/.pypirc << 'EOF'
+[distutils]
+index-servers =
+    pypi
+    testpypi
+
+[testpypi]
+repository = https://test.pypi.org/legacy/
+username = __token__
+password = pypi-YOUR-TOKEN-HERE
+EOF
+
+chmod 600 ~/.pypirc
+```
+
+**Upload and test:**
+
+```bash
+# Upload to Test PyPI
+make release-test
+
+# Install from Test PyPI
+make release-test-install
+
+# Or manually
+pip install --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            bundlecraft
+
+# Verify it works
+bundlecraft --version
+```
+
+**Note:** `--extra-index-url` is needed because dependencies (click, cryptography, etc.) aren't on Test PyPI.
+
+#### Docker Testing (For Cross-Version Compatibility)
+
+```bash
+# Build first
+make build
+
+# Test on Python 3.9 (minimum supported)
+docker run --rm -v $(pwd)/dist:/dist python:3.9-slim bash -c \
+  "pip install /dist/bundlecraft-*.whl && bundlecraft --version"
+
+# Test on Python 3.11
+docker run --rm -v $(pwd)/dist:/dist python:3.11-slim bash -c \
+  "pip install /dist/bundlecraft-*.whl && bundlecraft --version"
+
+# Test on Python 3.12
+docker run --rm -v $(pwd)/dist:/dist python:3.12-slim bash -c \
+  "pip install /dist/bundlecraft-*.whl && bundlecraft --version"
+```
+
+#### Testing Strategy by Release Type
+
+**Patch Releases (v0.1.1 → v0.1.2):**
+
+```bash
+make test-install  # Quick smoke test sufficient
+```
+
+**Minor Releases (v0.1.0 → v0.2.0):**
+
+```bash
+make test-install          # Smoke test
+make release-test          # Test PyPI
+make release-test-install  # Verify install
+```
+
+**Major Releases (v0.x.x → v1.0.0):**
+
+```bash
+make test-install                  # Smoke test
+make release-test                  # Test PyPI
+make release-test-install          # Verify install
+# Docker tests across Python versions
+# Extensive manual testing
+```
+
+#### Common Testing Issues
+
+**Problem:** "make test-install" fails with "Could not find version"
+
+```bash
+# Solution: Ensure package is built
+make build
+ls -lh dist/  # Should see .whl and .tar.gz
+```
+
+**Problem:** Test PyPI upload fails with 403 Forbidden
+
+```bash
+# Solution: Check token in ~/.pypirc or regenerate token
+# Visit: https://test.pypi.org/manage/account/token/
+```
+
+**Problem:** Can't find package on Test PyPI after upload
+
+```bash
+# Solution: Wait 2-3 minutes for indexing, then try again
+```
+
+**Problem:** Version already exists on Test PyPI
+
+```bash
+# Solution: Test PyPI doesn't allow re-uploads
+# Either: commit a change to bump dev version
+# Or: Use a test suffix in pyproject.toml temporarily
+```
+
+### Release Security
+
+BundleCraft uses a **four-layer security model** for PyPI releases:
+
+```text
+Developer → Tag Push → Branch Protection → Environment Approval → Trusted Publishing → PyPI
+             (v0.2.0)   (Tests must pass)  (Human review)        (OIDC signature)    (Live)
+```
+
+#### Security Layers Explained
+
+##### Layer 1: Branch Protection
+
+- Prevents direct commits to `main`
+- Requires PR approval before merge
+- Requires tests to pass before merge
+- Ensures code review happens
+
+##### Layer 2: Tag Protection
+
+- Only maintainers can create `v*` tags
+- Prevents unauthorized releases
+- Tags trigger the release workflow
+
+##### Layer 3: Environment Approval
+
+- Human review required before PyPI publish
+- Reviewer checks version, tests, artifacts
+- Can cancel during review
+- 5-minute wait timer (optional grace period)
+
+##### Layer 4: Trusted Publishing (OIDC)
+
+- No API tokens needed
+- GitHub signs workflow identity
+- PyPI verifies signature
+- Can't be used outside specific workflow
+- Can't be stolen or leaked
+
+#### Initial Security Setup
+
+##### 1. Branch Protection (Settings → Branches → Add rule for `main`)
+
+```yaml
+✅ Require pull request before merging
+   └─ Require approvals: 1
+   └─ Dismiss stale approvals when new commits pushed
+
+✅ Require status checks to pass before merging
+   └─ Require branches to be up to date
+   Required checks:
+      - test / Run Tests
+      - test / Run linting
+
+✅ Require conversation resolution before merging
+
+✅ Do not allow bypassing the above settings
+
+✅ Restrict who can push to matching branches
+   └─ Only: Administrators, Maintainers
+```
+
+##### 2. Tag Protection (Settings → Tags → Add rule)
+
+```yaml
+Pattern: v*
+Who can create: Maintainers only
+```
+
+##### 3. Environment Protection (Settings → Environments → Create `release`)
+
+```yaml
+Environment name: release
+
+Protection rules:
+✅ Required reviewers: 1-2 trusted maintainers
+   Example: @maintainer1, @maintainer2
+
+✅ Wait timer: 5 minutes (optional - gives grace period to cancel)
+
+✅ Deployment branches and tags
+   Pattern: refs/tags/v*
+   (Only version tags can deploy)
+```
+
+##### 4. PyPI Trusted Publishing (<https://pypi.org/manage/account/publishing/>)
+
+```yaml
+Add a new publisher:
+  PyPI Project Name: bundlecraft
+  Owner: bundlecraft-io
+  Repository: bundlecraft
+  Workflow: release.yaml
+  Environment: release
+```
+
+After first release, the "pending" publisher becomes active.
+
+#### How Environment Approval Works
+
+```bash
+# 1. You push a tag
+git tag v0.2.0
+git push origin v0.2.0
+
+# 2. GitHub Actions starts:
+#    ✅ Runs tests
+#    ✅ Builds wheel and sdist
+#    ✅ Pauses at publish-pypi job
+
+# 3. GitHub notifies required reviewers
+
+# 4. Reviewer checks:
+#    - Version number correct? (v0.2.0)
+#    - Tests passed?
+#    - Build artifacts look good?
+#    - Changelog updated?
+#    - Ready for users?
+
+# 5. Reviewer clicks "Approve and deploy" in GitHub UI
+
+# 6. Publish proceeds to PyPI
+
+# 7. Verify on PyPI:
+#    https://pypi.org/project/bundlecraft/
+```
+
+#### How Trusted Publishing Works
+
+```text
+GitHub Actions Workflow
+         ↓
+Request OIDC token from GitHub
+         ↓
+GitHub signs token with identity:
+  - Repository: bundlecraft-io/bundlecraft
+  - Workflow: release.yaml
+  - Environment: release
+  - Tag: refs/tags/v0.2.0
+         ↓
+Send package + OIDC token to PyPI
+         ↓
+PyPI verifies signature matches trusted publisher
+         ↓
+✅ Publish succeeds (valid signature)
+❌ Publish fails (invalid/unauthorized)
+```
+
+**Security benefits:**
+
+- No API tokens to leak
+- No token rotation needed
+- Only works from specific workflow
+- Only works from specific repository
+- Only works from environment-protected jobs
+
+#### Workflow Security Features
+
+The `.github/workflows/release.yaml` includes:
+
+**Minimal Permissions:**
+
+```yaml
+permissions:
+  contents: write  # Only for GitHub releases
+  id-token: write  # Only for PyPI OIDC
+```
+
+**Tag Validation:**
+
+```yaml
+# Ensures only semantic versions are released
+if [[ ! "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+  exit 1
+fi
+```
+
+**Test Requirements:**
+
+```yaml
+publish-pypi:
+  needs: [test, build]  # Can't publish without passing tests
+```
+
+**Artifact Verification:**
+
+```yaml
+- name: Verify package
+  run: twine check dist/*
+```
+
+#### Emergency Procedures
+
+**To cancel a release:**
+
+1. **Before approval:** Don't approve the deployment (it will timeout)
+2. **During wait timer:** Click "Cancel deployment" in Actions UI
+3. **After PyPI publish:** ⚠️ Can't unpublish! Release patch version with fix
+
+**If malicious tag is pushed:**
+
+```bash
+# 1. Delete the tag immediately
+git tag -d v0.2.0              # Local
+git push origin :refs/tags/v0.2.0  # Remote
+
+# 2. Workflow will fail (no approval)
+
+# 3. Check audit logs
+# Settings → Security → Audit log
+# Filter: action:tag.create
+
+# 4. Review tag protection settings
+# Ensure only maintainers can create v* tags
+```
+
+#### Security Checklist
+
+**Before first release:**
+
+- [ ] Branch protection enabled on `main`
+- [ ] Tag protection enabled for `v*`
+- [ ] Environment `release` created
+- [ ] Required reviewers configured (1-2 maintainers)
+- [ ] Deployment branches set to `refs/tags/v*`
+- [ ] PyPI Trusted Publisher configured
+- [ ] Workflow references `environment: release`
+- [ ] Test with a test tag to verify setup
+
+**After each release:**
+
+- [ ] Package appears on PyPI
+- [ ] Installation works: `pip install bundlecraft==X.Y.Z`
+- [ ] GitHub Release created
+- [ ] Audit logs show no unexpected activity
+
+#### Security Best Practices
+
+**DO:**
+
+- ✅ Always release from `main` branch
+- ✅ Use semantic versioning (v1.0.0, v1.2.3)
+- ✅ Review diff before approving deployment
+- ✅ Test on Test PyPI for major releases
+- ✅ Document breaking changes
+- ✅ Keep reviewer list current
+
+**DON'T:**
+
+- ❌ Share API tokens (not needed!)
+- ❌ Bypass branch protection
+- ❌ Create release tags from feature branches
+- ❌ Approve without reviewing
+- ❌ Use non-semantic versions
 
 ______________________________________________________________________
 

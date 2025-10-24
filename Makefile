@@ -21,6 +21,8 @@ help: ## Show this help message
 	@echo ""
 	@echo "Available targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "For detailed documentation, see CONTRIBUTING.md"
 
 # Installation targets
 install: ## Install package in editable mode (development)
@@ -88,10 +90,43 @@ build-sdist: clean-build ## Build source distribution only
 verify-package: ## Verify built package with twine
 	$(TWINE) check $(DIST_DIR)/*
 
+# Local testing targets
+test-install: build ## Test installation from built wheel in isolated venv
+	@echo "Creating test environment..."
+	@rm -rf /tmp/test-bundlecraft-install
+	@$(PYTHON) -m venv /tmp/test-bundlecraft-install
+	@echo "Installing from wheel..."
+	@/tmp/test-bundlecraft-install/bin/pip install --quiet dist/*.whl
+	@echo "Testing installation..."
+	@/tmp/test-bundlecraft-install/bin/bundlecraft --version
+	@/tmp/test-bundlecraft-install/bin/python -c "import bundlecraft; print(f'✅ Successfully installed: {bundlecraft.__version__}')"
+	@echo "Cleaning up..."
+	@rm -rf /tmp/test-bundlecraft-install
+	@echo "✅ Package installs and imports correctly!"
+
+test-install-interactive: build ## Test installation interactively (venv stays open)
+	@echo "Creating test environment at /tmp/test-bundlecraft..."
+	@rm -rf /tmp/test-bundlecraft
+	@$(PYTHON) -m venv /tmp/test-bundlecraft
+	@/tmp/test-bundlecraft/bin/pip install --quiet dist/*.whl
+	@echo ""
+	@echo "✅ Test environment ready at: /tmp/test-bundlecraft"
+	@echo "To use it:"
+	@echo "  source /tmp/test-bundlecraft/bin/activate"
+	@echo "  bundlecraft --version"
+	@echo "  deactivate"
+	@echo ""
+	@echo "Clean up with: rm -rf /tmp/test-bundlecraft"
+
 # Release targets (use with caution!)
 release-test: build verify-package ## Build and upload to Test PyPI
-	@echo "Uploading to Test PyPI..."
+	@echo "📦 Uploading to Test PyPI..."
+	@echo "Install with: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ bundlecraft"
 	$(TWINE) upload --repository testpypi $(DIST_DIR)/*
+
+release-test-install: ## Install latest version from Test PyPI
+	@echo "Installing from Test PyPI..."
+	pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ bundlecraft
 
 release: build verify-package ## Build and upload to PyPI (PRODUCTION!)
 	@echo "⚠️  WARNING: This will upload to PRODUCTION PyPI!"
