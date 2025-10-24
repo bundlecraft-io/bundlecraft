@@ -307,37 +307,280 @@ ______________________________________________________________________
 
 ## 🚀 Release Process
 
-### **⚠️ Under Construction! 🛠️**
+This section covers the complete release process for BundleCraft, from development to PyPI publication.
 
-> **Note:** BundleCraft's release process is defined in `docs/adr-0006-corerelease.md`. The current CI workflow in `.github/workflows/bundlecraft.yaml` will become the basis for:
->
-> 1. A **GitHub template repo** for users to publish their own trust bundles
-> 1. A **bundlecraft-demo** repo with prebuilt certs and configs for quick evaluation
+### Development Workflow
 
-```text
-TODO: this will need to be expanded to cover:
-- The pytest suite that must succeed before merge
-- the bundlecraft image publishing process
-- the bundlecraft pypi package publishing process
-- the bundlecraft template publishing process
-```
-
-### For Maintainers: Creating a Release
-
-Releases are tag-driven and automated:
-
-- Ensure `main` is green and docs are updated
-- Create and push a tag:
+#### 1. Clone and Setup (First Time)
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+# Clone the repository
+git clone https://github.com/bundlecraft-io/bundlecraft.git
+cd bundlecraft
+
+# Install with all dependencies
+make install-all
+# OR manually: pip install -e ".[dev,fetchers]"
+
+# Verify installation
+bundlecraft --version
+make test
 ```
 
-- CI handles the rest:
-  - Builds OCI image and pushes to GHCR
-  - Publishes Python package to PyPI (via Trusted Publishing)
-  - Creates GitHub Release with artifacts and notes
+#### 2. Daily Development
+
+```bash
+# Create a feature branch
+git checkout -b feature/my-awesome-feature
+
+# Make your changes to code in bundlecraft/
+vim bundlecraft/builder.py
+
+# Changes are immediately active (editable install)
+bundlecraft build --env dev
+
+# Run tests
+make test
+
+# Format and lint
+make format
+make lint-fix
+
+# Run full QA pipeline
+make qa
+
+# Commit your changes
+git add .
+git commit -m "feat: add awesome feature"
+git push origin feature/my-awesome-feature
+```
+
+#### 3. Testing Changes
+
+**Using `pip install -e .` (Editable Mode) - For Development:**
+
+- Use this 99% of the time during development
+- Code changes are immediately reflected
+- No reinstall needed
+- Fast iteration
+
+```bash
+# Install once
+make install-dev
+
+# Edit, test, repeat - no reinstall needed!
+vim bundlecraft/cli.py
+bundlecraft --help  # Sees your changes immediately
+```
+
+**Using `python -m build` (Package Build) - For Release Testing:**
+
+- Use before creating releases
+- Tests what end users will actually get
+- Verifies packaging is correct
+
+```bash
+# Build the package
+make build
+
+# Verify it's correct
+make verify-package
+
+# Test installation in isolated environment
+python -m venv /tmp/test-env
+/tmp/test-env/bin/pip install dist/*.whl
+/tmp/test-env/bin/bundlecraft --version
+```
+
+### Package Building and Distribution
+
+#### Understanding the Build Artifacts
+
+When you run `make build`, you create two types of distributions:
+
+- **Wheel (`.whl`)** - Binary distribution
+
+  - Fast to install
+  - Platform-independent (pure Python)
+  - What most users install via `pip install bundlecraft`
+
+- **Source Distribution (`.tar.gz`)** - Source code
+
+  - Contains complete source code
+  - Users can inspect/audit the code
+  - Can rebuild on any platform
+  - Required for PyPI best practices
+  - Allows custom builds with specific Python versions
+
+#### Versioning with Git Tags
+
+BundleCraft uses **automatic versioning** from git tags via `hatch-vcs`:
+
+```bash
+# Check current version (from last tag + commits)
+make version
+# Output: Version: 0.1.2.dev1+g6efd343a2.d20251024
+
+# When you're ready to release:
+git tag v0.2.0
+
+# Now version becomes: 0.2.0 (clean release)
+make build
+```
+
+**Version Format Explained:**
+
+- On a tag: `0.2.0` (clean release version)
+- After a tag: `0.2.0.dev1+g<hash>.d<date>` (development version)
+- No tags: `0.0.0.dev0+g<hash>` (initial development)
+
+**Semantic Versioning:**
+
+- `v0.1.0` → `v0.1.1` - Patch (bug fixes)
+- `v0.1.0` → `v0.2.0` - Minor (new features, backward compatible)
+- `v0.1.0` → `v1.0.0` - Major (breaking changes)
+
+### Creating a Release
+
+#### Manual Release Process
+
+```bash
+# 1. Ensure main branch is clean and tests pass
+git checkout main
+git pull origin main
+make qa  # Run format, lint, test
+
+# 2. Create and push the version tag
+git tag -a v0.2.0 -m "Release v0.2.0"
+git push origin v0.2.0
+git push origin main
+
+# 3. Build distributions
+make build
+
+# 4. Verify package quality
+make verify-package
+# Should show: "PASSED" for both .whl and .tar.gz
+
+# 5. Test on Test PyPI (recommended first time)
+make release-test
+# Test install: pip install -i https://test.pypi.org/simple/ bundlecraft
+
+# 6. Release to production PyPI
+make release
+# WARNING: This is irreversible! Can't delete/re-upload same version.
+```
+
+#### Automated Release via GitHub Actions
+
+**Trigger:** Pushing a version tag (`v*`) to GitHub automatically:
+
+1. Runs the full test suite
+2. Builds wheel and source distributions
+3. Publishes to PyPI (via Trusted Publishing)
+4. Builds and pushes Docker image to GHCR
+5. Creates GitHub Release with artifacts
+
+**Setup Requirements:**
+
+```bash
+# Push a version tag to trigger release
+git tag v0.2.0
+git push origin v0.2.0
+
+# GitHub Actions will:
+# ✅ Run tests
+# ✅ Build package
+# ✅ Publish to PyPI
+# ✅ Create GitHub Release
+```
+
+**To enable automated PyPI publishing:**
+
+- Go to [PyPI Trusted Publishers](https://pypi.org/manage/account/publishing/)
+- Add GitHub as trusted publisher:
+
+  - Repository: `bundlecraft-io/bundlecraft`
+  - Workflow: `release.yml`
+  - Environment: `release` (optional but recommended)
+
+### Pre-Release Checklist
+
+Before creating a release, ensure:
+
+```bash
+# ✅ All tests pass
+make test
+
+# ✅ Code is formatted and linted
+make format
+make lint
+
+# ✅ Version bumped appropriately
+# Decide: patch (0.1.1), minor (0.2.0), or major (1.0.0)
+
+# ✅ CHANGELOG/docs updated (if applicable)
+
+# ✅ No uncommitted changes
+git status
+
+# ✅ On main branch
+git checkout main
+git pull
+
+# ✅ Package builds successfully
+make build
+
+# ✅ Package passes validation
+make verify-package
+```
+
+### Post-Release Verification
+
+```bash
+# Wait 2-5 minutes for PyPI to process
+
+# Test installation in clean environment
+python -m venv /tmp/verify-release
+source /tmp/verify-release/bin/activate
+pip install bundlecraft
+bundlecraft --version  # Should show your new version
+deactivate
+
+# Verify on PyPI
+# Visit: https://pypi.org/project/bundlecraft/
+```
+
+### Using the Makefile
+
+The included `Makefile` provides convenient shortcuts:
+
+```bash
+# Show all available commands
+make help
+
+# Development
+make install-dev        # Install for development
+make format             # Format code with black
+make lint               # Lint with ruff
+make test               # Run tests
+make qa                 # Format, lint, and test
+
+# Building
+make build              # Build wheel + sdist
+make verify-package     # Verify with twine
+
+# Releasing
+make release-test       # Upload to Test PyPI
+make release            # Upload to PyPI (production!)
+
+# Versioning
+make version            # Show current version
+make tag-version VERSION=0.2.0  # Create version tag
+
+# Cleaning
+make clean              # Remove build artifacts
+```
 
 See `docs/adr-0006-corerelease.md` for the full distribution strategy.
 
