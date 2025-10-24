@@ -1,11 +1,12 @@
 [project]
 name = "bundlecraft"
 dynamic = ["version"]
-description = "BundleCraft - A tool for configuring, building, and packaging PKI trust stores."
-readme = "README.md"
+description = "Modern tool for building and managing CA trust bundles across multiple formats and environments"
+readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "MIT" }
 requires-python = ">=3.9"
-authors = [{ name = "BundleCraft.io" }]
+authors = [{ name = "BundleCraft.io", email = "hello@bundlecraft.io" }]
+maintainers = [{ name = "BundleCraft.io", email = "hello@bundlecraft.io" }]
 keywords = ["pki", "certificates", "trust-store", "ca-bundle", "security", "cryptography"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -85,14 +86,64 @@ ignore = [
 target-version = ["py310"]
 line-length = 100
 
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--showlocals",
+]
+
+[tool.coverage.run]
+source = ["bundlecraft"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
 [tool.hatch.version]
 source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["bundlecraft"]
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/*.pyo",
+    "**/.DS_Store",
+]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "bundlecraft/*.py",
-    "README.md",
+    "/bundlecraft",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
 ]
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/*.pyo",
+    "**/.DS_Store",
+    "**/test_*.py",
+    "**/*_test.py",
+]
+
+[tool.hatch.build.hooks.vcs]
+version-file = "bundlecraft/_version.py"

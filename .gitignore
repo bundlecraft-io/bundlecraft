@@ -28,6 +28,9 @@ tmp*/
 */key.pem
 *.key
 
+# Build
+bundlecraft/_version.py
+
 ########################################
 # Python cache and bytecode
 ########################################
