@@ -519,8 +519,11 @@ def normalize_to_pem(
     # Normalize common aliases
     if fmt in {"pfx", "pkcs12"}:
         fmt = "p12"
-    if fmt in {"pkcs7"}:
+    if fmt in {"pkcs7", "p7c"}:
         fmt = "p7b"
+    # Many distros use .crt/.cer for PEM-encoded certs
+    if fmt in {"crt", "cer"}:
+        fmt = "pem"
 
     has_keys = False
 
