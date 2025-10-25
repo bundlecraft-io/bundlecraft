@@ -91,7 +91,7 @@ jobs:
           name: python-package-distributions
           path: dist/
   # The following jobs only run based on the determined release channel (main or pre-release branch)
-  # AND if a semantic version tag is pushed (e.g., v1.2.3) on those branches
+  # AND if a semantic version tag is pushed (e.g., v1.2.3) on those branches.
   publish-pypi:
     name: Publish to PyPI
     needs: [build, determine-channel]
