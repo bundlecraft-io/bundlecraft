@@ -1,6 +1,6 @@
 ---
-name: 📦 BundleCraft PyPi Release
-run-name: 'BundleCraft PyPi Release - ${{ github.ref_name }} - Run #${{ github.run_number }}'
+name: 📦 Release to PyPI
+run-name: 'Release ${{ github.ref_name }} - Run #${{ github.run_number }}'
 on:
   push:
     branches: [main, pre-release]
@@ -14,31 +14,33 @@ env:
   PRE_RELEASE_BRANCH: pre-release
 jobs:
   determine-channel:
-    name: Determine release channel
+    name: Determine Release Channel
     runs-on: ubuntu-latest
     outputs:
-      CHANNEL: ${{ steps.set.outputs.channel }}
+      channel: ${{ steps.check.outputs.channel }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Determine source branch for tag
-        id: set
-        env:
-          MAIN_BRANCH: ${{ env.MAIN_BRANCH }}
-          PRE_RELEASE_BRANCH: ${{ env.PRE_RELEASE_BRANCH }}
+      - name: Determine source branch
+        id: check
         run: |
           TAG_SHA=$(git rev-parse "$GITHUB_SHA")
-          git fetch origin +refs/heads/${MAIN_BRANCH}:refs/remotes/origin/${MAIN_BRANCH} || true
-          git fetch origin +refs/heads/${PRE_RELEASE_BRANCH}:refs/remotes/origin/${PRE_RELEASE_BRANCH} || true
-          if git merge-base --is-ancestor "$TAG_SHA" "origin/${MAIN_BRANCH}"; then
+
+          # Fetch both branches
+          git fetch origin +refs/heads/${{ env.MAIN_BRANCH }}:refs/remotes/origin/${{ env.MAIN_BRANCH }} || true
+          git fetch origin +refs/heads/${{ env.PRE_RELEASE_BRANCH }}:refs/remotes/origin/${{ env.PRE_RELEASE_BRANCH }} || true
+
+          # Check ancestry
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/${{ env.MAIN_BRANCH }}"; then
             echo "channel=prod" >> $GITHUB_OUTPUT
-          elif git merge-base --is-ancestor "$TAG_SHA" "origin/${PRE_RELEASE_BRANCH}"; then
+            echo "✅ Tag from main branch → Production PyPI"
+          elif git merge-base --is-ancestor "$TAG_SHA" "origin/${{ env.PRE_RELEASE_BRANCH }}"; then
             echo "channel=prerelease" >> $GITHUB_OUTPUT
+            echo "✅ Tag from pre-release branch → Test PyPI"
           else
-            echo "channel=invalid" >> $GITHUB_OUTPUT
-            echo "Tag is not reachable from ${MAIN_BRANCH} or ${PRE_RELEASE_BRANCH}"
+            echo "❌ Tag not from main or pre-release branch"
             exit 1
           fi
   test:
@@ -48,8 +50,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -60,20 +60,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
       - name: Run tests
-        run: |
-          pytest -v --cov=bundlecraft --cov-report=term
+        run: pytest -v --cov=bundlecraft --cov-report=term
       - name: Run linting
-        run: |
-          ruff check bundlecraft tests
+        run: ruff check bundlecraft tests
   build:
-    name: Build Distribution
+    name: Build Package
     needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for version detection
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -84,41 +82,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install build twine
       - name: Build package
-        run: |
-          python -m build
+        run: python -m build
       - name: Verify package
-        run: |
-          twine check dist/*
-      - name: Extract version from tag
-        id: version
-        run: |
-          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-      - name: Show build artifacts
-        run: |
-          ls -lh dist/
-          echo "Version: ${{ steps.version.outputs.VERSION }}"
+        run: twine check dist/*
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: python-package-distributions
           path: dist/
+  # The following jobs only run based on the determined release channel (main or pre-release branch)
+  # AND if a semantic version tag is pushed (e.g., v1.2.3) on those branches
   publish-pypi:
     name: Publish to PyPI
     needs: [build, determine-channel]
-    if: needs.determine-channel.outputs.CHANNEL == 'prod'
+    if: needs.determine-channel.outputs.channel == 'prod'
     runs-on: ubuntu-latest
     environment:
       name: release
       url: https://pypi.org/p/bundlecraft
     permissions:
-      id-token: write  # Required for trusted publishing
+      id-token: write
     steps:
-      - name: Verify tag format
-        run: |
-          if [[ ! "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
-            echo "Error: Tag must match semantic versioning (e.g., v1.0.0, v1.0.0-beta.1)"
-            exit 1
-          fi
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -132,7 +116,7 @@ jobs:
   publish-testpypi:
     name: Publish to Test PyPI
     needs: [build, determine-channel]
-    if: needs.determine-channel.outputs.CHANNEL == 'prerelease'
+    if: needs.determine-channel.outputs.channel == 'prerelease'
     runs-on: ubuntu-latest
     environment:
       name: release
@@ -140,12 +124,6 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - name: Verify tag format
-        run: |
-          if [[ ! "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
-            echo "Error: Tag must match semantic versioning (e.g., v1.0.0, v1.0.0-beta.1)"
-            exit 1
-          fi
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -171,41 +149,30 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
-      - name: Extract version and create release notes
-        id: release_info
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Create release notes
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          cat > release_notes.md << 'EOF'
+          ## Installation
+          ```bash
+          pip install bundlecraft==${{ steps.version.outputs.VERSION }}
+          ```
 
-          # Generate release notes
-          cat > release_notes.md << EOF
-          ## BundleCraft v$VERSION
-
-          ### Installation
-          \`\`\`bash
-          pip install bundlecraft==$VERSION
-          \`\`\`
-
-          ### Docker
-          \`\`\`bash
-          docker pull ghcr.io/bundlecraft-io/bundlecraft:v$VERSION
-          \`\`\`
-
-          ### What's Changed
-          See the [full changelog](https://github.com/bundlecraft-io/bundlecraft/compare/v$(git describe --tags --abbrev=0 HEAD^)...v$VERSION) for details.
-
-          ### Package Contents
-          - \`bundlecraft-${VERSION}-py3-none-any.whl\` - Wheel distribution
-          - \`bundlecraft-${VERSION}.tar.gz\` - Source distribution
+          ## Package Contents
+          - `bundlecraft-${{ steps.version.outputs.VERSION }}-py3-none-any.whl` - Wheel distribution
+          - `bundlecraft-${{ steps.version.outputs.VERSION }}.tar.gz` - Source distribution
           EOF
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: ncipollo/release-action@v1
         with:
-          files: dist/*
-          body_path: release_notes.md
-          draft: false
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-          generate_release_notes: true
+          tag: ${{ github.ref_name }}
+          bodyFile: release_notes.md
+          artifacts: dist/*
+          allowUpdates: true
+          makeLatest: true
+          generateReleaseNotes: true
   github-prerelease:
     name: Create GitHub Pre-Release
     needs: publish-testpypi
@@ -220,31 +187,32 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
-      - name: Extract version and create pre-release notes
-        id: release_info_pr
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Create pre-release notes
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          cat > release_notes_pr.md << EOF
-          ## BundleCraft v$VERSION (Pre-release)
+          cat > release_notes.md << 'EOF'
+          ## Pre-Release - Test PyPI Only
 
-          ### Install from Test PyPI
+          ### Installation
           ```bash
           pip install --index-url https://test.pypi.org/simple/ \
                       --extra-index-url https://pypi.org/simple/ \
-                      bundlecraft==$VERSION
+                      bundlecraft==${{ steps.version.outputs.VERSION }}
           ```
           EOF
       - name: Create GitHub Pre-Release
-        uses: softprops/action-gh-release@v1
+        uses: ncipollo/release-action@v1
         with:
-          files: dist/*
-          body_path: release_notes_pr.md
-          draft: false
+          tag: ${{ github.ref_name }}
+          bodyFile: release_notes.md
+          artifacts: dist/*
+          allowUpdates: true
           prerelease: true
-          generate_release_notes: true
+          generateReleaseNotes: true
   verify-release:
-    name: Verify Release
+    name: Verify PyPI Release
     needs: publish-pypi
     runs-on: ubuntu-latest
     steps:
@@ -252,24 +220,19 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Wait for PyPI to process
+      - name: Wait for PyPI indexing
         run: sleep 60
       - name: Extract version
         id: version
-        run: |
-          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       - name: Install from PyPI
-        run: |
-          pip install bundlecraft==${{ steps.version.outputs.VERSION }}
+        run: pip install bundlecraft==${{ steps.version.outputs.VERSION }}
       - name: Verify installation
         run: |
           bundlecraft --version
-          python -c "import bundlecraft; print(f'Installed version: {bundlecraft.__version__}')"
-      - name: Test basic functionality
-        run: |
           bundlecraft --help
   verify-testpypi:
-    name: Verify Test PyPI
+    name: Verify Test PyPI Release
     needs: publish-testpypi
     runs-on: ubuntu-latest
     steps:
@@ -277,21 +240,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Wait for Test PyPI to process
+      - name: Wait for Test PyPI indexing
         run: sleep 60
       - name: Extract version
-        id: version_pr
-        run: |
-          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       - name: Install from Test PyPI
         run: |
           pip install --index-url https://test.pypi.org/simple/ \
                       --extra-index-url https://pypi.org/simple/ \
-                      bundlecraft==${{ steps.version_pr.outputs.VERSION }}
+                      bundlecraft==${{ steps.version.outputs.VERSION }}
       - name: Verify installation
-        run: |
-          bundlecraft --version
-          python -c "import bundlecraft; print(f'Installed version: {bundlecraft.__version__}')"
-      - name: Test basic functionality
         run: |-
+          bundlecraft --version
           bundlecraft --help
