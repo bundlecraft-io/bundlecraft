@@ -39,7 +39,7 @@ jobs:
             echo "channel=prod" >> $GITHUB_OUTPUT
             echo "✅ Tag from main branch → Production PyPI"
           elif git merge-base --is-ancestor "$TAG_SHA" "origin/${{ env.PRE_RELEASE_BRANCH }}"; then
-            echo "channel=prerelease" >> $GITHUB_OUTPUT
+            echo "channel=pre-release" >> $GITHUB_OUTPUT
             echo "✅ Tag from pre-release branch → Test PyPI"
           else
             echo "❌ Tag not from main or pre-release branch"
@@ -53,12 +53,12 @@ jobs:
             echo "❌ Invalid production tag: $TAG. Expected vMAJOR.MINOR.PATCH (e.g., v1.2.3)."
             exit 1
           fi
-      - name: Validate prerelease tag format (vMAJOR.MINOR.PATCH-(alpha|beta).N)
-        if: steps.check.outputs.channel == 'prerelease'
+      - name: Validate pre-release tag format (vMAJOR.MINOR.PATCH-(alpha|beta).N)
+        if: steps.check.outputs.channel == 'pre-release'
         run: |
           TAG="${GITHUB_REF_NAME}"
           if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta)\.[0-9]+$ ]]; then
-            echo "❌ Invalid prerelease tag: $TAG. Expected vMAJOR.MINOR.PATCH-(alpha|beta).N (e.g., v1.2.3-beta.1)."
+            echo "❌ Invalid pre-release tag: $TAG. Expected vMAJOR.MINOR.PATCH-(alpha|beta).N (e.g., v1.2.3-beta.1)."
             exit 1
           fi
   test:
@@ -170,7 +170,7 @@ jobs:
     name: Build Container Image (Test)
     needs: [test, determine-channel]
     runs-on: ubuntu-latest
-    if: needs.determine-channel.outputs.channel == 'prerelease' && startsWith(github.ref,
+    if: needs.determine-channel.outputs.channel == 'pre-release' && startsWith(github.ref,
       'refs/tags/v')
     permissions:
       packages: write
@@ -208,7 +208,7 @@ jobs:
             type=semver,pattern={{version}},value=${{ steps.version.outputs.VERSION }}
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.VERSION }}
             type=semver,pattern={{major}},value=${{ steps.version.outputs.VERSION }}
-            type=raw,value=latest,enable=${{ needs.determine-channel.outputs.channel == 'prerelease' }}
+            type=raw,value=latest,enable=${{ needs.determine-channel.outputs.channel == 'pre-release' }}
       - name: Build and push
         id: build
         uses: docker/build-push-action@v5
@@ -248,7 +248,7 @@ jobs:
   publish-testpypi:
     name: Publish to Test PyPI
     needs: [build, determine-channel]
-    if: needs.determine-channel.outputs.channel == 'prerelease' && startsWith(github.ref,
+    if: needs.determine-channel.outputs.channel == 'pre-release' && startsWith(github.ref,
       'refs/tags/v')
     runs-on: ubuntu-latest
     environment:
@@ -354,7 +354,7 @@ jobs:
           skipIfReleaseExists: true
           makeLatest: true
           generateReleaseNotes: true
-  github-prerelease:
+  github-pre-release:
     name: Create GitHub Pre-Release
     needs: [publish-testpypi, publish-gcr-test]
     runs-on: ubuntu-latest
