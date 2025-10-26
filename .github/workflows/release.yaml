@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write  # For creating GitHub releases
   id-token: write  # For PyPI trusted publishing
+  packages: write  # For pushing to GitHub Container Registry
 env:
   MAIN_BRANCH: main
   PRE_RELEASE_BRANCH: pre-release
@@ -90,6 +91,111 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
+  # Build and push container images to GHCR
+  build-image:
+    name: Build Container Image
+    needs: [test, determine-channel]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.VERSION }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.VERSION }}
+            type=semver,pattern={{major}},value=${{ steps.version.outputs.VERSION }}
+            type=raw,value=latest,enable=${{ needs.determine-channel.outputs.channel == 'prod' }}
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            HATCH_BUILD_VERSION=${{ steps.version.outputs.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  build-image-test:
+    name: Build Test Container Image
+    needs: [test, determine-channel]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}-test
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.VERSION }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.VERSION }}
+            type=semver,pattern={{major}},value=${{ steps.version.outputs.VERSION }}
+            type=raw,value=latest,enable=${{ needs.determine-channel.outputs.channel == 'prerelease' }}
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            HATCH_BUILD_VERSION=${{ steps.version.outputs.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
   # The following jobs only run based on the determined release channel (main or pre-release branch)
   # AND if a semantic version tag (e.g., v1.2.3) is pushed  on those branches to mark an official release.
   publish-pypi:
@@ -137,9 +243,37 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
           verbose: true
           print-hash: true
+  publish-gcr:
+    name: Publish to GHCR (Production)
+    needs: [build-image, determine-channel]
+    if: needs.determine-channel.outputs.channel == 'prod' && startsWith(github.ref,
+      'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Image published
+        run: |
+          echo "✅ Production image published to GHCR"
+          echo "Image: ${{ needs.build-image.outputs.image-tag }}"
+          echo "Digest: ${{ needs.build-image.outputs.image-digest }}"
+  publish-gcr-test:
+    name: Publish to GHCR (Test)
+    needs: [build-image-test, determine-channel]
+    if: needs.determine-channel.outputs.channel == 'prerelease' && startsWith(github.ref,
+      'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Image published
+        run: |
+          echo "✅ Test image published to GHCR"
+          echo "Image: ${{ needs.build-image-test.outputs.image-tag }}"
+          echo "Digest: ${{ needs.build-image-test.outputs.image-digest }}"
   github-release:
     name: Create GitHub Release
-    needs: publish-pypi
+    needs: [publish-pypi, publish-gcr]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -158,8 +292,17 @@ jobs:
         run: |
           cat > release_notes.md << 'EOF'
           ## Installation
+
+          ### Python Package
           ```bash
           pip install bundlecraft==${{ steps.version.outputs.VERSION }}
+          ```
+
+          ### Container Image
+          ```bash
+          docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
+          # or
+          podman pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
           ```
 
           ## Package Contents
@@ -177,7 +320,7 @@ jobs:
           generateReleaseNotes: true
   github-prerelease:
     name: Create GitHub Pre-Release
-    needs: publish-testpypi
+    needs: [publish-testpypi, publish-gcr-test]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -197,11 +340,18 @@ jobs:
           cat > release_notes.md << 'EOF'
           ## Pre-Release - Test PyPI Only
 
-          ### Installation
+          ### Python Package
           ```bash
           pip install --index-url https://test.pypi.org/simple/ \
                       --extra-index-url https://pypi.org/simple/ \
                       bundlecraft==${{ steps.version.outputs.VERSION }}
+          ```
+
+          ### Container Image (Test)
+          ```bash
+          docker pull ghcr.io/${{ github.repository }}-test:${{ steps.version.outputs.VERSION }}
+          # or
+          podman pull ghcr.io/${{ github.repository }}-test:${{ steps.version.outputs.VERSION }}
           ```
           EOF
       - name: Create GitHub Pre-Release

@@ -39,7 +39,30 @@ from bundlecraft.helpers.utils import ensure_dir, load_yaml, sha256_file
 # Path constants
 # ---------------------------------------------------------------------
 CURRENT_DIR = Path(__file__).resolve().parent
-ROOT = CURRENT_DIR.parent
+
+
+def _detect_workspace_root() -> Path:
+    """Determine the workspace root for configs and sources.
+
+    Priority:
+      1) BUNDLECRAFT_WORKSPACE environment variable, if set and exists
+      2) Current working directory if it looks like a BundleCraft workspace (has config/)
+      3) Package repo root (parent of this file) as a final fallback (dev/editable installs)
+    """
+    import os as _os
+
+    env_root = _os.environ.get("BUNDLECRAFT_WORKSPACE")
+    if env_root:
+        p = Path(env_root).expanduser().resolve()
+        if p.exists():
+            return p
+    cwd = Path.cwd().resolve()
+    if (cwd / "config").exists():
+        return cwd
+    return CURRENT_DIR.parent
+
+
+ROOT = _detect_workspace_root()
 CONFIG_DIR = ROOT / "config"
 SOURCES_DIR = ROOT / "cert_sources"
 STAGED_DIR = SOURCES_DIR / "staged"
