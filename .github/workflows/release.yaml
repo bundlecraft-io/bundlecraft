@@ -1,9 +1,8 @@
 ---
 name: 📦 BundleCraft Release
-run-name: 'Release ${{ github.ref_name }} on branch ${{ github.ref }} - Run #${{ github.run_number }}'
+run-name: 'Release ${{ github.ref_name }} - Run #${{ github.run_number }}'
 on:
   push:
-    branches: [main, pre-release]
     tags:
       - v*  # Trigger on version tags like v0.1.0, v0.2.0, etc.
 permissions:
@@ -23,6 +22,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
           fetch-depth: 0
       - name: Determine source branch
         id: check
@@ -72,6 +73,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
           fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -107,6 +110,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
           fetch-depth: 0
       - name: Extract version
         id: version
@@ -160,6 +165,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
           fetch-depth: 0
       - name: Extract version
         id: version
