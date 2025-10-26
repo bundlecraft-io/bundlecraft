@@ -86,7 +86,7 @@ output_formats:
   - jks
   - p12
 package: true
-build_path: dist/test-inline/
+build_path: dist/.test-inline/
 verify:
   fail_on_expired: false
 filters:
