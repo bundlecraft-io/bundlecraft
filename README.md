@@ -270,7 +270,7 @@ System dependencies
 
 ```bash
 # Required for conversions and verification
-sudo apt-get install openssl openjdk-17-jre-headless  # (for keytool)
+sudo apt-get install openssl openjdk-21-jdk-headless  # (for keytool)
 
 # Optional: jq (required for scripts/json-output-examples.sh)
 sudo apt-get install jq
