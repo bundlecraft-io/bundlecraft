@@ -365,11 +365,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: python-package-distributions
-          path: dist/
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
@@ -406,16 +401,31 @@ jobs:
           podman pull ghcr.io/${{ github.repository }}-test:${{ steps.version.outputs.VERSION }}
           ```
           EOF
-      - name: Create GitHub Pre-Release
-        uses: ncipollo/release-action@v1
+      - name: Create Draft Release
+        id: create_draft_release
+        uses: softprops/action-gh-release@v1
         with:
-          tag: ${{ github.ref_name }}
-          bodyFile: release_notes.md
-          artifacts: dist/*
-          allowUpdates: true
-          skipIfReleaseExists: true
+          tag_name: ${{ github.ref_name }}
+          name: BundleCraft Pre-Release ${{ github.ref_name }}
+          body: release_notes.md
           prerelease: true
-          generateReleaseNotes: true
+          generate_release_notes: true
+          draft: true  # Create as a draft initially
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*
+      - name: Publish Release
+        uses: softprops/action-gh-release@v1
+        id: create_release
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: BundleCraft Pre-Release ${{ github.ref_name }}
+          body: release_notes.md
+          prerelease: true
+          generate_release_notes: true
+          draft: false  # Publish real release
   verify-release:
     name: Verify PyPI Release
     needs: publish-pypi
