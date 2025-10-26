@@ -4,10 +4,13 @@ IMAGE_NAME ?= bundlecraft
 IMAGE_TAG ?= local
 IMAGE_REF ?= localhost/$(IMAGE_NAME):$(IMAGE_TAG)
 
-# Optional: reference to the published test image on GHCR
-GHCR_IMAGE ?= ghcr.io/bundlecraft-io/bundlecraft-test
-GHCR_TAG ?= latest
-GHCR_IMAGE_REF ?= $(GHCR_IMAGE):$(GHCR_TAG)
+# Workspace and quick-test credentials
+BUNDLECRAFT_WORKSPACE ?= $(CURDIR)
+TRUST_JKS_PASSWORD ?= changeit
+TRUST_P12_PASSWORD ?= changeit
+
+# Temp venv for testing built wheels
+TMP_VENV ?= .tmp/pypi-test-venv
 
 # Release helpers: derive version from latest git tag
 # - GIT_TAG is used as the image tag (e.g. v1.2.3)
@@ -16,68 +19,146 @@ GIT_TAG ?= $(shell git describe --tags --abbrev=0 2>/dev/null)
 VERSION ?= $(shell echo "$(GIT_TAG)" | sed 's/^v//')
 RELEASE_IMAGE_REF ?= localhost/$(IMAGE_NAME):$(GIT_TAG)
 
-.PHONY: test-image release-image test-image-run test-image-build-dev test-image-verify-dev \
-	ghcr-test-image-run ghcr-test-image-build-dev ghcr-test-image-verify-dev help
+.PHONY: \
+	build-image build-test-image build-pypi build-test-pypi \
+	test-image-version test-image-build test-image-run \
+	test-pypi-version test-pypi-build test-pypi-run \
+	ci-install-dev ci-test ci-lint \
+	help
 
 help:
 	@echo "Container targets:"
-	@echo "  release-image           Build image using latest git tag (HATCH_BUILD_VERSION from tag)"
-	@echo "  test-image              Build image tagged 'local' with HATCH_BUILD_VERSION=0.0.0+local"
-	@echo "  test-image-run          Show bundlecraft --version using test image"
-	@echo "  test-image-build-dev    Build dev bundles in container using test image"
-	@echo "  test-image-verify-dev   Verify dev bundles in container using test image"
-	@echo "  ghcr-test-image-run     Run GHCR test image (default: $(GHCR_IMAGE_REF)) --version"
-	@echo "  ghcr-test-image-build-dev  Build dev bundles using GHCR test image (mounts PWD)"
-	@echo "  ghcr-test-image-verify-dev Verify dev bundles using GHCR test image"
+	@echo "  build-image             Build image using latest git tag (HATCH_BUILD_VERSION from tag)"
+	@echo "  build-test-image        Build image tagged 'local' with HATCH_BUILD_VERSION=0.0.0+local"
+	@echo "  test-image-version      Run 'bundlecraft --version' using built image"
+	@echo "  test-image-build        Prepare configs, build + verify in container, cleanup"
+	@echo "  test-image-run          Same setup, but runs your args: make test-image-run BUNDLECRAFT_ARGS='build --env dev'"
+	@echo "PyPI targets:"
+	@echo "  build-pypi              Build wheel + sdist using latest git tag"
+	@echo "  build-test-pypi         Build wheel + sdist with version 0.0.0+local"
+	@echo "  test-pypi-version       Create temp venv, install built wheel, print version"
+	@echo "  test-pypi-build         Prepare configs, install built wheel, build + verify, cleanup"
+	@echo "  test-pypi-run           Same setup, but runs your args: make test-pypi-run BUNDLECRAFT_ARGS='build --env dev'"
+	@echo "CI helpers:"
+	@echo "  ci-install-dev          Install dev dependencies for CI"
+	@echo "  ci-test                 Run pytest with coverage for CI"
+	@echo "  ci-lint                 Run ruff linting for CI"
 
-test-image:
+build-test-image:
 	$(CONTAINER) build --build-arg HATCH_BUILD_VERSION=$(HATCH_BUILD_VERSION) -t $(IMAGE_REF) .
 
 # Build a release image tagged with the latest git tag.
 # - Uses $(GIT_TAG) for the image tag.
 # - Uses $(VERSION) (without leading 'v') for HATCH_BUILD_VERSION inside the wheel.
-release-image:
+build-image:
 	@test -n "$(GIT_TAG)" || (echo "No git tag found. Create a tag (e.g. v1.2.3) or call: make release-image GIT_TAG=v1.2.3" >&2; exit 1)
 	$(CONTAINER) build \
 	  --build-arg HATCH_BUILD_VERSION=$(VERSION) \
 	  -t $(RELEASE_IMAGE_REF) \
 	  .
 
-test-image-run: image
+test-image-version: build-test-image
 	$(CONTAINER) run --rm $(IMAGE_REF) --version
 
-test-image-build-dev: image
+test-image-build: build-test-image
+	@set -e; \
+	BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh; \
+	trap 'BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh --cleanup' EXIT; \
 	$(CONTAINER) run --rm \
 	  --userns=keep-id \
-	  -v "$(CURDIR):/workspace:Z" \
+	  -e BUNDLECRAFT_WORKSPACE=/workspace \
+	  -e TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" \
+	  -e TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
+	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace:Z" \
 	  -w /workspace \
 	  $(IMAGE_REF) \
-	  build --env dev --verbose --force
-
-test-image-verify-dev: image
+	  build --env test-example-envconfig --verbose --force; \
 	$(CONTAINER) run --rm \
 	  --userns=keep-id \
-	  -v "$(CURDIR):/workspace:Z" \
+	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace:Z" \
 	  -w /workspace \
 	  $(IMAGE_REF) \
-	  verify --target dist/dev/custom/internal --verify-all
+	  verify --target dist/.test-inline/test-inline --verify-all
 
-# --- GHCR test image helpers ---
-ghcr-test-image-run:
-	$(CONTAINER) run --rm $(GHCR_IMAGE_REF) --version
-
-ghcr-test-image-build-dev:
+test-image-run: build-test-image
+	@set -e; \
+	BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh; \
+	trap 'BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh --cleanup' EXIT; \
+	if [ -z "$(BUNDLECRAFT_ARGS)" ]; then \
+	  echo "Usage: make test-image-run BUNDLECRAFT_ARGS='build --env dev --verbose'" >&2; \
+	  exit 2; \
+	fi; \
 	$(CONTAINER) run --rm \
 	  --userns=keep-id \
-	  -v "$(CURDIR):/workspace:Z" \
+	  -e BUNDLECRAFT_WORKSPACE=/workspace \
+	  -e TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" \
+	  -e TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
+	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace:Z" \
 	  -w /workspace \
-	  $(GHCR_IMAGE_REF) \
-	  build --env dev --verbose --force
+	  $(IMAGE_REF) \
+	  $(BUNDLECRAFT_ARGS)
 
-ghcr-test-image-verify-dev:
-	$(CONTAINER) run --rm \
-	  --userns=keep-id \
-	  -v "$(CURDIR):/workspace:Z" \
-	  -w /workspace \
-	  $(GHCR_IMAGE_REF) \
-	  verify --target dist/dev/custom/internal --verify-all
+# ---- PyPI build/test helpers ----
+build-pypi:
+	rm -rf dist && mkdir -p dist
+	@test -n "$(GIT_TAG)" || (echo "No git tag found. Create a tag (e.g. v1.2.3) or call: make build-pypi GIT_TAG=v1.2.3" >&2; exit 1)
+	HATCH_BUILD_VERSION=$(VERSION) \
+	SETUPTOOLS_SCM_PRETEND_VERSION=$(VERSION) \
+	SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BUNDLECRAFT=$(VERSION) \
+	  python -m build
+	python -m pip install --no-input --quiet --upgrade twine
+	twine check dist/*
+
+build-test-pypi:
+	rm -rf dist && mkdir -p dist
+	HATCH_BUILD_VERSION=0.0.0+local \
+	SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0+local \
+	SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BUNDLECRAFT=0.0.0+local \
+	  python -m build
+	python -m pip install --no-input --quiet --upgrade twine
+	twine check dist/*
+
+test-pypi-version: build-test-pypi
+	@set -e; \
+	rm -rf "$(TMP_VENV)"; python -m venv "$(TMP_VENV)"; \
+	. "$(TMP_VENV)/bin/activate"; pip install -U pip; pip install dist/*.whl; \
+	bundlecraft --version; \
+	deactivate; rm -rf "$(TMP_VENV)"
+
+test-pypi-build: build-test-pypi
+	@set -e; \
+	BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh; \
+	trap 'BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh --cleanup; rm -rf "$(TMP_VENV)"' EXIT; \
+	rm -rf "$(TMP_VENV)"; python -m venv "$(TMP_VENV)"; \
+	. "$(TMP_VENV)/bin/activate"; pip install -U pip; pip install dist/*.whl; \
+	BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" \
+	TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
+	  bundlecraft build --env test-example-envconfig --verbose --force; \
+	bundlecraft verify --target dist/.test-inline/test-inline --verify-all; \
+	deactivate
+
+test-pypi-run: build-test-pypi
+	@set -e; \
+	BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh; \
+	trap 'BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh --cleanup; rm -rf "$(TMP_VENV)"' EXIT; \
+	if [ -z "$(BUNDLECRAFT_ARGS)" ]; then \
+	  echo "Usage: make test-pypi-run BUNDLECRAFT_ARGS='build --env dev --verbose'" >&2; \
+	  exit 2; \
+	fi; \
+	rm -rf "$(TMP_VENV)"; python -m venv "$(TMP_VENV)"; \
+	. "$(TMP_VENV)/bin/activate"; pip install -U pip; pip install dist/*.whl; \
+	BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" \
+	TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
+	  bundlecraft $(BUNDLECRAFT_ARGS); \
+	deactivate
+
+# ---- CI helpers ----
+ci-install-dev:
+	python -m pip install --upgrade pip
+	pip install -e ".[dev]"
+
+ci-test:
+	pytest -v --cov=bundlecraft --cov-report=term
+
+ci-lint:
+	ruff check bundlecraft tests
