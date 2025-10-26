@@ -365,14 +365,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Extract version
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: python-package-distributions
           path: dist/
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       - name: Normalize PEP 440 version
         id: norm
         shell: bash
@@ -407,20 +407,21 @@ jobs:
           ```
           EOF
       - name: Create GitHub Pre-Release
-        uses: softprops/action-gh-release@v1
         id: create_release
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: ${{ github.ref_name }}
           name: BundleCraft Pre-Release ${{ github.ref_name }}
-          body_path: release_notes.md
+          tag: ${{ github.ref_name }}
+          bodyFile: release_notes.md
+          allowUpdates: true
+          immutableCreate: true
+          skipIfReleaseExists: true
           prerelease: true
-          generate_release_notes: true
-          draft: false
-          files: |
-            dist/*
+          generateReleaseNotes: true
+          artifacts: dist/*
       - name: Display Release URL in Summary
         run: |
-          echo "::notice file=release_url.md::Release URL: ${{ steps.create_release.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "::notice file=release_url.md::Release URL: ${{ steps.create_release.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
   verify-release:
     name: Verify PyPI Release
     needs: publish-pypi
