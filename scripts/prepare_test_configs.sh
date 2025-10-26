@@ -9,8 +9,8 @@ WORKSPACE="${BUNDLECRAFT_WORKSPACE:-$PWD}"
 CONFIG_DIR="$WORKSPACE/config"
 SOURCES_DIR="$CONFIG_DIR/sources"
 ENVS_DIR="$CONFIG_DIR/envs"
-SOURCE_FILE="$SOURCES_DIR/test-example-sourcecfg.yaml"
-ENV_FILE="$ENVS_DIR/test-example-envconfig.yaml"
+SOURCE_FILE="$SOURCES_DIR/.test-example-sourcecfg.yaml"
+ENV_FILE="$ENVS_DIR/.test-example-envconfig.yaml"
 
 ROOT_PEM="-----BEGIN CERTIFICATE-----
 MIIBszCCAVmgAwIBAgIUQW1QkQw1QkQw1QkQw1QkQw1QkQw1QwDQYJKoZIhvcNAQEL

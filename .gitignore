@@ -7,6 +7,8 @@ cert_sources/fetched/
 cert_sources/staged/
 build*/
 dist*/
+config/envs/.test-example-envconfig.yaml
+config/sources/.test-example-sourcecfg.yaml
 
 # Personal/local test folders
 personal*/
