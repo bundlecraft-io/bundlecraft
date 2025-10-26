@@ -1,6 +1,6 @@
 ---
-name: 📦 Release to PyPI
-run-name: 'Release ${{ github.ref_name }} - Run #${{ github.run_number }}'
+name: 📦 BundleCraft Release
+run-name: 'Release ${{ github.ref_name }} on branch ${{ github.ref }} - Run #${{ github.run_number }}'
 on:
   push:
     branches: [main, pre-release]
@@ -93,10 +93,11 @@ jobs:
           path: dist/
   # Build and push container images to GHCR
   build-image:
-    name: Build Container Image
+    name: Build Container Image (Production)
     needs: [test, determine-channel]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.determine-channel.outputs.channel == 'prod' && startsWith(github.ref,
+      'refs/tags/v')
     permissions:
       packages: write
     outputs:
@@ -145,10 +146,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
   build-image-test:
-    name: Build Test Container Image
+    name: Build Container Image (Test)
     needs: [test, determine-channel]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.determine-channel.outputs.channel == 'prerelease' && startsWith(github.ref,
+      'refs/tags/v')
     permissions:
       packages: write
     outputs:
@@ -246,8 +248,6 @@ jobs:
   publish-gcr:
     name: Publish to GHCR (Production)
     needs: [build-image, determine-channel]
-    if: needs.determine-channel.outputs.channel == 'prod' && startsWith(github.ref,
-      'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -260,8 +260,6 @@ jobs:
   publish-gcr-test:
     name: Publish to GHCR (Test)
     needs: [build-image-test, determine-channel]
-    if: needs.determine-channel.outputs.channel == 'prerelease' && startsWith(github.ref,
-      'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       packages: write
