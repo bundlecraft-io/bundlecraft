@@ -324,6 +324,25 @@ jobs:
             PEP440_VERSION="${base}${suf}${num}"
           fi
           echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${{ github.ref_name }}$" | head -n1)
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, using initial commit"
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "Generating changelog from $PREV_TAG to ${{ github.ref_name }}"
+
+          # Generate changelog
+          {
+            echo "## What's Changed"
+            echo ""
+            git log ${PREV_TAG}..${{ github.ref_name }} --pretty=format:"- %s (%h)" --no-merges
+          } > changelog.md
+          echo "Changelog generated"
       - name: Create release notes
         run: |
           cat > release_notes.md << 'EOF'
@@ -345,6 +364,9 @@ jobs:
           - `bundlecraft-${{ steps.norm.outputs.PEP440_VERSION }}-py3-none-any.whl` - Wheel distribution
           - `bundlecraft-${{ steps.norm.outputs.PEP440_VERSION }}.tar.gz` - Source distribution
           EOF
+
+          # Append changelog
+          cat changelog.md >> release_notes.md
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
@@ -387,6 +409,25 @@ jobs:
             PEP440_VERSION="${base}${suf}${num}"
           fi
           echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${{ github.ref_name }}$" | head -n1)
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, using initial commit"
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "Generating changelog from $PREV_TAG to ${{ github.ref_name }}"
+
+          # Generate changelog
+          {
+            echo "## What's Changed"
+            echo ""
+            git log ${PREV_TAG}..${{ github.ref_name }} --pretty=format:"- %s (%h)" --no-merges
+          } > changelog.md
+          echo "Changelog generated"
       - name: Create pre-release notes
         run: |
           cat > release_notes.md << 'EOF'
@@ -406,6 +447,9 @@ jobs:
           podman pull ghcr.io/${{ github.repository }}-test:${{ steps.version.outputs.VERSION }}
           ```
           EOF
+
+          # Append changelog
+          cat changelog.md >> release_notes.md
       - name: Create GitHub Pre-Release
         id: create_release
         uses: ncipollo/release-action@v1
@@ -414,7 +458,7 @@ jobs:
           tag: ${{ github.ref_name }}
           bodyFile: release_notes.md
           allowUpdates: true
-          immutableCreate: true
+          immutableCreate: true  # actionlint: ignore [action]
           skipIfReleaseExists: true
           prerelease: true
           generateReleaseNotes: true

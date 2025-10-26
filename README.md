@@ -677,6 +677,12 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
+## 📋 Changelog
+
+See [CHANGELOG.md](https://github.com/bundlecraft-io/bundlecraft/blob/main/CHANGELOG.md) for release history and what's changed between versions.
+
+______________________________________________________________________
+
 ## 🏷️ Tags & Metadata
 
 - **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, openssl, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, keytool, certificates, pki-tools
