@@ -444,6 +444,8 @@ jobs:
             PEP440_VERSION="${base}${suf}${num}"
           fi
           echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
+      - name: Update pip
+        run: pip install --upgrade pip
       - name: Install from PyPI
         run: pip install bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }}
       - name: Verify installation
@@ -460,7 +462,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Wait for Test PyPI indexing
-        run: sleep 60
+        run: sleep 90
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
@@ -478,6 +480,8 @@ jobs:
             PEP440_VERSION="${base}${suf}${num}"
           fi
           echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
+      - name: Update pip
+        run: pip install --upgrade pip
       - name: Install from Test PyPI
         run: |
           pip install --index-url https://test.pypi.org/simple/ \
