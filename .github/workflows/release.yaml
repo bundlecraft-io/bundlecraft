@@ -462,25 +462,11 @@ jobs:
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-      - name: Normalize PEP 440 version
-        id: norm
-        shell: bash
-        run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          PEP440_VERSION="$VERSION"
-          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
-            base="${BASH_REMATCH[1]}"
-            pre="${BASH_REMATCH[2]}"
-            num="${BASH_REMATCH[3]}"
-            if [ "$pre" = "alpha" ]; then suf="a"; else suf="b"; fi
-            PEP440_VERSION="${base}${suf}${num}"
-          fi
-          echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
       - name: Install from Test PyPI
         run: |
           pip install --index-url https://test.pypi.org/simple/ \
                       --extra-index-url https://pypi.org/simple/ \
-                      bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }}
+                      bundlecraft==${{ steps.version.outputs.VERSION }}
       - name: Verify installation
         run: |-
           bundlecraft --version
