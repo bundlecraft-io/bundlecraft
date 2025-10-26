@@ -342,9 +342,15 @@ jobs:
 
           # Generate changelog
           {
-            echo "## What's Changed"
             echo ""
-            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges
+            echo "---"
+            echo ""
+            echo "## 📝 Commits in This Release"
+            echo ""
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (\`%h\`)" --no-merges
+            echo ""
+            echo ""
+            echo "**Previous release:** [\`${PREV_TAG}\`](https://github.com/${{ github.repository }}/releases/tag/${PREV_TAG})"
           } > changelog.md
           echo "Changelog generated"
       - name: Create release notes
@@ -431,9 +437,15 @@ jobs:
 
           # Generate changelog
           {
-            echo "## What's Changed"
             echo ""
-            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges
+            echo "---"
+            echo ""
+            echo "## 📝 Commits in This Release"
+            echo ""
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (\`%h\`)" --no-merges
+            echo ""
+            echo ""
+            echo "**Previous release:** [\`${PREV_TAG}\`](https://github.com/${{ github.repository }}/releases/tag/${PREV_TAG})"
           } > changelog.md
           echo "Changelog generated"
       - name: Create pre-release notes
