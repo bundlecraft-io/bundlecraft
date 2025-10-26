@@ -302,11 +302,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: python-package-distributions
           path: dist/
+      - name: Fetch tags
+        run: git fetch --tags --force
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
@@ -334,13 +338,13 @@ jobs:
             echo "No previous tag found, using initial commit"
             PREV_TAG=$(git rev-list --max-parents=0 HEAD)
           fi
-          echo "Generating changelog from $PREV_TAG to ${{ github.ref_name }}"
+          echo "Generating changelog from $PREV_TAG to HEAD"
 
           # Generate changelog
           {
             echo "## What's Changed"
             echo ""
-            git log ${PREV_TAG}..${{ github.ref_name }} --pretty=format:"- %s (%h)" --no-merges
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges
           } > changelog.md
           echo "Changelog generated"
       - name: Create release notes
@@ -387,11 +391,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: python-package-distributions
           path: dist/
+      - name: Fetch tags
+        run: git fetch --tags --force
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
@@ -419,13 +427,13 @@ jobs:
             echo "No previous tag found, using initial commit"
             PREV_TAG=$(git rev-list --max-parents=0 HEAD)
           fi
-          echo "Generating changelog from $PREV_TAG to ${{ github.ref_name }}"
+          echo "Generating changelog from $PREV_TAG to HEAD"
 
           # Generate changelog
           {
             echo "## What's Changed"
             echo ""
-            git log ${PREV_TAG}..${{ github.ref_name }} --pretty=format:"- %s (%h)" --no-merges
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges
           } > changelog.md
           echo "Changelog generated"
       - name: Create pre-release notes
