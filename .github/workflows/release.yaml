@@ -309,6 +309,20 @@ jobs:
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Normalize PEP 440 version
+        id: norm
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PEP440_VERSION="$VERSION"
+          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            pre="${BASH_REMATCH[2]}"
+            num="${BASH_REMATCH[3]}"
+            if [ "$pre" = "alpha" ]; then suf="a"; else suf="b"; fi
+            PEP440_VERSION="${base}${suf}${num}"
+          fi
+          echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
       - name: Create release notes
         run: |
           cat > release_notes.md << 'EOF'
@@ -316,7 +330,7 @@ jobs:
 
           ### Python Package
           ```bash
-          pip install bundlecraft==${{ steps.version.outputs.VERSION }}
+          pip install bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }}
           ```
 
           ### Container Image
@@ -327,8 +341,8 @@ jobs:
           ```
 
           ## Package Contents
-          - `bundlecraft-${{ steps.version.outputs.VERSION }}-py3-none-any.whl` - Wheel distribution
-          - `bundlecraft-${{ steps.version.outputs.VERSION }}.tar.gz` - Source distribution
+          - `bundlecraft-${{ steps.norm.outputs.PEP440_VERSION }}-py3-none-any.whl` - Wheel distribution
+          - `bundlecraft-${{ steps.norm.outputs.PEP440_VERSION }}.tar.gz` - Source distribution
           EOF
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
@@ -337,6 +351,7 @@ jobs:
           bodyFile: release_notes.md
           artifacts: dist/*
           allowUpdates: true
+          skipIfReleaseExists: true
           makeLatest: true
           generateReleaseNotes: true
   github-prerelease:
@@ -356,6 +371,20 @@ jobs:
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Normalize PEP 440 version
+        id: norm
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PEP440_VERSION="$VERSION"
+          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            pre="${BASH_REMATCH[2]}"
+            num="${BASH_REMATCH[3]}"
+            if [ "$pre" = "alpha" ]; then suf="a"; else suf="b"; fi
+            PEP440_VERSION="${base}${suf}${num}"
+          fi
+          echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
       - name: Create pre-release notes
         run: |
           cat > release_notes.md << 'EOF'
@@ -365,7 +394,7 @@ jobs:
           ```bash
           pip install --index-url https://test.pypi.org/simple/ \
                       --extra-index-url https://pypi.org/simple/ \
-                      bundlecraft==${{ steps.version.outputs.VERSION }}
+                      bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }}
           ```
 
           ### Container Image (Test)
@@ -382,6 +411,7 @@ jobs:
           bodyFile: release_notes.md
           artifacts: dist/*
           allowUpdates: true
+          skipIfReleaseExists: true
           prerelease: true
           generateReleaseNotes: true
   verify-release:
@@ -398,8 +428,22 @@ jobs:
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Normalize PEP 440 version
+        id: norm
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PEP440_VERSION="$VERSION"
+          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            pre="${BASH_REMATCH[2]}"
+            num="${BASH_REMATCH[3]}"
+            if [ "$pre" = "alpha" ]; then suf="a"; else suf="b"; fi
+            PEP440_VERSION="${base}${suf}${num}"
+          fi
+          echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
       - name: Install from PyPI
-        run: pip install bundlecraft==${{ steps.version.outputs.VERSION }}
+        run: pip install bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }}
       - name: Verify installation
         run: |
           bundlecraft --version
@@ -418,11 +462,25 @@ jobs:
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Normalize PEP 440 version
+        id: norm
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PEP440_VERSION="$VERSION"
+          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            pre="${BASH_REMATCH[2]}"
+            num="${BASH_REMATCH[3]}"
+            if [ "$pre" = "alpha" ]; then suf="a"; else suf="b"; fi
+            PEP440_VERSION="${base}${suf}${num}"
+          fi
+          echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
       - name: Install from Test PyPI
         run: |
           pip install --index-url https://test.pypi.org/simple/ \
                       --extra-index-url https://pypi.org/simple/ \
-                      bundlecraft==${{ steps.version.outputs.VERSION }}
+                      bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }}
       - name: Verify installation
         run: |-
           bundlecraft --version
