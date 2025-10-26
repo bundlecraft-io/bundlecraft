@@ -23,6 +23,7 @@ RELEASE_IMAGE_REF ?= localhost/$(IMAGE_NAME):$(GIT_TAG)
 	build-image build-test-image build-pypi build-test-pypi \
 	test-image-version test-image-build test-image-run \
 	test-pypi-version test-pypi-build test-pypi-run \
+	ci-install-dev ci-test ci-lint \
 	help
 
 help:
@@ -38,6 +39,10 @@ help:
 	@echo "  test-pypi-version       Create temp venv, install built wheel, print version"
 	@echo "  test-pypi-build         Prepare configs, install built wheel, build + verify, cleanup"
 	@echo "  test-pypi-run           Same setup, but runs your args: make test-pypi-run BUNDLECRAFT_ARGS='build --env dev'"
+	@echo "CI helpers:"
+	@echo "  ci-install-dev          Install dev dependencies for CI"
+	@echo "  ci-test                 Run pytest with coverage for CI"
+	@echo "  ci-lint                 Run ruff linting for CI"
 
 build-test-image:
 	$(CONTAINER) build --build-arg HATCH_BUILD_VERSION=$(HATCH_BUILD_VERSION) -t $(IMAGE_REF) .
@@ -146,3 +151,14 @@ test-pypi-run: build-test-pypi
 	TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
 	  bundlecraft $(BUNDLECRAFT_ARGS); \
 	deactivate
+
+# ---- CI helpers ----
+ci-install-dev:
+	python -m pip install --upgrade pip
+	pip install -e ".[dev]"
+
+ci-test:
+	pytest -v --cov=bundlecraft --cov-report=term
+
+ci-lint:
+	ruff check bundlecraft tests

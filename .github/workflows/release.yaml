@@ -56,14 +56,12 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-      - name: Run tests
-        run: pytest -v --cov=bundlecraft --cov-report=term
-      - name: Run linting
-        run: ruff check bundlecraft tests
+      - name: Install dev dependencies (Makefile)
+        run: make ci-install-dev
+      - name: Run tests (Makefile)
+        run: make ci-test
+      - name: Run linting (Makefile)
+        run: make ci-lint
   build:
     name: Build Package
     needs: test
@@ -82,10 +80,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install build twine
-      - name: Build package
-        run: python -m build
-      - name: Verify package
-        run: twine check dist/*
+      - name: Build package (tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: make build-pypi GIT_TAG=${{ github.ref_name }}
+      - name: Build package (branch)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: make build-test-pypi
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
