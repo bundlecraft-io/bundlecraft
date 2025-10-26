@@ -45,6 +45,22 @@ jobs:
             echo "❌ Tag not from main or pre-release branch"
             exit 1
           fi
+      - name: Validate production tag format (vMAJOR.MINOR.PATCH)
+        if: steps.check.outputs.channel == 'prod'
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid production tag: $TAG. Expected vMAJOR.MINOR.PATCH (e.g., v1.2.3)."
+            exit 1
+          fi
+      - name: Validate prerelease tag format (vMAJOR.MINOR.PATCH-(alpha|beta).N)
+        if: steps.check.outputs.channel == 'prerelease'
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta)\.[0-9]+$ ]]; then
+            echo "❌ Invalid prerelease tag: $TAG. Expected vMAJOR.MINOR.PATCH-(alpha|beta).N (e.g., v1.2.3-beta.1)."
+            exit 1
+          fi
   test:
     name: Run Tests
     needs: determine-channel
