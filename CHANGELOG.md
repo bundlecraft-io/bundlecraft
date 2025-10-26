@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## Pre-Releases
+
 ## [0.1.3-beta.13] - 2025-10-26
 
 ### Added
@@ -21,5 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Container immutable release handling
 
-[Unreleased]: https://github.com/bundlecraft-io/bundlecraft/compare/v0.1.3-beta.13...HEAD
-[0.1.3-beta.13]: https://github.com/bundlecraft-io/bundlecraft/releases/tag/v0.1.3-beta.13
+---
+
+## [0.1.3-beta.14] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow
+
+---
+
+## Stable Releases
