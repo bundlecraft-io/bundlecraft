@@ -82,6 +82,11 @@ ignore = [
   "E501", # line length handled by formatter
 ]
 
+# Ignore lints in the auto-generated version file produced by hatch-vcs/setuptools-scm.
+# This file is not hand-edited and may use legacy typing/import patterns.
+[tool.ruff.lint.per-file-ignores]
+"bundlecraft/_version.py" = ["I001", "UP035", "UP006", "UP007"]
+
 [tool.black]
 target-version = ["py310"]
 line-length = 100

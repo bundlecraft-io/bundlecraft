@@ -1,9 +1,8 @@
 ---
-name: 📦 Release to PyPI
+name: 📦 BundleCraft Release
 run-name: 'Release ${{ github.ref_name }} - Run #${{ github.run_number }}'
 on:
   push:
-    branches: [main, pre-release]
     tags:
       - v*  # Trigger on version tags like v0.1.0, v0.2.0, etc.
 permissions:
@@ -23,6 +22,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
           fetch-depth: 0
       - name: Determine source branch
         id: check
@@ -42,6 +43,22 @@ jobs:
             echo "✅ Tag from pre-release branch → Test PyPI"
           else
             echo "❌ Tag not from main or pre-release branch"
+            exit 1
+          fi
+      - name: Validate production tag format (vMAJOR.MINOR.PATCH)
+        if: steps.check.outputs.channel == 'prod'
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid production tag: $TAG. Expected vMAJOR.MINOR.PATCH (e.g., v1.2.3)."
+            exit 1
+          fi
+      - name: Validate prerelease tag format (vMAJOR.MINOR.PATCH-(alpha|beta).N)
+        if: steps.check.outputs.channel == 'prerelease'
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta)\.[0-9]+$ ]]; then
+            echo "❌ Invalid prerelease tag: $TAG. Expected vMAJOR.MINOR.PATCH-(alpha|beta).N (e.g., v1.2.3-beta.1)."
             exit 1
           fi
   test:
@@ -70,6 +87,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
           fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -93,10 +112,11 @@ jobs:
           path: dist/
   # Build and push container images to GHCR
   build-image:
-    name: Build Container Image
+    name: Build Container Image (Production)
     needs: [test, determine-channel]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.determine-channel.outputs.channel == 'prod' && startsWith(github.ref,
+      'refs/tags/v')
     permissions:
       packages: write
     outputs:
@@ -106,6 +126,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
           fetch-depth: 0
       - name: Extract version
         id: version
@@ -145,10 +167,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
   build-image-test:
-    name: Build Test Container Image
+    name: Build Container Image (Test)
     needs: [test, determine-channel]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.determine-channel.outputs.channel == 'prerelease' && startsWith(github.ref,
+      'refs/tags/v')
     permissions:
       packages: write
     outputs:
@@ -158,6 +181,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
           fetch-depth: 0
       - name: Extract version
         id: version
@@ -227,7 +252,7 @@ jobs:
       'refs/tags/v')
     runs-on: ubuntu-latest
     environment:
-      name: release
+      name: pre-release
       url: https://test.pypi.org/p/bundlecraft
     permissions:
       id-token: write
@@ -246,8 +271,6 @@ jobs:
   publish-gcr:
     name: Publish to GHCR (Production)
     needs: [build-image, determine-channel]
-    if: needs.determine-channel.outputs.channel == 'prod' && startsWith(github.ref,
-      'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -260,8 +283,6 @@ jobs:
   publish-gcr-test:
     name: Publish to GHCR (Test)
     needs: [build-image-test, determine-channel]
-    if: needs.determine-channel.outputs.channel == 'prerelease' && startsWith(github.ref,
-      'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       packages: write
