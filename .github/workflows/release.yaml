@@ -546,7 +546,7 @@ jobs:
           artifacts: dist/*
       - name: Display Release URL in Summary
         run: |
-          echo "'BundleCraft Release ${{ github.ref_name }}': ${{ steps.create_release.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "BundleCraft Release ${{ github.ref_name }} Github Release created: ${{ steps.create_release.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
   verify-release:
     name: Verify PyPI Release
     needs: publish-pypi
