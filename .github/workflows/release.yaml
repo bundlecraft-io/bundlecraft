@@ -290,7 +290,7 @@ jobs:
           verbose: true
           print-hash: true
   publish-gcr:
-    name: Publish to GHCR (Production)
+    name: Publish to GHCR
     needs: [build-image, determine-channel]
     runs-on: ubuntu-latest
     permissions:
@@ -422,15 +422,21 @@ jobs:
           # Append changelog
           cat changelog.md >> release_notes.md
       - name: Create GitHub Release
+        id: create_release
         uses: ncipollo/release-action@v1
         with:
+          name: BundleCraft Release ${{ github.ref_name }}
           tag: ${{ github.ref_name }}
           bodyFile: release_notes.md
-          artifacts: dist/*
           allowUpdates: true
+          immutableCreate: true  # actionlint: ignore [action]
           skipIfReleaseExists: true
-          makeLatest: true
+          prerelease: false
           generateReleaseNotes: true
+          artifacts: dist/*
+      - name: Display Release URL in Summary
+        run: |
+          echo "BundleCraft Release ${{ github.ref_name }} Github Release Created: ${{ steps.create_release.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
   github-pre-release:
     name: Create GitHub Pre-Release
     needs: [build, determine-channel]
@@ -552,7 +558,7 @@ jobs:
           artifacts: dist/*
       - name: Display Release URL in Summary
         run: |
-          echo "BundleCraft Release ${{ github.ref_name }} Github Release created: ${{ steps.create_release.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "BundleCraft Pre-Release ${{ github.ref_name }} Github Release Created: ${{ steps.create_release.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
   verify-release:
     name: Verify PyPI Release
     needs: publish-pypi
@@ -585,9 +591,15 @@ jobs:
       - name: Update pip
         run: pip install --upgrade pip
       - name: Install from PyPI
-        run: pip install bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }}
-      - name: Verify installation
         run: |
+          for i in {1..5}; do
+            echo "Attempt $i to install..."
+            pip install bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }} && break
+            echo "Retrying in $((i * 20))s..."
+            sleep $((i * 20))
+          done
+      - name: Verify installation
+        run: |-
           bundlecraft --version
           bundlecraft --help
   verify-testpypi:
