@@ -343,8 +343,17 @@ jobs:
           # Extract version-specific changelog from CHANGELOG.md if it exists
           VERSION="${{ steps.version.outputs.VERSION }}"
           if [ -f CHANGELOG.md ]; then
-            # Try to extract the section for this version
-            awk "/## \[${VERSION}\]/,/^---$|^## \[/" CHANGELOG.md | sed '$d' | sed '1d' > changelog_section.md || true
+            # Escape regex specials in version for safe matching
+            SAFE_VERSION=$(printf '%s' "$VERSION" | sed 's/[.[(){}+*?^$\\|]/\\&/g')
+            # Find start line for this version section
+            START_LINE=$(grep -n "^## \[$SAFE_VERSION\]" CHANGELOG.md | head -n1 | cut -d: -f1 || true)
+            if [ -n "$START_LINE" ]; then
+              # Find end line: next '---' separator or next '## [' heading after start
+              END_LINE=$(awk -v s="$START_LINE" 'NR>s && (/^---$/ || /^## \[/){print NR; exit}' CHANGELOG.md)
+              if [ -z "$END_LINE" ]; then END_LINE=$(wc -l < CHANGELOG.md); fi
+              # Extract body between start and end (exclude header and delimiter)
+              sed -n "$((START_LINE+1)),$((END_LINE-1))p" CHANGELOG.md > changelog_section.md || true
+            fi
           fi
 
           # Generate commit log
@@ -452,8 +461,17 @@ jobs:
           # Extract version-specific changelog from CHANGELOG.md if it exists
           VERSION="${{ steps.version.outputs.VERSION }}"
           if [ -f CHANGELOG.md ]; then
-            # Try to extract the section for this version
-            awk "/## \[${VERSION}\]/,/^---$|^## \[/" CHANGELOG.md | sed '$d' | sed '1d' > changelog_section.md || true
+            # Escape regex specials in version for safe matching
+            SAFE_VERSION=$(printf '%s' "$VERSION" | sed 's/[.[(){}+*?^$\\|]/\\&/g')
+            # Find start line for this version section
+            START_LINE=$(grep -n "^## \[$SAFE_VERSION\]" CHANGELOG.md | head -n1 | cut -d: -f1 || true)
+            if [ -n "$START_LINE" ]; then
+              # Find end line: next '---' separator or next '## [' heading after start
+              END_LINE=$(awk -v s="$START_LINE" 'NR>s && (/^---$/ || /^## \[/){print NR; exit}' CHANGELOG.md)
+              if [ -z "$END_LINE" ]; then END_LINE=$(wc -l < CHANGELOG.md); fi
+              # Extract body between start and end (exclude header and delimiter)
+              sed -n "$((START_LINE+1)),$((END_LINE-1))p" CHANGELOG.md > changelog_section.md || true
+            fi
           fi
 
           # Generate commit log
