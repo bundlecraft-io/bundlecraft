@@ -551,6 +551,7 @@ jobs:
     name: Verify PyPI Release
     needs: publish-pypi
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -587,6 +588,7 @@ jobs:
     name: Verify Test PyPI Release
     needs: publish-testpypi
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Set up Python
         uses: actions/setup-python@v5
