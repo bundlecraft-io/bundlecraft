@@ -731,6 +731,17 @@ def main(
                         )
 
                 bundle_cache_dirs[bname] = cache_dir
+            except FileNotFoundError as e:
+                # More specific error for missing source configs
+                click.secho(
+                    f"  [cache] ✗ Source config not found for '{bname}': {e}", fg="red", err=True
+                )
+                click.secho(
+                    f"  [HINT] Create config/sources/{bname}.yaml with source configuration",
+                    fg="yellow",
+                    err=True,
+                )
+                sys.exit(ExitCode.CONFIG_ERROR)
             except Exception as e:
                 click.secho(
                     f"  [cache] ✗ Failed to stage/cache bundle {bname}: {e}", fg="red", err=True
@@ -953,16 +964,56 @@ def main(
             for bdir in bundle_dirs:
                 cache_pem = bdir / "bundlecraft-ca-trust.pem"
                 if cache_pem.exists():
+                    blocks_before = len(merged_blocks)
                     merged_blocks.extend(_read_pem_chunks([cache_pem]))
+                    blocks_added = len(merged_blocks) - blocks_before
+                    if verbose:
+                        click.echo(
+                            f"  [{bundle_name}] Loaded {blocks_added} cert(s) from cached: {cache_pem.relative_to(ROOT)}",
+                            err=True,
+                        )
                 else:
+                    if not bdir.exists():
+                        click.secho(
+                            f"  [ERROR] [{bundle_name}] Bundle directory does not exist: {bdir.relative_to(ROOT)}",
+                            fg="red",
+                            err=True,
+                        )
+                        click.secho(
+                            f"  [HINT] Run without --skip-fetch or check that source '{bdir.name}' is configured correctly",
+                            fg="yellow",
+                            err=True,
+                        )
+                        sys.exit(ExitCode.BUILD_ERROR)
                     pem_files = _aggregate_staged_sources([bdir], verbose=verbose)
+                    if not pem_files:
+                        click.secho(
+                            f"  [ERROR] [{bundle_name}] No .pem files found in: {bdir.relative_to(ROOT)}",
+                            fg="red",
+                            err=True,
+                        )
+                        sys.exit(ExitCode.BUILD_ERROR)
+                    blocks_before = len(merged_blocks)
                     merged_blocks.extend(_read_pem_chunks(pem_files))
+                    blocks_added = len(merged_blocks) - blocks_before
+                    if verbose:
+                        click.echo(
+                            f"  [{bundle_name}] Loaded {blocks_added} cert(s) from {len(pem_files)} file(s) in: {bdir.relative_to(ROOT)}",
+                            err=True,
+                        )
 
             # Apply filters to merged blocks
             from bundlecraft.helpers.utils import apply_filters
 
             filters_cfg = env_cfg.get("filters") or {}
+            blocks_before_filter = len(merged_blocks)
             merged_blocks = apply_filters(merged_blocks, filters_cfg)
+            blocks_filtered = blocks_before_filter - len(merged_blocks)
+            if blocks_filtered > 0 and verbose:
+                click.echo(
+                    f"  [{bundle_name}] Filtered out {blocks_filtered} certificate(s) per configuration",
+                    err=True,
+                )
 
             if not merged_blocks:
                 click.secho(
@@ -970,6 +1021,18 @@ def main(
                     fg="red",
                     err=True,
                 )
+                if blocks_before_filter > 0:
+                    click.secho(
+                        f"  [HINT] All {blocks_before_filter} certificate(s) were filtered out. Check your filter configuration.",
+                        fg="yellow",
+                        err=True,
+                    )
+                else:
+                    click.secho(
+                        "  [HINT] No certificates were loaded from bundle directories. Check source configs and staging.",
+                        fg="yellow",
+                        err=True,
+                    )
                 sys.exit(ExitCode.INVALID_CERT)
 
             pem_out = build_root / "bundlecraft-ca-trust.pem"
