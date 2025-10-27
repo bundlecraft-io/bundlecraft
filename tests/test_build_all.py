@@ -103,3 +103,42 @@ class TestBuildAll:
             out = result.output
             assert "Plan:" in out
             assert "one" in out
+
+    def test_build_all_no_configs_gives_clear_error(self, runner, temp_dir, monkeypatch):
+        # Ensure we get a clear error when no env configs exist
+        import bundlecraft.builder as builder_mod
+
+        monkeypatch.setattr(builder_mod, "ROOT", temp_dir)
+        monkeypatch.setattr(builder_mod, "CONFIG_DIR", temp_dir / "config")
+
+        # Create config dir structure but no env files
+        (temp_dir / "config" / "envs").mkdir(parents=True, exist_ok=True)
+
+        with runner.isolated_filesystem(temp_dir):
+            result = runner.invoke(cli, ["build-all", "--print-plan"])
+            assert result.exit_code != 0
+            assert "No environments found to build" in result.output
+            assert "pattern:" in result.output
+
+    def test_build_all_collects_multiple_envs(self, runner, temp_dir, monkeypatch):
+        # Regression test: ensure the loop appends each env (not just the last one)
+        import bundlecraft.builder as builder_mod
+
+        monkeypatch.setattr(builder_mod, "ROOT", temp_dir)
+        monkeypatch.setattr(builder_mod, "CONFIG_DIR", temp_dir / "config")
+
+        # Write three envs
+        write_minimal_env(temp_dir, "alpha", env_name="Alpha")
+        write_minimal_env(temp_dir, "beta", env_name="Beta")
+        write_minimal_env(temp_dir, "gamma", env_name="Gamma")
+
+        with runner.isolated_filesystem(temp_dir):
+            result = runner.invoke(cli, ["build-all", "--print-plan", "--json"])
+            assert result.exit_code == 0
+            doc = json.loads(result.output)
+            envs = {e["env"]: e for e in doc["environments"]}
+            # All three should be collected
+            assert set(envs.keys()) == {"alpha", "beta", "gamma"}
+            assert envs["alpha"]["name"] == "Alpha"
+            assert envs["beta"]["name"] == "Beta"
+            assert envs["gamma"]["name"] == "Gamma"

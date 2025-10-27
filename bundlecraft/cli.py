@@ -139,7 +139,7 @@ def build_all(
             click.echo(f"::warning::Failed to parse {path}: {e}")
             cfg = {}
 
-    chosen.append((env_stem, cfg))
+        chosen.append((env_stem, cfg))
 
     if not chosen:
         # Provide a helpful message that includes the resolved pattern
