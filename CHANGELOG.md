@@ -51,4 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3-beta.17] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow (hoping this message shows up!)
+
+---
+
 ## Stable Releases

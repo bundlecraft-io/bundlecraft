@@ -1,6 +1,6 @@
 ---
 name: 📦 BundleCraft Release
-run-name: 'Release ${{ github.ref_name }} - Run #${{ github.run_number }}'
+run-name: 'BundleCraft Release ${{ github.ref_name }} - Run #${{ github.run_number }}'
 on:
   push:
     tags:
@@ -340,10 +340,24 @@ jobs:
           fi
           echo "Generating changelog from $PREV_TAG to HEAD"
 
-          # Generate changelog
+          # Extract version-specific changelog from CHANGELOG.md if it exists
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          if [ -f CHANGELOG.md ]; then
+            # Try to extract the section for this version
+            awk "/## \[${VERSION}\]/,/^---$|^## \[/" CHANGELOG.md | sed '$d' | sed '1d' > changelog_section.md || true
+          fi
+
+          # Generate commit log
           {
-            echo ""
-            echo "---"
+            # Add manual changelog if found
+            if [ -f changelog_section.md ] && [ -s changelog_section.md ]; then
+              echo ""
+              echo "## 📋 Release Notes"
+              echo ""
+              cat changelog_section.md
+              echo ""
+              echo "---"
+            fi
             echo ""
             echo "## 📝 Commits in This Release"
             echo ""
@@ -435,10 +449,24 @@ jobs:
           fi
           echo "Generating changelog from $PREV_TAG to HEAD"
 
-          # Generate changelog
+          # Extract version-specific changelog from CHANGELOG.md if it exists
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          if [ -f CHANGELOG.md ]; then
+            # Try to extract the section for this version
+            awk "/## \[${VERSION}\]/,/^---$|^## \[/" CHANGELOG.md | sed '$d' | sed '1d' > changelog_section.md || true
+          fi
+
+          # Generate commit log
           {
-            echo ""
-            echo "---"
+            # Add manual changelog if found
+            if [ -f changelog_section.md ] && [ -s changelog_section.md ]; then
+              echo ""
+              echo "## 📋 Release Notes"
+              echo ""
+              cat changelog_section.md
+              echo ""
+              echo "---"
+            fi
             echo ""
             echo "## 📝 Commits in This Release"
             echo ""
