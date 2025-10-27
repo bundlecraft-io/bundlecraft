@@ -61,6 +61,12 @@ jobs:
             echo "❌ Invalid pre-release tag: $TAG. Expected vMAJOR.MINOR.PATCH-(alpha|beta).N (e.g., v1.2.3-beta.1)."
             exit 1
           fi
+      - name: Announce selected release channel
+        run: |
+          echo "::notice title=Release channel::${{ steps.check.outputs.channel }}"
+          echo "### 📣 Release Channel" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Selected: ${{ steps.check.outputs.channel }}" >> "$GITHUB_STEP_SUMMARY"
   test:
     name: Run Tests
     needs: determine-channel
