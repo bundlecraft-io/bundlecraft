@@ -19,8 +19,8 @@ from pathlib import Path
 import click
 import yaml
 
+import bundlecraft.builder as builder_mod
 from bundlecraft import __version__
-from bundlecraft.builder import CONFIG_DIR
 from bundlecraft.builder import main as build_main
 from bundlecraft.converter import main as convert_main
 from bundlecraft.differ import main as diff_main
@@ -107,7 +107,7 @@ def build_all(
     users can simply run a single command without pre-computing a matrix.
     """
     # Discover env config files
-    default_base = Path(CONFIG_DIR) / "envs"
+    default_base = Path(builder_mod.CONFIG_DIR) / "envs"
     pattern: str
     if envs_path:
         p = Path(envs_path).expanduser()
@@ -139,7 +139,7 @@ def build_all(
             click.echo(f"::warning::Failed to parse {path}: {e}")
             cfg = {}
 
-        chosen.append((env_stem, cfg))
+    chosen.append((env_stem, cfg))
 
     if not chosen:
         # Provide a helpful message that includes the resolved pattern
@@ -154,7 +154,7 @@ def build_all(
                     {
                         "env": env_stem,
                         "name": str((cfg or {}).get("name") or env_stem),
-                        "path": str(Path(CONFIG_DIR) / "envs" / f"{env_stem}.yaml"),
+                        "path": str(Path(builder_mod.CONFIG_DIR) / "envs" / f"{env_stem}.yaml"),
                     }
                     for env_stem, cfg in chosen
                 ],
@@ -167,7 +167,7 @@ def build_all(
             )
             for env_stem, cfg in chosen:
                 env_name = str((cfg or {}).get("name") or env_stem)
-                path_hint = Path(CONFIG_DIR) / "envs" / f"{env_stem}.yaml"
+                path_hint = Path(builder_mod.CONFIG_DIR) / "envs" / f"{env_stem}.yaml"
                 click.echo(f" - {env_name} ({env_stem}) -> {path_hint}")
         return
 
