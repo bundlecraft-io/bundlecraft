@@ -617,9 +617,14 @@ jobs:
         run: pip install --upgrade pip
       - name: Install from Test PyPI
         run: |
-          pip install --index-url https://test.pypi.org/simple/ \
-                      --extra-index-url https://pypi.org/simple/ \
-                      bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }}
+          for i in {1..5}; do
+            echo "Attempt $i to install..."
+            pip install --index-url https://test.pypi.org/simple/ \
+                        --extra-index-url https://pypi.org/simple/ \
+                        "bundlecraft==$VERSION" && break
+            echo "Retrying in $((i * 20))s..."
+            sleep $((i * 20))
+          done
       - name: Verify installation
         run: |-
           bundlecraft --version
