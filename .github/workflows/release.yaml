@@ -36,7 +36,7 @@ jobs:
 
           # Check ancestry
           if git merge-base --is-ancestor "$TAG_SHA" "origin/${{ env.MAIN_BRANCH }}"; then
-            echo "channel=prod" >> $GITHUB_OUTPUT
+            echo "channel=main" >> $GITHUB_OUTPUT
             echo "✅ Tag from main branch → Production PyPI"
           elif git merge-base --is-ancestor "$TAG_SHA" "origin/${{ env.PRE_RELEASE_BRANCH }}"; then
             echo "channel=pre-release" >> $GITHUB_OUTPUT
@@ -46,7 +46,7 @@ jobs:
             exit 1
           fi
       - name: Validate production tag format (vMAJOR.MINOR.PATCH)
-        if: steps.check.outputs.channel == 'prod'
+        if: steps.check.outputs.channel == 'main'
         run: |
           TAG="${GITHUB_REF_NAME}"
           if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -133,10 +133,10 @@ jobs:
           path: dist/
   # Build and push container images to GHCR
   build-image:
-    name: Build Container Image (Production)
+    name: Build Container Image
     needs: [test, determine-channel]
     runs-on: ubuntu-latest
-    if: needs.determine-channel.outputs.channel == 'prod' && startsWith(github.ref,
+    if: needs.determine-channel.outputs.channel == 'main' && startsWith(github.ref,
       'refs/tags/v')
     permissions:
       packages: write
@@ -174,7 +174,7 @@ jobs:
             type=semver,pattern={{version}},value=${{ steps.version.outputs.VERSION }}
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.VERSION }}
             type=semver,pattern={{major}},value=${{ steps.version.outputs.VERSION }}
-            type=raw,value=latest,enable=${{ needs.determine-channel.outputs.channel == 'prod' }}
+            type=raw,value=latest,enable=${{ needs.determine-channel.outputs.channel == 'main' }}
       - name: Build and push
         id: build
         uses: docker/build-push-action@v5
@@ -247,7 +247,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: [build, determine-channel]
-    if: needs.determine-channel.outputs.channel == 'prod' && startsWith(github.ref,
+    if: needs.determine-channel.outputs.channel == 'main' && startsWith(github.ref,
       'refs/tags/v')
     runs-on: ubuntu-latest
     environment:
@@ -316,7 +316,7 @@ jobs:
   github-release:
     name: Create GitHub Release
     needs: [build, determine-channel]
-    if: needs.determine-channel.outputs.channel == 'prod'
+    if: needs.determine-channel.outputs.channel == 'main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
