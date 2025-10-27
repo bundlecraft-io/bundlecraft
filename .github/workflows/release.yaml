@@ -1,0 +1,649 @@
+---
+name: 📦 BundleCraft Release
+run-name: 'BundleCraft Release ${{ github.ref_name }} - Run #${{ github.run_number }}'
+on:
+  push:
+    tags:
+      - v*  # Trigger on version tags like v0.1.0, v0.2.0, etc.
+permissions:
+  contents: write  # For creating GitHub releases
+  id-token: write  # For PyPI trusted publishing
+  packages: write  # For pushing to GitHub Container Registry
+env:
+  MAIN_BRANCH: main
+  PRE_RELEASE_BRANCH: pre-release
+jobs:
+  determine-channel:
+    name: Determine Release Channel
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.check.outputs.channel }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Determine source branch
+        id: check
+        run: |
+          TAG_SHA=$(git rev-parse "$GITHUB_SHA")
+
+          # Fetch both branches
+          git fetch origin +refs/heads/${{ env.MAIN_BRANCH }}:refs/remotes/origin/${{ env.MAIN_BRANCH }} || true
+          git fetch origin +refs/heads/${{ env.PRE_RELEASE_BRANCH }}:refs/remotes/origin/${{ env.PRE_RELEASE_BRANCH }} || true
+
+          # Check ancestry
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/${{ env.MAIN_BRANCH }}"; then
+            echo "channel=main" >> $GITHUB_OUTPUT
+            echo "✅ Tag from main branch → Production PyPI"
+          elif git merge-base --is-ancestor "$TAG_SHA" "origin/${{ env.PRE_RELEASE_BRANCH }}"; then
+            echo "channel=pre-release" >> $GITHUB_OUTPUT
+            echo "✅ Tag from pre-release branch → Test PyPI"
+          else
+            echo "❌ Tag not from main or pre-release branch"
+            exit 1
+          fi
+      - name: Validate production tag format (vMAJOR.MINOR.PATCH)
+        if: steps.check.outputs.channel == 'main'
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid production tag: $TAG. Expected vMAJOR.MINOR.PATCH (e.g., v1.2.3)."
+            exit 1
+          fi
+      - name: Validate pre-release tag format (vMAJOR.MINOR.PATCH-(alpha|beta).N)
+        if: steps.check.outputs.channel == 'pre-release'
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta)\.[0-9]+$ ]]; then
+            echo "❌ Invalid pre-release tag: $TAG. Expected vMAJOR.MINOR.PATCH-(alpha|beta).N (e.g., v1.2.3-beta.1)."
+            exit 1
+          fi
+      - name: Announce selected release channel
+        run: |
+          echo "::notice title=Release channel::${{ steps.check.outputs.channel }}"
+          echo "### 📣 Release Channel" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Selected: ${{ steps.check.outputs.channel }}" >> "$GITHUB_STEP_SUMMARY"
+  test:
+    name: Run Tests
+    needs: determine-channel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dev dependencies (Makefile)
+        run: make ci-install-dev
+      - name: Run tests (Makefile)
+        run: make ci-test
+      - name: Run linting (Makefile)
+        run: make ci-lint
+  build:
+    name: Build Package
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+      - name: Update Changelog URL (tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          URL="https://github.com/${REPO}/releases/tag/${TAG}"
+          echo "Setting [project.urls].Changelog to ${URL}"
+          awk -v url="$URL" '
+            BEGIN{in_urls=0}
+            /^\[project\.urls\]/ {in_urls=1; print; next}
+            /^\[/ && $0 !~ /^\[project\.urls\]/ {in_urls=0}
+            in_urls && /^Changelog *=/ { print "Changelog = \"" url "\""; next }
+            { print }
+          ' pyproject.toml > pyproject.toml.tmp && mv pyproject.toml.tmp pyproject.toml
+      - name: Build package (tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: make build-pypi GIT_TAG=${{ github.ref_name }}
+      - name: Build package (branch)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: make build-test-pypi
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+  # Build and push container images to GHCR
+  build-image:
+    name: Build Container Image
+    needs: [test, determine-channel]
+    runs-on: ubuntu-latest
+    if: needs.determine-channel.outputs.channel == 'main' && startsWith(github.ref,
+      'refs/tags/v')
+    permissions:
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.VERSION }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.VERSION }}
+            type=semver,pattern={{major}},value=${{ steps.version.outputs.VERSION }}
+            type=raw,value=latest,enable=${{ needs.determine-channel.outputs.channel == 'main' }}
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            HATCH_BUILD_VERSION=${{ steps.version.outputs.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  build-image-test:
+    name: Build Container Image (Test)
+    needs: [test, determine-channel]
+    runs-on: ubuntu-latest
+    if: needs.determine-channel.outputs.channel == 'pre-release' && startsWith(github.ref,
+      'refs/tags/v')
+    permissions:
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}-test
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.VERSION }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.VERSION }}
+            type=semver,pattern={{major}},value=${{ steps.version.outputs.VERSION }}
+            type=raw,value=latest,enable=${{ needs.determine-channel.outputs.channel == 'pre-release' }}
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            HATCH_BUILD_VERSION=${{ steps.version.outputs.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  # The following jobs only run based on the determined release channel (main or pre-release branch)
+  # AND if a semantic version tag (e.g., v1.2.3) is pushed  on those branches to mark an official release.
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build, determine-channel]
+    if: needs.determine-channel.outputs.channel == 'main' && startsWith(github.ref,
+      'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://pypi.org/p/bundlecraft
+    permissions:
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          print-hash: true
+  publish-testpypi:
+    name: Publish to Test PyPI
+    needs: [build, determine-channel]
+    if: needs.determine-channel.outputs.channel == 'pre-release' && startsWith(github.ref,
+      'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment:
+      name: pre-release
+      url: https://test.pypi.org/p/bundlecraft
+    permissions:
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Publish to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
+          print-hash: true
+  publish-gcr:
+    name: Publish to GHCR
+    needs: [build-image, determine-channel]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Image published
+        run: |
+          echo "✅ Production image published to GHCR"
+          echo "Image: ${{ needs.build-image.outputs.image-tag }}"
+          echo "Digest: ${{ needs.build-image.outputs.image-digest }}"
+  publish-gcr-test:
+    name: Publish to GHCR (Test)
+    needs: [build-image-test, determine-channel]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Image published
+        run: |
+          echo "✅ Test image published to GHCR"
+          echo "Image: ${{ needs.build-image-test.outputs.image-tag }}"
+          echo "Digest: ${{ needs.build-image-test.outputs.image-digest }}"
+  github-release:
+    name: Create GitHub Release
+    needs: [build, determine-channel]
+    if: needs.determine-channel.outputs.channel == 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Fetch tags
+        run: git fetch --tags --force
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Normalize PEP 440 version
+        id: norm
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PEP440_VERSION="$VERSION"
+          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            pre="${BASH_REMATCH[2]}"
+            num="${BASH_REMATCH[3]}"
+            if [ "$pre" = "alpha" ]; then suf="a"; else suf="b"; fi
+            PEP440_VERSION="${base}${suf}${num}"
+          fi
+          echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${{ github.ref_name }}$" | head -n1)
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, using initial commit"
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "Generating changelog from $PREV_TAG to HEAD"
+
+          # Extract version-specific changelog from CHANGELOG.md if it exists
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          if [ -f CHANGELOG.md ]; then
+            # Escape regex specials in version for safe matching
+            SAFE_VERSION=$(printf '%s' "$VERSION" | sed 's/[.[(){}+*?^$\\|]/\\&/g')
+            # Find start line for this version section
+            START_LINE=$(grep -n "^## \[$SAFE_VERSION\]" CHANGELOG.md | head -n1 | cut -d: -f1 || true)
+            if [ -n "$START_LINE" ]; then
+              # Find end line: next '---' separator or next '## [' heading after start
+              END_LINE=$(awk -v s="$START_LINE" 'NR>s && (/^---$/ || /^## \[/){print NR; exit}' CHANGELOG.md)
+              if [ -z "$END_LINE" ]; then END_LINE=$(wc -l < CHANGELOG.md); fi
+              # Extract body between start and end (exclude header and delimiter)
+              sed -n "$((START_LINE+1)),$((END_LINE-1))p" CHANGELOG.md > changelog_section.md || true
+            fi
+          fi
+
+          # Generate commit log
+          {
+            # Add manual changelog if found
+            if [ -f changelog_section.md ] && [ -s changelog_section.md ]; then
+              echo ""
+              echo "## 📋 Release Notes"
+              echo ""
+              cat changelog_section.md
+              echo ""
+              echo "---"
+            fi
+            echo ""
+            echo "## 📝 Commits in This Release"
+            echo ""
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (\`%h\`)" --no-merges
+            echo ""
+            echo ""
+            echo "**Previous release:** [\`${PREV_TAG}\`](https://github.com/${{ github.repository }}/releases/tag/${PREV_TAG})"
+          } > changelog.md
+          echo "Changelog generated"
+      - name: Create release notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Installation
+
+          ### Python Package
+          ```bash
+          pip install bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }}
+          ```
+
+          ### Container Image
+          ```bash
+          docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
+          # or
+          podman pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
+          ```
+
+          ## Package Contents
+          - `bundlecraft-${{ steps.norm.outputs.PEP440_VERSION }}-py3-none-any.whl` - Wheel distribution
+          - `bundlecraft-${{ steps.norm.outputs.PEP440_VERSION }}.tar.gz` - Source distribution
+          EOF
+
+          # Append changelog
+          cat changelog.md >> release_notes.md
+      - name: Create GitHub Release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          name: BundleCraft Release ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
+          bodyFile: release_notes.md
+          allowUpdates: true
+          immutableCreate: true  # actionlint: ignore [action]
+          skipIfReleaseExists: true
+          prerelease: false
+          generateReleaseNotes: true
+          artifacts: dist/*
+      - name: Display Release URL in Summary
+        run: |
+          echo "BundleCraft Release ${{ github.ref_name }} Github Release Created: ${{ steps.create_release.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
+  github-pre-release:
+    name: Create GitHub Pre-Release
+    needs: [build, determine-channel]
+    if: needs.determine-channel.outputs.channel == 'pre-release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Fetch tags
+        run: git fetch --tags --force
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Normalize PEP 440 version
+        id: norm
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PEP440_VERSION="$VERSION"
+          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            pre="${BASH_REMATCH[2]}"
+            num="${BASH_REMATCH[3]}"
+            if [ "$pre" = "alpha" ]; then suf="a"; else suf="b"; fi
+            PEP440_VERSION="${base}${suf}${num}"
+          fi
+          echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${{ github.ref_name }}$" | head -n1)
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, using initial commit"
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "Generating changelog from $PREV_TAG to HEAD"
+
+          # Extract version-specific changelog from CHANGELOG.md if it exists
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          if [ -f CHANGELOG.md ]; then
+            # Escape regex specials in version for safe matching
+            SAFE_VERSION=$(printf '%s' "$VERSION" | sed 's/[.[(){}+*?^$\\|]/\\&/g')
+            # Find start line for this version section
+            START_LINE=$(grep -n "^## \[$SAFE_VERSION\]" CHANGELOG.md | head -n1 | cut -d: -f1 || true)
+            if [ -n "$START_LINE" ]; then
+              # Find end line: next '---' separator or next '## [' heading after start
+              END_LINE=$(awk -v s="$START_LINE" 'NR>s && (/^---$/ || /^## \[/){print NR; exit}' CHANGELOG.md)
+              if [ -z "$END_LINE" ]; then END_LINE=$(wc -l < CHANGELOG.md); fi
+              # Extract body between start and end (exclude header and delimiter)
+              sed -n "$((START_LINE+1)),$((END_LINE-1))p" CHANGELOG.md > changelog_section.md || true
+            fi
+          fi
+
+          # Generate commit log
+          {
+            # Add manual changelog if found
+            if [ -f changelog_section.md ] && [ -s changelog_section.md ]; then
+              echo ""
+              echo "## 📋 Release Notes"
+              echo ""
+              cat changelog_section.md
+              echo ""
+              echo "---"
+            fi
+            echo ""
+            echo "## 📝 Commits in This Release"
+            echo ""
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (\`%h\`)" --no-merges
+            echo ""
+            echo ""
+            echo "**Previous release:** [\`${PREV_TAG}\`](https://github.com/${{ github.repository }}/releases/tag/${PREV_TAG})"
+          } > changelog.md
+          echo "Changelog generated"
+      - name: Create pre-release notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Pre-Release - Test PyPI Only
+
+          ### Python Package
+          ```bash
+          pip install --index-url https://test.pypi.org/simple/ \
+                      --extra-index-url https://pypi.org/simple/ \
+                      bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }}
+          ```
+
+          ### Container Image (Test)
+          ```bash
+          docker pull ghcr.io/${{ github.repository }}-test:${{ steps.version.outputs.VERSION }}
+          # or
+          podman pull ghcr.io/${{ github.repository }}-test:${{ steps.version.outputs.VERSION }}
+          ```
+          EOF
+
+          # Append changelog
+          cat changelog.md >> release_notes.md
+      - name: Create GitHub Pre-Release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          name: BundleCraft Pre-Release ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
+          bodyFile: release_notes.md
+          allowUpdates: true
+          immutableCreate: true  # actionlint: ignore [action]
+          skipIfReleaseExists: true
+          prerelease: true
+          generateReleaseNotes: true
+          artifacts: dist/*
+      - name: Display Release URL in Summary
+        run: |
+          echo "BundleCraft Pre-Release ${{ github.ref_name }} Github Release Created: ${{ steps.create_release.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
+  verify-release:
+    name: Verify PyPI Release
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Wait for PyPI indexing
+        run: sleep 90
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Normalize PEP 440 version
+        id: norm
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PEP440_VERSION="$VERSION"
+          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            pre="${BASH_REMATCH[2]}"
+            num="${BASH_REMATCH[3]}"
+            if [ "$pre" = "alpha" ]; then suf="a"; else suf="b"; fi
+            PEP440_VERSION="${base}${suf}${num}"
+          fi
+          echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
+      - name: Update pip
+        run: pip install --upgrade pip
+      - name: Install from PyPI
+        run: |
+          for i in {1..5}; do
+            echo "Attempt $i to install..."
+            pip install bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }} && break
+            echo "Retrying in $((i * 20))s..."
+            sleep $((i * 20))
+          done
+      - name: Verify installation
+        run: |-
+          bundlecraft --version
+          bundlecraft --help
+  verify-testpypi:
+    name: Verify Test PyPI Release
+    needs: publish-testpypi
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Wait for Test PyPI indexing
+        run: sleep 90
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Normalize PEP 440 version
+        id: norm
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PEP440_VERSION="$VERSION"
+          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            pre="${BASH_REMATCH[2]}"
+            num="${BASH_REMATCH[3]}"
+            if [ "$pre" = "alpha" ]; then suf="a"; else suf="b"; fi
+            PEP440_VERSION="${base}${suf}${num}"
+          fi
+          echo "PEP440_VERSION=${PEP440_VERSION}" >> $GITHUB_OUTPUT
+      - name: Update pip
+        run: pip install --upgrade pip
+      - name: Install from Test PyPI
+        run: |
+          for i in {1..5}; do
+            echo "Attempt $i to install..."
+            pip install --index-url https://test.pypi.org/simple/ \
+                        --extra-index-url https://pypi.org/simple/ \
+                        bundlecraft==${{ steps.norm.outputs.PEP440_VERSION }} && break
+            echo "Retrying in $((i * 20))s..."
+            sleep $((i * 20))
+          done
+      - name: Verify installation
+        run: |-
+          bundlecraft --version
+          bundlecraft --help

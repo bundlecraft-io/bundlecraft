@@ -1,53 +1,70 @@
 [project]
 name = "bundlecraft"
-version = "0.1.1"
-description = "Modern tool for building and managing CA trust bundles."
-readme = "README.md"
+dynamic = ["version"]
+description = "Modern tool for building and managing CA trust bundles across multiple formats and environments"
+readme = { file = "README.md", content-type = "text/markdown" }
+license = { text = "MIT" }
 requires-python = ">=3.9"
-authors = [{ name = "BundleCraft.io" }]
+authors = [{ name = "BundleCraft.io", email = "hello@bundlecraft.io" }]
+maintainers = [{ name = "BundleCraft.io", email = "hello@bundlecraft.io" }]
+keywords = ["pki", "certificates", "trust-store", "ca-bundle", "security", "cryptography"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Security :: Cryptography",
+    "Topic :: System :: Systems Administration",
+]
 dependencies = [
-  "click>=8.0",
-  "cryptography>=42.0",
-  "pyOpenSSL>=23.0",
-  "PyYAML>=6.0",
-  "pydantic>=2.0",
-  "python-gnupg>=0.5.0",
-  "cyclonedx-bom>=4.0.0",
+  "click>=8.0,<9.0",
+  "cryptography>=42.0,<50.0",
+  "pyOpenSSL>=23.0,<26.0",
+  "PyYAML>=6.0,<7.0",
+  "pydantic>=2.0,<3.0",
+  "python-gnupg>=0.5.0,<1.0",
+  "cyclonedx-bom>=4.0.0,<8.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-"pytest>=8.0.0",
-"pytest-cov>=4.1.0",
-"pytest-mock>=3.11.1",
-"black>=24.0.0",
-"ruff>=0.14.0",
-"build>=1.2.2",
-"twine>=5.0.0",
-"pre-commit>=3.7.0",
-"yamllint>=1.35.0",
-"yamlfix>=1.17.0",
-"Flask>=3.0.0",
-"flasgger>=0.9.7",
+  "pytest>=8.0.0",
+  "pytest-cov>=4.1.0",
+  "pytest-mock>=3.11.1",
+  "black>=24.0.0",
+  "ruff>=0.14.0",
+  "build>=1.2.2",
+  "twine>=5.0.0",
+  "pre-commit>=3.7.0",
+  "yamllint>=1.35.0",
+  "yamlfix>=1.17.0",
+  "Flask>=3.0.0",
+  "flasgger>=0.9.7",
 ]
 fetchers = [
   "hvac>=2.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/bundlecraft-io/bundlecraft"
+Documentation = "https://github.com/bundlecraft-io/bundlecraft#readme"
+Repository = "https://github.com/bundlecraft-io/bundlecraft"
+Issues = "https://github.com/bundlecraft-io/bundlecraft/issues"
+Changelog = "https://github.com/bundlecraft-io/bundlecraft/releases"
+
 [project.scripts]
 bundlecraft = "bundlecraft.cli:cli"
 
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-py-modules = []
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["bundlecraft*"]
-namespaces = false
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
 [tool.ruff]
 target-version = "py310"
@@ -65,6 +82,73 @@ ignore = [
   "E501", # line length handled by formatter
 ]
 
+# Ignore lints in the auto-generated version file produced by hatch-vcs/setuptools-scm.
+# This file is not hand-edited and may use legacy typing/import patterns.
+[tool.ruff.lint.per-file-ignores]
+"bundlecraft/_version.py" = ["I001", "UP035", "UP006", "UP007"]
+
 [tool.black]
 target-version = ["py310"]
 line-length = 100
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--showlocals",
+]
+
+[tool.coverage.run]
+source = ["bundlecraft"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["bundlecraft"]
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/*.pyo",
+    "**/.DS_Store",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/bundlecraft",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/*.pyo",
+    "**/.DS_Store",
+    "**/test_*.py",
+    "**/*_test.py",
+]
+
+[tool.hatch.build.hooks.vcs]
+version-file = "bundlecraft/_version.py"

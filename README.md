@@ -270,7 +270,7 @@ System dependencies
 
 ```bash
 # Required for conversions and verification
-sudo apt-get install openssl openjdk-17-jre-headless  # (for keytool)
+sudo apt-get install openssl openjdk-21-jdk-headless  # (for keytool)
 
 # Optional: jq (required for scripts/json-output-examples.sh)
 sudo apt-get install jq
@@ -674,6 +674,12 @@ ______________________________________________________________________
 - Issues and PRs are welcome!
 - Please ensure all changes are reflected in relevant docs in [`docs/`](docs/).
 - For more info, see: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
+
+______________________________________________________________________
+
+## 📋 Changelog
+
+See [CHANGELOG.md](https://github.com/bundlecraft-io/bundlecraft/blob/main/CHANGELOG.md) for release history and what's changed between versions.
 
 ______________________________________________________________________
 
