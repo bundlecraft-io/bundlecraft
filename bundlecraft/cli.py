@@ -13,6 +13,7 @@ Subcommands:
 """
 
 import glob
+import json
 from pathlib import Path
 
 import click
@@ -53,22 +54,16 @@ cli.add_command(fetch_main, name="fetch")
 # ---------------------------------------------------------------------------
 
 
-def _parse_envs_arg(val: str | None) -> set[str]:
-    if not val:
-        return set()
-    return {s.strip() for s in str(val).split(",") if s and s.strip()}
-
-
 @cli.command(name="build-all", context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
-    "--envs",
+    "--envs-path",
     type=str,
-    help="Comma-separated list of env file stems to include (e.g., dev,qa). Defaults to all in config/envs/.",
-)
-@click.option(
-    "--github-release-only",
-    is_flag=True,
-    help="Include only envs with a github-release distribution target enabled.",
+    help=(
+        "Path or glob to discover env yaml files. "
+        "If a directory, scans for *.yaml inside. "
+        "Relative paths are resolved under config/envs/. "
+        "Examples: 'my_github_envs', 'my_github_envs/*.yaml', 'config/envs/custom/*.yaml'."
+    ),
 )
 @click.option("--skip-fetch", is_flag=True, help="Skip fetch stage; use existing staged sources")
 @click.option("--skip-verify", is_flag=True, help="Skip verification stage")
@@ -86,9 +81,13 @@ def _parse_envs_arg(val: str | None) -> set[str]:
 @click.option("--no-sbom", is_flag=True, help="Skip SBOM generation")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON output")
 @click.option("--keep-temp", is_flag=True, help="Preserve temp build dirs on failure")
+@click.option(
+    "--print-plan",
+    is_flag=True,
+    help="Show which environment configs would be built and exit without building",
+)
 def build_all(
-    envs: str | None,
-    github_release_only: bool,
+    envs_path: str | None,
     skip_fetch: bool,
     skip_verify: bool,
     output_root: str,
@@ -100,16 +99,31 @@ def build_all(
     no_sbom: bool,
     json_output: bool,
     keep_temp: bool,
+    print_plan: bool,
 ):
     """Discover all environments under config/envs/ and build each one.
 
     This ingrains the logic from the detect script so Docker and Python package
     users can simply run a single command without pre-computing a matrix.
     """
-    sel_envs = _parse_envs_arg(envs)
-
     # Discover env config files
-    env_files = sorted(glob.glob(str(Path(CONFIG_DIR) / "envs" / "*.yaml")))
+    default_base = Path(CONFIG_DIR) / "envs"
+    pattern: str
+    if envs_path:
+        p = Path(envs_path).expanduser()
+        # Interpret relative paths under default_base
+        if not p.is_absolute():
+            p = (default_base / p).resolve()
+        # If a directory, scan for *.yaml
+        if p.exists() and p.is_dir():
+            pattern = str(p / "*.yaml")
+        else:
+            # Assume it's a file or glob pattern
+            pattern = str(p)
+    else:
+        pattern = str(default_base / "*.yaml")
+
+    env_files = sorted(glob.glob(pattern))
     chosen: list[tuple[str, dict]] = []  # (env_stem, cfg)
 
     for path in env_files:
@@ -118,10 +132,6 @@ def build_all(
             continue
         env_stem = Path(base).stem
 
-        # Filter --envs first
-        if sel_envs and env_stem not in sel_envs:
-            continue
-
         try:
             with open(path, encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
@@ -129,25 +139,37 @@ def build_all(
             click.echo(f"::warning::Failed to parse {path}: {e}")
             cfg = {}
 
-        # Optionally filter for github-release-only environments
-        if github_release_only:
-            dist = cfg.get("distribution_metadata") or cfg.get("distribution") or {}
-            entries = []
-            if isinstance(dist, dict):
-                entries = dist.get("bundles") or dist.get("targets") or []
-            enabled = any(
-                isinstance(t, dict)
-                and t.get("type") == "github-release"
-                and (t.get("enabled") is True)
-                for t in entries
-            )
-            if not enabled:
-                continue
-
         chosen.append((env_stem, cfg))
 
     if not chosen:
-        raise click.ClickException("No environments found to build under config/envs/.")
+        # Provide a helpful message that includes the resolved pattern
+        raise click.ClickException(f"No environments found to build (pattern: {pattern}).")
+
+    # If --print-plan is provided, display plan and exit without building
+    if print_plan:
+        if json_output:
+            plan = {
+                "pattern": pattern,
+                "environments": [
+                    {
+                        "env": env_stem,
+                        "name": str((cfg or {}).get("name") or env_stem),
+                        "path": str(Path(CONFIG_DIR) / "envs" / f"{env_stem}.yaml"),
+                    }
+                    for env_stem, cfg in chosen
+                ],
+            }
+            click.echo(json.dumps(plan))
+        else:
+            click.secho(
+                f"Plan: {len(chosen)} environment(s) will be built (pattern: {pattern})",
+                fg="cyan",
+            )
+            for env_stem, cfg in chosen:
+                env_name = str((cfg or {}).get("name") or env_stem)
+                path_hint = Path(CONFIG_DIR) / "envs" / f"{env_stem}.yaml"
+                click.echo(f" - {env_name} ({env_stem}) -> {path_hint}")
+        return
 
     # Run builds sequentially; each environment builds all its bundles by default
     ctx = click.get_current_context()
