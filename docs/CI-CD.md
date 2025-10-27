@@ -95,13 +95,27 @@ ______________________________________________________________________
 
 ### 1. Discover
 
-Discovers which environment/bundle combinations to build:
+Discover which environment/bundle combinations to build using the built-in CLI discovery:
 
-- Scans `config/envs/*.yaml` for environment configurations
-- Filters by optional `environments` input (comma-separated)
-- Only includes environments with `github-release` enabled
-- Outputs JSON matrix for parallel builds
-- Validates environment selection and provides summary
+- Use `bundlecraft build-all --print-plan` to list environments to build
+- Scans `config/envs/*.yaml` by default; scope with `--envs-path` to target subfolders or globs
+- Emit JSON with `--json` for easy matrix generation
+- Validate selection and provide summary before building
+
+Examples:
+
+```bash
+# Discover all envs under config/envs/
+bundlecraft build-all --print-plan --json
+
+# Discover only envs under config/envs/teamA/
+bundlecraft build-all --envs-path teamA --print-plan --json
+
+# Discover envs matching a glob
+bundlecraft build-all --envs-path "teamA/*.yaml" --print-plan --json
+```
+
+The JSON document contains a simple list of environments and their resolved paths, suitable for transforming into a GitHub Actions matrix.
 
 ### 2. Build
 
@@ -190,8 +204,8 @@ Compared to previous release: `bundlecraft-truststore-v2025.10.20-1500`
 
 **Workflow inputs:**
 
-- `environments` (optional): Comma-separated list of environments to build (e.g., "dev,prod")
-  - Leave blank to build all environments with GitHub release enabled
+- `envs_path` (optional): Path or glob to limit discovery (e.g., `teamA`, `teamA/*.yaml`)
+- Optionally process the plan JSON to further filter or shard builds at the workflow level
 
 **Concurrency:**
 
