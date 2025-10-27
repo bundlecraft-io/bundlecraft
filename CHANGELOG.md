@@ -66,5 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No changes, refining CI/CD workflow (hoping this message shows up!)
 
 ---
+## [0.1.3-beta.19] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow (hoping this message shows up, cmon pypi)
+
+---
 
 ## Stable Releases
