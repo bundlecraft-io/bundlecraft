@@ -142,3 +142,91 @@ class TestBuildAll:
             assert envs["alpha"]["name"] == "Alpha"
             assert envs["beta"]["name"] == "Beta"
             assert envs["gamma"]["name"] == "Gamma"
+
+    def test_build_all_recursive_discovers_nested(self, runner, temp_dir, monkeypatch):
+        # Test that --recursive finds configs in subdirectories
+        import bundlecraft.builder as builder_mod
+
+        monkeypatch.setattr(builder_mod, "ROOT", temp_dir)
+        monkeypatch.setattr(builder_mod, "CONFIG_DIR", temp_dir / "config")
+
+        # Create nested structure: config/envs/team1/env1.yaml, config/envs/team2/env2.yaml
+        team1_dir = temp_dir / "config" / "envs" / "team1"
+        team2_dir = temp_dir / "config" / "envs" / "team2"
+        team1_dir.mkdir(parents=True, exist_ok=True)
+        team2_dir.mkdir(parents=True, exist_ok=True)
+        (temp_dir / "config" / "sources").mkdir(parents=True, exist_ok=True)
+
+        # Write env configs in subdirectories
+        (team1_dir / "env1.yaml").write_text(
+            "name: Team1Env\nbundles:\n  env1:\n    include_sources: [env1]\noutput_formats: [pem]\n",
+            encoding="utf-8",
+        )
+        (team2_dir / "env2.yaml").write_text(
+            "name: Team2Env\nbundles:\n  env2:\n    include_sources: [env2]\noutput_formats: [pem]\n",
+            encoding="utf-8",
+        )
+        # Create corresponding source configs
+        (temp_dir / "config" / "sources" / "env1.yaml").write_text("{}\n", encoding="utf-8")
+        (temp_dir / "config" / "sources" / "env2.yaml").write_text("{}\n", encoding="utf-8")
+
+        # Also add one at root level to ensure we get all
+        write_minimal_env(temp_dir, "root", env_name="RootEnv")
+
+        with runner.isolated_filesystem(temp_dir):
+            # Without --recursive, should only find root level
+            result = runner.invoke(cli, ["build-all", "--print-plan", "--json"])
+            assert result.exit_code == 0
+            doc = json.loads(result.output)
+            envs_no_recursive = {e["env"] for e in doc["environments"]}
+            assert envs_no_recursive == {"root"}
+
+            # With --recursive, should find all three
+            result = runner.invoke(cli, ["build-all", "--recursive", "--print-plan", "--json"])
+            assert result.exit_code == 0
+            doc = json.loads(result.output)
+            envs_recursive = {e["env"] for e in doc["environments"]}
+            assert envs_recursive == {"root", "env1", "env2"}
+
+    def test_build_all_recursive_with_envs_path(self, runner, temp_dir, monkeypatch):
+        # Test that --recursive works with --envs-path scoping
+        import bundlecraft.builder as builder_mod
+
+        monkeypatch.setattr(builder_mod, "ROOT", temp_dir)
+        monkeypatch.setattr(builder_mod, "CONFIG_DIR", temp_dir / "config")
+
+        # Create structure: config/envs/teamA/sub1/a.yaml, config/envs/teamA/sub2/b.yaml, config/envs/teamB/c.yaml
+        teamA_sub1 = temp_dir / "config" / "envs" / "teamA" / "sub1"
+        teamA_sub2 = temp_dir / "config" / "envs" / "teamA" / "sub2"
+        teamB = temp_dir / "config" / "envs" / "teamB"
+        teamA_sub1.mkdir(parents=True, exist_ok=True)
+        teamA_sub2.mkdir(parents=True, exist_ok=True)
+        teamB.mkdir(parents=True, exist_ok=True)
+        (temp_dir / "config" / "sources").mkdir(parents=True, exist_ok=True)
+
+        (teamA_sub1 / "a.yaml").write_text(
+            "name: A\nbundles:\n  a:\n    include_sources: [a]\noutput_formats: [pem]\n",
+            encoding="utf-8",
+        )
+        (teamA_sub2 / "b.yaml").write_text(
+            "name: B\nbundles:\n  b:\n    include_sources: [b]\noutput_formats: [pem]\n",
+            encoding="utf-8",
+        )
+        (teamB / "c.yaml").write_text(
+            "name: C\nbundles:\n  c:\n    include_sources: [c]\noutput_formats: [pem]\n",
+            encoding="utf-8",
+        )
+        (temp_dir / "config" / "sources" / "a.yaml").write_text("{}\n", encoding="utf-8")
+        (temp_dir / "config" / "sources" / "b.yaml").write_text("{}\n", encoding="utf-8")
+        (temp_dir / "config" / "sources" / "c.yaml").write_text("{}\n", encoding="utf-8")
+
+        with runner.isolated_filesystem(temp_dir):
+            # Recursive scan of teamA only
+            result = runner.invoke(
+                cli, ["build-all", "--envs-path", "teamA", "--recursive", "--print-plan", "--json"]
+            )
+            assert result.exit_code == 0
+            doc = json.loads(result.output)
+            envs = {e["env"] for e in doc["environments"]}
+            # Should find a and b (both under teamA), but not c (under teamB)
+            assert envs == {"a", "b"}

@@ -86,6 +86,11 @@ cli.add_command(fetch_main, name="fetch")
     is_flag=True,
     help="Show which environment configs would be built and exit without building",
 )
+@click.option(
+    "--recursive",
+    is_flag=True,
+    help="Recursively discover env configs in subdirectories (e.g., **/*.yaml)",
+)
 def build_all(
     envs_path: str | None,
     skip_fetch: bool,
@@ -100,6 +105,7 @@ def build_all(
     json_output: bool,
     keep_temp: bool,
     print_plan: bool,
+    recursive: bool,
 ):
     """Discover all environments under config/envs/ and build each one.
 
@@ -114,16 +120,16 @@ def build_all(
         # Interpret relative paths under default_base
         if not p.is_absolute():
             p = (default_base / p).resolve()
-        # If a directory, scan for *.yaml
+        # If a directory, scan for *.yaml (or **/*.yaml if recursive)
         if p.exists() and p.is_dir():
-            pattern = str(p / "*.yaml")
+            pattern = str(p / ("**/*.yaml" if recursive else "*.yaml"))
         else:
             # Assume it's a file or glob pattern
             pattern = str(p)
     else:
-        pattern = str(default_base / "*.yaml")
+        pattern = str(default_base / ("**/*.yaml" if recursive else "*.yaml"))
 
-    env_files = sorted(glob.glob(pattern))
+    env_files = sorted(glob.glob(pattern, recursive=recursive))
     chosen: list[tuple[str, dict]] = []  # (env_stem, cfg)
 
     for path in env_files:
