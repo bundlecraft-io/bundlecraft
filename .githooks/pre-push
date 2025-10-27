@@ -1,0 +1,53 @@
+#!/bin/bash
+# Pre-push hook: Prevent pushing tags without corresponding CHANGELOG.md entries
+# To install: git config core.hooksPath .githooks
+
+set -e
+
+# Read stdin to get what's being pushed
+while read local_ref local_sha remote_ref remote_sha; do
+  # Only check tags (refs/tags/*)
+  if [[ "$remote_ref" =~ ^refs/tags/v(.*)$ ]]; then
+    TAG_NAME="${BASH_REMATCH[0]#refs/tags/}"
+    VERSION="${BASH_REMATCH[1]}"
+
+    echo "🔍 Validating tag $TAG_NAME against CHANGELOG.md..."
+
+    # Check if CHANGELOG.md exists
+    if [ ! -f CHANGELOG.md ]; then
+      echo "❌ ERROR: CHANGELOG.md not found in repository root"
+      echo "   Cannot push tag $TAG_NAME without a changelog"
+      exit 1
+    fi
+
+    # Escape version for safe regex matching
+    SAFE_VERSION=$(printf '%s' "$VERSION" | sed 's/[.[\()\{\}+*?^$\\|]/\\&/g')
+
+    # Check if version entry exists in CHANGELOG.md
+    if ! grep -q "^## \[$SAFE_VERSION\]" CHANGELOG.md; then
+      echo "❌ ERROR: No changelog entry found for version $VERSION"
+      echo ""
+      echo "   Please add an entry to CHANGELOG.md following this format:"
+      echo ""
+      echo "   ## [$VERSION] - $(date +%Y-%m-%d)"
+      echo ""
+      echo "   ### Added"
+      echo "   - New feature description"
+      echo ""
+      echo "   ### Changed"
+      echo "   - Modified behavior description"
+      echo ""
+      echo "   ### Fixed"
+      echo "   - Bug fix description"
+      echo ""
+      echo "   ---"
+      echo ""
+      echo "   Then commit the changelog and push again."
+      exit 1
+    fi
+
+    echo "✅ Changelog entry found for $TAG_NAME"
+  fi
+done
+
+exit 0
