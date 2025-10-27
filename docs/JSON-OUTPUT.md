@@ -69,6 +69,12 @@ bundlecraft build-all --envs-path teamA --print-plan --json
 
 # Discover envs using a glob pattern
 bundlecraft build-all --envs-path "teamA/*.yaml" --print-plan --json
+
+# Recursively discover all envs in subdirectories
+bundlecraft build-all --recursive --print-plan --json
+
+# Combine recursive with scoping
+bundlecraft build-all --envs-path teamA --recursive --print-plan --json
 ```
 
 ### Build Command

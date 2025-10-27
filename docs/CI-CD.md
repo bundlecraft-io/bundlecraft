@@ -99,6 +99,7 @@ Discover which environment/bundle combinations to build using the built-in CLI d
 
 - Use `bundlecraft build-all --print-plan` to list environments to build
 - Scans `config/envs/*.yaml` by default; scope with `--envs-path` to target subfolders or globs
+- Add `--recursive` to discover configs in nested subdirectories (e.g., `config/envs/**/*.yaml`)
 - Emit JSON with `--json` for easy matrix generation
 - Validate selection and provide summary before building
 
@@ -113,6 +114,12 @@ bundlecraft build-all --envs-path teamA --print-plan --json
 
 # Discover envs matching a glob
 bundlecraft build-all --envs-path "teamA/*.yaml" --print-plan --json
+
+# Recursively discover all envs in subdirectories
+bundlecraft build-all --recursive --print-plan --json
+
+# Combine recursive with scoping
+bundlecraft build-all --envs-path teamA --recursive --print-plan --json
 ```
 
 The JSON document contains a simple list of environments and their resolved paths, suitable for transforming into a GitHub Actions matrix.

@@ -162,9 +162,13 @@ bundlecraft build-all
 bundlecraft build-all --envs-path my_group
 bundlecraft build-all --envs-path "my_group/*.yaml"
 
+# Recursively discover envs in subdirectories (e.g., config/envs/**/*)
+bundlecraft build-all --recursive
+
 # Preview what would be built (no changes)
 bundlecraft build-all --print-plan
 bundlecraft build-all --envs-path my_group --print-plan --json
+bundlecraft build-all --recursive --print-plan
 ```
 
 Outputs:
