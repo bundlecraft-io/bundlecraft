@@ -155,6 +155,16 @@ bundlecraft build --env dev
 
 # Build one bundle
 bundlecraft build --env dev --bundle mozilla
+
+# Build all environments (discovery baked in)
+# Scans config/envs/*.yaml by default; use --envs-path to scope to a subdirectory or glob
+bundlecraft build-all
+bundlecraft build-all --envs-path my_group
+bundlecraft build-all --envs-path "my_group/*.yaml"
+
+# Preview what would be built (no changes)
+bundlecraft build-all --print-plan
+bundlecraft build-all --envs-path my_group --print-plan --json
 ```
 
 Outputs:
@@ -451,6 +461,7 @@ ______________________________________________________________________
 |---|---|---|
 | `bundlecraft.fetch` (CLI: `bundlecraft fetch`) | Securely fetch remote sources and stage them (no persistent cache) | `bundlecraft fetch --env prod --bundle internal` |
 | `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --env prod --bundle internal-prod` |
+| `bundlecraft.cli build-all` (CLI: `bundlecraft build-all`) | Discover and build all environments; supports scoping and plan output | `bundlecraft build-all --envs-path teamA --print-plan` |
 | `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify dist/prod/internal` |
 | `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert any supported input to any supported output (PEM, P7B, JKS, P12, ZIP) | `bundlecraft convert --input dist/prod/internal/bundlecraft-ca-trust.pem --output-dir dist/prod/internal/ --output-format jks` |
 

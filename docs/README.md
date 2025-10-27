@@ -14,6 +14,7 @@ ______________________________________________________________________
 - **[Build Paths and Reserved Directories](build-paths-and-dist.md)** - How output paths are determined, customizing env.build_path safely, and reserved files under dist/
 - **[BundleCraft Diff](bundlecraft-diff.md)** - Compare certificate bundles between builds and releases
 - **[JSON Output Schemas](JSON-OUTPUT.md)** - Machine-readable output formats for all CLI commands (--json flag)
+- **Build-All Discovery (see CI/CD → Discover)** - Use `bundlecraft build-all --envs-path ... --print-plan` to list or scope environments prior to building
 - **[Exit Codes](exit-codes.md)** - Standardized exit codes for CI/CD integration and error handling
 - **[Signing and SBOM](SIGNING-AND-SBOM.md)** - GPG signing of releases and automatic CycloneDX SBOM generation
 
