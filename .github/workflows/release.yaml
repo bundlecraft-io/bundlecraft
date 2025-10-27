@@ -99,6 +99,21 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install build twine
+      - name: Update Changelog URL (tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          URL="https://github.com/${REPO}/releases/tag/${TAG}"
+          echo "Setting [project.urls].Changelog to ${URL}"
+          awk -v url="$URL" '
+            BEGIN{in_urls=0}
+            /^\[project\.urls\]/ {in_urls=1; print; next}
+            /^\[/ && $0 !~ /^\[project\.urls\]/ {in_urls=0}
+            in_urls && /^Changelog *=/ { print "Changelog = \"" url "\""; next }
+            { print }
+          ' pyproject.toml > pyproject.toml.tmp && mv pyproject.toml.tmp pyproject.toml
       - name: Build package (tag)
         if: startsWith(github.ref, 'refs/tags/v')
         run: make build-pypi GIT_TAG=${{ github.ref_name }}
