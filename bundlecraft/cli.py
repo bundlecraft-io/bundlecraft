@@ -154,16 +154,32 @@ def build_all(
     # If --print-plan is provided, display plan and exit without building
     if print_plan:
         if json_output:
-            plan = {
-                "pattern": pattern,
-                "environments": [
+            plan_envs = []
+            for env_stem, cfg in chosen:
+                # Compute build path for this env
+                env_name_for_path = (cfg or {}).get("name") or env_stem
+                safe_env = str(env_name_for_path).replace("/", "-").replace(" ", "-")
+                build_path_cfg = (cfg or {}).get("build_path")
+                if build_path_cfg:
+                    build_path_clean = str(build_path_cfg).strip("/").replace("..", "")
+                    if build_path_clean.startswith("dist/"):
+                        build_path_clean = build_path_clean[5:]
+                    build_output_base = str(Path("dist") / build_path_clean)
+                else:
+                    build_output_base = str(Path(output_root) / safe_env)
+
+                plan_envs.append(
                     {
                         "env": env_stem,
                         "name": str((cfg or {}).get("name") or env_stem),
                         "path": str(Path(builder_mod.CONFIG_DIR) / "envs" / f"{env_stem}.yaml"),
+                        "build_path": build_output_base,
                     }
-                    for env_stem, cfg in chosen
-                ],
+                )
+
+            plan = {
+                "pattern": pattern,
+                "environments": plan_envs,
             }
             click.echo(json.dumps(plan))
         else:
@@ -174,7 +190,21 @@ def build_all(
             for env_stem, cfg in chosen:
                 env_name = str((cfg or {}).get("name") or env_stem)
                 path_hint = Path(builder_mod.CONFIG_DIR) / "envs" / f"{env_stem}.yaml"
+
+                # Compute build path for this env
+                env_name_for_path = (cfg or {}).get("name") or env_stem
+                safe_env = str(env_name_for_path).replace("/", "-").replace(" ", "-")
+                build_path_cfg = (cfg or {}).get("build_path")
+                if build_path_cfg:
+                    build_path_clean = str(build_path_cfg).strip("/").replace("..", "")
+                    if build_path_clean.startswith("dist/"):
+                        build_path_clean = build_path_clean[5:]
+                    build_output_base = str(Path("dist") / build_path_clean)
+                else:
+                    build_output_base = str(Path(output_root) / safe_env)
+
                 click.echo(f" - {env_name} ({env_stem}) -> {path_hint}")
+                click.echo(f"   Build path: {build_output_base}/<bundle>")
         return
 
     # Run builds sequentially; each environment builds all its bundles by default

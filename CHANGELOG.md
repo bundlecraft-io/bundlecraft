@@ -144,6 +144,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3-beta.25] - 2025-10-28
+
+### Changed
+
+- `bundlecraft build-all --print-plan` now prints `build_path`
+
+---
+
 ## Stable Releases
 
 ---
