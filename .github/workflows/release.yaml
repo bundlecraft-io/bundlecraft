@@ -229,7 +229,7 @@ jobs:
             type=semver,pattern={{version}},value=${{ steps.version.outputs.VERSION }}
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.VERSION }}
             type=semver,pattern={{major}},value=${{ steps.version.outputs.VERSION }}
-            type=raw,value=latest,enable=${{ needs.determine-channel.outputs.channel == 'pre-release' }}
+            type=raw,value=pre-release,enable=${{ needs.determine-channel.outputs.channel == 'pre-release' }}
       - name: Build and push
         id: build
         uses: docker/build-push-action@v5

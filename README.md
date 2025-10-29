@@ -155,6 +155,20 @@ bundlecraft build --env dev
 
 # Build one bundle
 bundlecraft build --env dev --bundle mozilla
+
+# Build all environments (discovery baked in)
+# Scans config/envs/*.yaml by default; use --envs-path to scope to a subdirectory or glob
+bundlecraft build-all
+bundlecraft build-all --envs-path my_group
+bundlecraft build-all --envs-path "my_group/*.yaml"
+
+# Recursively discover envs in subdirectories (e.g., config/envs/**/*)
+bundlecraft build-all --recursive
+
+# Preview what would be built (no changes)
+bundlecraft build-all --print-plan
+bundlecraft build-all --envs-path my_group --print-plan --json
+bundlecraft build-all --recursive --print-plan
 ```
 
 Outputs:
@@ -394,6 +408,46 @@ bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --o
 
 ______________________________________________________________________
 
+## 🎯 Template Repository - Get Started Quickly
+
+New to BundleCraft and looking to get started using it? Use the official template repository for a quick setup within your own BundleCraft config repository:
+
+### 🧱 [BundleCraft Starter Template](https://github.com/bundlecraft-io/bundlecraft-starter)
+
+The template provides:
+
+- ✅ **Complete GitHub Actions workflow** with containerized builds
+- 🔄 **Dynamic build matrix** for parallel environment processing
+- 🔐 **Optional GPG signing** for artifact integrity
+- 📊 **Automatic certificate diff reports** between releases
+- ⚙️ **Highly configurable** for different organizational needs
+
+### Quick Setup
+
+```bash
+# Create a new repository from the template
+gh repo create my-org/my-certificate-bundles --template bundlecraft-io/bundlecraft-starter
+
+# Clone and customize
+git clone https://github.com/my-org/my-certificate-bundles.git
+cd my-certificate-bundles
+
+# Add your certificates
+mkdir -p cert_sources/internal
+cp /path/to/your/rootCA.pem cert_sources/internal/
+
+# Configure your bundles
+# Edit config/sources/*.yaml and config/envs/*.yaml
+
+# Commit and trigger your first build
+git add . && git commit -m "Initial certificate configuration"
+git push origin main
+```
+
+The template is perfect for anyone wanting to adopt BundleCraft with minimal setup!
+
+______________________________________________________________________
+
 ## ⚙️ Environment Variables
 
 BundleCraft supports the following environment variables for configuration:
@@ -451,6 +505,7 @@ ______________________________________________________________________
 |---|---|---|
 | `bundlecraft.fetch` (CLI: `bundlecraft fetch`) | Securely fetch remote sources and stage them (no persistent cache) | `bundlecraft fetch --env prod --bundle internal` |
 | `bundlecraft.builder` (CLI: `bundlecraft build`) | Build trust bundles from configs, write all outputs | `bundlecraft build --env prod --bundle internal-prod` |
+| `bundlecraft.cli build-all` (CLI: `bundlecraft build-all`) | Discover and build all environments; supports scoping and plan output | `bundlecraft build-all --envs-path teamA --print-plan` |
 | `bundlecraft.verifier` (CLI: `bundlecraft verify`) | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify dist/prod/internal` |
 | `bundlecraft.converter` (CLI: `bundlecraft convert`) | Convert any supported input to any supported output (PEM, P7B, JKS, P12, ZIP) | `bundlecraft convert --input dist/prod/internal/bundlecraft-ca-trust.pem --output-dir dist/prod/internal/ --output-format jks` |
 
@@ -690,6 +745,12 @@ ______________________________________________________________________
 ______________________________________________________________________
 
 ## 🔗 Related Projects & References
+
+**BundleCraft Ecosystem:**
+
+- [🧱 BundleCraft Starter](https://github.com/bundlecraft-io/bundlecraft-starter) —  Template repository with GitHub Actions workflow for orchestrating your own BundleCraft builds.
+
+**Standards & Documentation:**
 
 - [RFC 5280 — Internet X.509 PKI Certificate and CRL Profile](https://datatracker.ietf.org/doc/html/rfc5280)
 - [RFC 5652 — Cryptographic Message Syntax (CMS / PKCS#7)](https://datatracker.ietf.org/doc/html/rfc5652)

@@ -731,6 +731,17 @@ def main(
                         )
 
                 bundle_cache_dirs[bname] = cache_dir
+            except FileNotFoundError as e:
+                # More specific error for missing source configs
+                click.secho(
+                    f"  [cache] ✗ Source config not found for '{bname}': {e}", fg="red", err=True
+                )
+                click.secho(
+                    f"  [HINT] Create config/sources/{bname}.yaml with source configuration",
+                    fg="yellow",
+                    err=True,
+                )
+                sys.exit(ExitCode.CONFIG_ERROR)
             except Exception as e:
                 click.secho(
                     f"  [cache] ✗ Failed to stage/cache bundle {bname}: {e}", fg="red", err=True
@@ -774,20 +785,21 @@ def main(
     fmt_overrides = env_cfg.get("format_overrides") or {}
 
     # Determine the build output directory with build_path override support
-    # Ensure build_path is always rooted to dist/ for safety
+    # IMPORTANT: All builds must be rooted in dist/<env>/ for security
+    # build_path can only specify a subdirectory within that root
     build_path_cfg = env_cfg.get("build_path")
     if build_path_cfg:
-        # Strip any leading slashes or ../ attempts and ensure it's under dist/
-        build_path_clean = str(build_path_cfg).strip("/").replace("..", "")
-        # If user provides a path starting with "dist/", strip it first
-        if build_path_clean.startswith("dist/"):
-            build_path_clean = build_path_clean[5:]  # Remove "dist/" prefix
-        # Construct final path: ROOT/dist/<user_path>/<bundle_name>
-        build_output_base = (ROOT / "dist" / build_path_clean).resolve()
-        # Validate that the resolved path is still under dist/
-        dist_root = (ROOT / "dist").resolve()
-        if not str(build_output_base).startswith(str(dist_root)):
-            error_msg = f"build_path must remain under dist/ directory (got: {build_path_cfg})"
+        # Normalize and validate the build_path (should already be validated by schema)
+        build_path_clean = str(build_path_cfg).strip("/")
+        
+        # Final structure: dist/<env>/<build_path>/<bundle>
+        # Note: safe_env is the environment name, build_path_clean is the custom subdirectory
+        build_output_base = (ROOT / "dist" / safe_env / build_path_clean).resolve()
+        
+        # Double-check that resolved path is under dist/<env> (defense in depth)
+        expected_root = (ROOT / "dist" / safe_env).resolve()
+        if not str(build_output_base).startswith(str(expected_root)):
+            error_msg = f"build_path must remain under dist/{safe_env}/ directory (got: {build_path_cfg})"
             if json_output:
                 json_errors.append(error_msg)
                 from bundlecraft.helpers.json_output import create_build_response, emit_json
@@ -800,9 +812,14 @@ def main(
             else:
                 click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
             sys.exit(ExitCode.CONFIG_ERROR)
+        
+        # Manifest shows the full path relative to project root
+        manifest_build_path = f"dist/{safe_env}/{build_path_clean}"
     else:
         # Default: dist/<env>/<bundle>
         build_output_base = (Path(output_root) / safe_env).resolve()
+        # Effective default base for manifest field ignores --output-root and follows spec
+        manifest_build_path = f"dist/{safe_env}"
 
     per_bundle_results: dict[str, dict] = {}
     import shutil
@@ -888,6 +905,7 @@ def main(
                         ),
                         "certificate_count": len(pem_blocks),
                         "output_formats": output_formats,
+                        "build_path": manifest_build_path,
                     }
 
                     # Add verification summary if not skipped
@@ -953,16 +971,56 @@ def main(
             for bdir in bundle_dirs:
                 cache_pem = bdir / "bundlecraft-ca-trust.pem"
                 if cache_pem.exists():
+                    blocks_before = len(merged_blocks)
                     merged_blocks.extend(_read_pem_chunks([cache_pem]))
+                    blocks_added = len(merged_blocks) - blocks_before
+                    if verbose:
+                        click.echo(
+                            f"  [{bundle_name}] Loaded {blocks_added} cert(s) from cached: {cache_pem.relative_to(ROOT)}",
+                            err=True,
+                        )
                 else:
+                    if not bdir.exists():
+                        click.secho(
+                            f"  [ERROR] [{bundle_name}] Bundle directory does not exist: {bdir.relative_to(ROOT)}",
+                            fg="red",
+                            err=True,
+                        )
+                        click.secho(
+                            f"  [HINT] Run without --skip-fetch or check that source '{bdir.name}' is configured correctly",
+                            fg="yellow",
+                            err=True,
+                        )
+                        sys.exit(ExitCode.BUILD_ERROR)
                     pem_files = _aggregate_staged_sources([bdir], verbose=verbose)
+                    if not pem_files:
+                        click.secho(
+                            f"  [ERROR] [{bundle_name}] No .pem files found in: {bdir.relative_to(ROOT)}",
+                            fg="red",
+                            err=True,
+                        )
+                        sys.exit(ExitCode.BUILD_ERROR)
+                    blocks_before = len(merged_blocks)
                     merged_blocks.extend(_read_pem_chunks(pem_files))
+                    blocks_added = len(merged_blocks) - blocks_before
+                    if verbose:
+                        click.echo(
+                            f"  [{bundle_name}] Loaded {blocks_added} cert(s) from {len(pem_files)} file(s) in: {bdir.relative_to(ROOT)}",
+                            err=True,
+                        )
 
             # Apply filters to merged blocks
             from bundlecraft.helpers.utils import apply_filters
 
             filters_cfg = env_cfg.get("filters") or {}
+            blocks_before_filter = len(merged_blocks)
             merged_blocks = apply_filters(merged_blocks, filters_cfg)
+            blocks_filtered = blocks_before_filter - len(merged_blocks)
+            if blocks_filtered > 0 and verbose:
+                click.echo(
+                    f"  [{bundle_name}] Filtered out {blocks_filtered} certificate(s) per configuration",
+                    err=True,
+                )
 
             if not merged_blocks:
                 click.secho(
@@ -970,6 +1028,18 @@ def main(
                     fg="red",
                     err=True,
                 )
+                if blocks_before_filter > 0:
+                    click.secho(
+                        f"  [HINT] All {blocks_before_filter} certificate(s) were filtered out. Check your filter configuration.",
+                        fg="yellow",
+                        err=True,
+                    )
+                else:
+                    click.secho(
+                        "  [HINT] No certificates were loaded from bundle directories. Check source configs and staging.",
+                        fg="yellow",
+                        err=True,
+                    )
                 sys.exit(ExitCode.INVALID_CERT)
 
             pem_out = build_root / "bundlecraft-ca-trust.pem"
@@ -1051,6 +1121,7 @@ def main(
                     ),
                     "certificate_count": len(merged_blocks),
                     "output_formats": output_formats,
+                    "build_path": manifest_build_path,
                 }
 
                 # Add verification summary if not skipped
@@ -1213,6 +1284,7 @@ def main(
                 "timestamp_utc": timestamp_utc,
                 "certificate_count": len(pem_blocks),
                 "output_formats": output_formats,
+                "build_path": manifest_build_path,
             }
             # Add verification summary if not skipped (same policy for all targets)
             if not skip_verify:
@@ -1281,6 +1353,7 @@ def main(
                 "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "certificate_count": len(pem_blocks),
                 "output_formats": output_formats,
+                "build_path": manifest_build_path,
             }
             # Add verification summary if not skipped (same policy for all targets)
             if not skip_verify:

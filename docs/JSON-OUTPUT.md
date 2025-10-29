@@ -28,6 +28,55 @@ All JSON responses share a common base structure:
 
 ## Command-Specific Schemas
 
+### Build-All Plan (Discovery)
+
+When running `bundlecraft build-all --print-plan --json`, the CLI emits a discovery plan that lists which environments would be built. This does not perform any build actions.
+
+```json
+{
+  "pattern": "/abs/path/to/config/envs/*.yaml",
+  "environments": [
+    {
+      "env": "dev",
+      "name": "Development",
+      "path": "/abs/path/to/config/envs/dev.yaml"
+    },
+    {
+      "env": "prod",
+      "name": "Production",
+      "path": "/abs/path/to/config/envs/prod.yaml"
+    }
+  ]
+}
+```
+
+Fields:
+
+- **pattern**: `string` - The resolved glob or directory pattern used for discovery. Defaults to `config/envs/*.yaml` under the detected workspace.
+- **environments**: `array` - List of discovered environments
+  - **env**: `string` - Environment identifier (file stem of the YAML, e.g., `dev` for `dev.yaml`)
+  - **name**: `string` - Human-friendly name from the environment config (`name`), falls back to `env` when unspecified
+  - **path**: `string` - Absolute path to the environment config file
+
+Examples:
+
+```bash
+# Discover all envs
+bundlecraft build-all --print-plan --json
+
+# Discover envs scoped to a subdirectory
+bundlecraft build-all --envs-path teamA --print-plan --json
+
+# Discover envs using a glob pattern
+bundlecraft build-all --envs-path "teamA/*.yaml" --print-plan --json
+
+# Recursively discover all envs in subdirectories
+bundlecraft build-all --recursive --print-plan --json
+
+# Combine recursive with scoping
+bundlecraft build-all --envs-path teamA --recursive --print-plan --json
+```
+
 ### Build Command
 
 The `build` command produces the following JSON structure:

@@ -12,6 +12,7 @@ The BundleCraft framework consists of four primary components (Fetch → Build �
 | ------------------------------ | --------------------------------------------------------------------------- | --------------------- |
 | **Fetcher** (`fetch.py`) | Securely fetches remote certificate sources and stages them for build. | `bundlecraft fetch` |
 | **Builder** (`builder.py`) | Builds trust bundles from configured certificate sources. | `bundlecraft build` |
+| **Bulk Builder** (`cli.py`) | Discovers and builds all environments automatically. | `bundlecraft build-all` |
 | **Verifier** (`verifier.py`) | Verifies integrity, consistency, and certificate validity of built bundles. | `bundlecraft verify` |
 | **Converter** (`converter.py`) | Converts certificate bundles between any supported formats (PEM, P7B, JKS, P12, ZIP). Accepts DER as input. | `bundlecraft convert` |
 | **Differ** (`differ.py`) | Compares two bundle builds to identify added, removed, and unchanged certificates. | `bundlecraft diff` |
@@ -51,11 +52,12 @@ You’ll see:
 Usage: bundlecraft [OPTIONS] COMMAND [ARGS]...
 
 Commands:
-  fetch    Securely fetch and stage certificates from declared sources.
-  build    Build CA trust bundles from configured sources.
-  verify   Verify integrity and consistency of built bundles.
-  convert  Convert PEM bundles into alternate trust store formats.
-  diff     Compare two bundle builds and generate diff reports.
+  fetch      Securely fetch and stage certificates from declared sources.
+  build      Build CA trust bundles from configured sources.
+  build-all  Discover and build all environments automatically.
+  verify     Verify integrity and consistency of built bundles.
+  convert    Convert PEM bundles into alternate trust store formats.
+  diff       Compare two bundle builds and generate diff reports.
 ```
 
 ### 🌐 `bundlecraft fetch`
@@ -257,6 +259,92 @@ repo:
 
 ______________________________________________________________________
 
+### 🏗️ `bundlecraft build-all`
+
+**Purpose:** Discover and build all environments automatically. This command scans for environment configuration files and builds each one sequentially, eliminating the need to manually specify each environment.
+
+**Usage:**
+
+```bash
+bundlecraft build-all [OPTIONS]
+```
+
+**Options:**
+
+| Option | Description |
+| ----------------- | ----------- |
+| `--envs-path` | Path or glob to discover env yaml files. If a directory, scans for `*.yaml` inside. Relative paths are resolved under `config/envs/`. Examples: `'my_github_envs'`, `'my_github_envs/*.yaml'`, `'config/envs/custom/*.yaml'`. |
+| `--recursive` | Recursively discover env configs in subdirectories (e.g., `**/*.yaml`). |
+| `--print-plan` | Show which environment configs would be built and exit without building. |
+| `--skip-fetch` | Skip fetch stage; use existing staged sources. |
+| `--skip-verify` | Skip verification stage. |
+| `--output-root` | Root directory for outputs (default: `./dist`). |
+| `--verbose` | Enable verbose logging. |
+| `--force` | Overwrite existing output files. |
+| `--dry-run` | Show actions without writing files or executing external tools. |
+| `--sign` | GPG-sign release artifacts. |
+| `--gpg-key-id` | GPG key ID to use for signing. |
+| `--no-sbom` | Skip SBOM generation. |
+| `--json` | Emit machine-readable JSON output. |
+| `--keep-temp` | Preserve temporary build directories on failure. |
+
+**Discovery Logic:**
+
+- By default, scans `config/envs/*.yaml` for environment configurations
+- Skips files starting with "example" (e.g., `example-dev.yaml`)
+- Each discovered environment builds all its configured bundles
+- Uses the same outputs and artifacts as individual `bundlecraft build` commands
+
+**Examples:**
+
+```bash
+# Build all environments in config/envs/
+bundlecraft build-all
+
+# Build environments in a specific subdirectory
+bundlecraft build-all --envs-path my_group
+
+# Use glob pattern for specific environments
+bundlecraft build-all --envs-path "my_group/*.yaml"
+
+# Recursively discover environments in subdirectories
+bundlecraft build-all --recursive
+
+# Show build plan without executing (useful for CI/CD planning)
+bundlecraft build-all --print-plan
+
+# JSON output for programmatic use
+bundlecraft build-all --envs-path my_group --print-plan --json
+
+# Recursive discovery with plan output
+bundlecraft build-all --recursive --print-plan
+```
+
+**CI/CD Integration:**
+
+The `--print-plan` option is particularly useful for CI/CD systems that need to understand what will be built:
+
+```bash
+# Get build plan in JSON format for matrix strategies
+bundlecraft build-all --print-plan --json
+
+# Scope to specific environment groups
+bundlecraft build-all --envs-path teamA --print-plan --json
+```
+
+**Output Structure:**
+
+When using `--print-plan --json`, the output includes:
+
+- `pattern`: The resolved file pattern used for discovery
+- `environments`: Array of discovered environments with:
+  - `env`: Environment file stem (e.g., `prod`)
+  - `name`: Display name from config or file stem
+  - `path`: Full path to the environment config file
+  - `build_path`: Computed output directory for this environment
+
+______________________________________________________________________
+
 ### 🔍 `bundlecraft verify`
 
 **Purpose:** Verify the integrity, consistency, and validity of generated trust bundles.
@@ -435,6 +523,7 @@ bundlecraft [COMMAND] [OPTIONS]
 
 ```bash
 bundlecraft build --env prod --bundle internal
+bundlecraft build-all --print-plan
 bundlecraft verify --target dist/prod/internal --verify-all
 bundlecraft convert --pem-file dist/prod/internal/bundlecraft-ca-trust.pem --output-dir dist/prod/internal/
 ```

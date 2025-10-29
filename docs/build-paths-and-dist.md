@@ -50,6 +50,26 @@ dist/
 - If you include a `dist/` prefix, it is removed. For example, `dist/dev/custom/` is treated as `dev/custom/`.
 - If, after normalization, the path attempts to escape `dist/`, the build will fail with a clear error.
 
+### Manifest field: build_path
+
+Each built bundle includes a `manifest.json` file. The manifest now records the effective environment build base under `dist/` using a `build_path` field.
+
+Example `manifest.json` excerpt:
+
+```json
+{
+  "env": "TestEnv",
+  "bundle": "internal",
+  "build_path": "dist/TestEnv",
+  "certificate_count": 42,
+  "output_formats": ["pem", "p7b"]
+}
+```
+
+- When `env.build_path` is omitted, `build_path` defaults to `dist/<env-name>`.
+- When `env.build_path` is set (e.g., `team/dev/custom/`), `build_path` becomes `dist/team/dev/custom`.
+- This is the base directory under which per-bundle folders are created (e.g., `dist/TestEnv/<bundle>/...`).
+
 ## Reserved and managed files
 
 BundleCraft generates and manages several files inside each bundle directory. Some files are excluded from packaging to ensure deterministic and minimal artifacts:
