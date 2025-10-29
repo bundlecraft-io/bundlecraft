@@ -785,20 +785,21 @@ def main(
     fmt_overrides = env_cfg.get("format_overrides") or {}
 
     # Determine the build output directory with build_path override support
-    # Ensure build_path is always rooted to dist/ for safety
+    # IMPORTANT: All builds must be rooted in dist/<env>/ for security
+    # build_path can only specify a subdirectory within that root
     build_path_cfg = env_cfg.get("build_path")
     if build_path_cfg:
-        # Strip any leading slashes or ../ attempts and ensure it's under dist/
-        build_path_clean = str(build_path_cfg).strip("/").replace("..", "")
-        # If user provides a path starting with "dist/", strip it first
-        if build_path_clean.startswith("dist/"):
-            build_path_clean = build_path_clean[5:]  # Remove "dist/" prefix
-        # Construct final path: ROOT/dist/<user_path>/<bundle_name>
-        build_output_base = (ROOT / "dist" / build_path_clean).resolve()
-        # Validate that the resolved path is still under dist/
-        dist_root = (ROOT / "dist").resolve()
-        if not str(build_output_base).startswith(str(dist_root)):
-            error_msg = f"build_path must remain under dist/ directory (got: {build_path_cfg})"
+        # Normalize and validate the build_path (should already be validated by schema)
+        build_path_clean = str(build_path_cfg).strip("/")
+        
+        # Final structure: dist/<env>/<build_path>/<bundle>
+        # Note: safe_env is the environment name, build_path_clean is the custom subdirectory
+        build_output_base = (ROOT / "dist" / safe_env / build_path_clean).resolve()
+        
+        # Double-check that resolved path is under dist/<env> (defense in depth)
+        expected_root = (ROOT / "dist" / safe_env).resolve()
+        if not str(build_output_base).startswith(str(expected_root)):
+            error_msg = f"build_path must remain under dist/{safe_env}/ directory (got: {build_path_cfg})"
             if json_output:
                 json_errors.append(error_msg)
                 from bundlecraft.helpers.json_output import create_build_response, emit_json
@@ -811,8 +812,9 @@ def main(
             else:
                 click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
             sys.exit(ExitCode.CONFIG_ERROR)
-        # Effective build_path string to include in manifest (always under dist/)
-        manifest_build_path = f"dist/{build_path_clean}"
+        
+        # Manifest shows the full path relative to project root
+        manifest_build_path = f"dist/{safe_env}/{build_path_clean}"
     else:
         # Default: dist/<env>/<bundle>
         build_output_base = (Path(output_root) / safe_env).resolve()

@@ -162,6 +162,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3-beta.27] - 2025-10-28
+
+### Changed
+
+- feat: enforce build_path to be a subdirectory within dist/env for security
+
+---
+
 ## Stable Releases
 
 ---

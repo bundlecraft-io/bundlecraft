@@ -255,6 +255,12 @@ output_formats:  # Which formats to produce
   - jks   # Java KeyStore
   - p12   # PKCS#12
 
+# Build output configuration
+# IMPORTANT: All builds are rooted in dist/<env>/ for security
+# build_path specifies a subdirectory within that root
+# Final structure: dist/<env>/<build_path>/<bundle>/<cert_files>
+build_path: my/custom/dir  # Optional: creates dist/<env>/my/custom/dir/<bundle>/
+
 # Outputs are written by default to: dist/<env-name>/<bundle-name>/
 package: true  # Create .tar.gz of outputs
 ````
@@ -424,12 +430,61 @@ output_metadata:
     app.kubernetes.io/managed-by: "bundlecraft"
 ```
 
+### Build Path Configuration
+
+The `build_path` field allows customization of the output directory structure while maintaining security by enforcing that all builds remain under `dist/<env>/`.
+
+**Security Rules:**
+
+- All builds are rooted in `dist/<env>/` - this cannot be overridden
+- `build_path` specifies a subdirectory within that root
+- Path traversal attempts (`..`) are blocked
+- Absolute paths are not allowed
+
+**Structure:**
+
+```yaml
+# Without build_path (default)
+name: my-env
+# Results in: dist/my-env/<bundle>/<cert_files>
+
+# With build_path
+name: my-env
+build_path: team/custom/dir
+# Results in: dist/my-env/team/custom/dir/<bundle>/<cert_files>
+```
+
+**Validation:**
+
+- Must be a relative path (no leading `/`)
+- Cannot contain `..` (parent directory references)  
+- Cannot start with `dist/` (automatically prefixed)
+- Path components can only contain alphanumeric characters, hyphens, underscores, and dots
+
+**Examples:**
+
+```yaml
+# Valid build_path values
+build_path: staging                    # → dist/<env>/staging/<bundle>/
+build_path: team-a/v2                 # → dist/<env>/team-a/v2/<bundle>/
+build_path: custom.dir/sub_folder     # → dist/<env>/custom.dir/sub_folder/<bundle>/
+
+# Invalid build_path values (will cause validation errors)
+build_path: /absolute/path            # Error: absolute paths not allowed
+build_path: ../escape                 # Error: parent directory traversal
+build_path: dist/override            # Error: cannot override dist/ prefix
+build_path: invalid@chars            # Error: special characters not allowed
+```
+
 ### Complete Environment Config Example
 
 ```yaml
 ---
 name: Production
 description: Production env with full certificate suite
+
+# Optional: customize output directory structure
+build_path: releases/prod
 
 bundles:
   internal-prod:
@@ -655,7 +710,8 @@ ______________________________________________________________________
 
 - `bundle_cfg.package`: reserved (may be used for bundle-level compression hints)
 - `craft_cfg.publish_targets`: deprecated, use `distribution.targets` instead
-- `craft_cfg.build_path`: deprecated; prefer CLI `--output-root`
+
+**Note on build_path:** The `build_path` field in environment configs is supported but constrained to subdirectories within `dist/<env>/` for security. All builds are rooted in the dist directory structure.
 
 ______________________________________________________________________
 

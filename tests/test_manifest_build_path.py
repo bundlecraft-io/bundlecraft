@@ -74,7 +74,7 @@ def test_manifest_includes_build_path_default(temp_workspace, sample_bundle_conf
 
 
 def test_manifest_includes_build_path_custom(temp_workspace, sample_bundle_config, monkeypatch):
-    # Prepare configs WITH build_path specified; ensure manifest reflects it under dist/
+    # Prepare configs WITH build_path specified; ensure manifest reflects it under dist/<env>/
     _prepare_basic_env(temp_workspace, sample_bundle_config, build_path_line="team/dev/custom/")
 
     # Monkeypatch builder module constants
@@ -98,8 +98,9 @@ def test_manifest_includes_build_path_custom(temp_workspace, sample_bundle_confi
             ],
         )
         assert isinstance(result.exit_code, int)
-        bundle_dir = temp_workspace / "dist" / "team" / "dev" / "custom" / "only"
+        # New behavior: build_path is a subdirectory within dist/<env>/
+        bundle_dir = temp_workspace / "dist" / "TestEnv" / "team" / "dev" / "custom" / "only"
         manifest_file = bundle_dir / "manifest.json"
         assert manifest_file.exists(), "manifest.json missing"
         data = json.loads(manifest_file.read_text())
-        assert data.get("build_path") == "dist/team/dev/custom"
+        assert data.get("build_path") == "dist/TestEnv/team/dev/custom"

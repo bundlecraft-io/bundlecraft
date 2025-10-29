@@ -156,17 +156,16 @@ def build_all(
         if json_output:
             plan_envs = []
             for env_stem, cfg in chosen:
-                # Compute build path for this env
+                # Compute build path for this env (new behavior: always under dist/<env>)
                 env_name_for_path = (cfg or {}).get("name") or env_stem
                 safe_env = str(env_name_for_path).replace("/", "-").replace(" ", "-")
                 build_path_cfg = (cfg or {}).get("build_path")
                 if build_path_cfg:
-                    build_path_clean = str(build_path_cfg).strip("/").replace("..", "")
-                    if build_path_clean.startswith("dist/"):
-                        build_path_clean = build_path_clean[5:]
-                    build_output_base = str(Path("dist") / build_path_clean)
+                    # build_path is now a subdirectory within dist/<env>/
+                    build_path_clean = str(build_path_cfg).strip("/")
+                    build_output_base = str(Path("dist") / safe_env / build_path_clean)
                 else:
-                    build_output_base = str(Path(output_root) / safe_env)
+                    build_output_base = str(Path("dist") / safe_env)
 
                 plan_envs.append(
                     {
@@ -191,17 +190,16 @@ def build_all(
                 env_name = str((cfg or {}).get("name") or env_stem)
                 path_hint = Path(builder_mod.CONFIG_DIR) / "envs" / f"{env_stem}.yaml"
 
-                # Compute build path for this env
+                # Compute build path for this env (new behavior: always under dist/<env>)
                 env_name_for_path = (cfg or {}).get("name") or env_stem
                 safe_env = str(env_name_for_path).replace("/", "-").replace(" ", "-")
                 build_path_cfg = (cfg or {}).get("build_path")
                 if build_path_cfg:
-                    build_path_clean = str(build_path_cfg).strip("/").replace("..", "")
-                    if build_path_clean.startswith("dist/"):
-                        build_path_clean = build_path_clean[5:]
-                    build_output_base = str(Path("dist") / build_path_clean)
+                    # build_path is now a subdirectory within dist/<env>/
+                    build_path_clean = str(build_path_cfg).strip("/")
+                    build_output_base = str(Path("dist") / safe_env / build_path_clean)
                 else:
-                    build_output_base = str(Path(output_root) / safe_env)
+                    build_output_base = str(Path("dist") / safe_env)
 
                 click.echo(f" - {env_name} ({env_stem}) -> {path_hint}")
                 click.echo(f"   Build path: {build_output_base}/<bundle>")

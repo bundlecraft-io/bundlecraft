@@ -243,6 +243,78 @@ class TestCraftConfigValidation:
             validate_env_config(data)
         assert "include_sources" in str(exc_info.value).lower()
 
+    def test_build_path_parent_traversal(self):
+        """build_path cannot contain parent directory references."""
+        data = {
+            "name": "Test",
+            "description": "Test",
+            "bundles": {"internal": {"include_sources": ["test"]}},
+            "build_path": "team/../escape",
+        }
+        with pytest.raises((ValidationError, ValueError)) as exc_info:
+            validate_env_config(data)
+        assert ".." in str(exc_info.value)
+
+    def test_build_path_absolute_path(self):
+        """build_path cannot be an absolute path."""
+        data = {
+            "name": "Test",
+            "description": "Test",
+            "bundles": {"internal": {"include_sources": ["test"]}},
+            "build_path": "/absolute/path",
+        }
+        with pytest.raises((ValidationError, ValueError)) as exc_info:
+            validate_env_config(data)
+        assert "relative" in str(exc_info.value)
+
+    def test_build_path_dist_prefix(self):
+        """build_path should not include dist/ prefix."""
+        data = {
+            "name": "Test",
+            "description": "Test",
+            "bundles": {"internal": {"include_sources": ["test"]}},
+            "build_path": "dist/my/custom/path",
+        }
+        with pytest.raises((ValidationError, ValueError)) as exc_info:
+            validate_env_config(data)
+        assert "dist/" in str(exc_info.value) and "prefix" in str(exc_info.value)
+
+    def test_build_path_invalid_characters(self):
+        """build_path components can only contain safe characters."""
+        data = {
+            "name": "Test",
+            "description": "Test",
+            "bundles": {"internal": {"include_sources": ["test"]}},
+            "build_path": "invalid@chars/bad$name",
+        }
+        with pytest.raises((ValidationError, ValueError)) as exc_info:
+            validate_env_config(data)
+        assert "alphanumeric" in str(exc_info.value) or "characters" in str(exc_info.value)
+
+    def test_build_path_empty_components(self):
+        """build_path cannot have empty path components."""
+        data = {
+            "name": "Test", 
+            "description": "Test",
+            "bundles": {"internal": {"include_sources": ["test"]}},
+            "build_path": "valid//empty",
+        }
+        with pytest.raises((ValidationError, ValueError)) as exc_info:
+            validate_env_config(data)
+        assert "empty" in str(exc_info.value) and "component" in str(exc_info.value)
+
+    def test_build_path_valid(self):
+        """Valid build_path should pass validation."""
+        data = {
+            "name": "Test",
+            "description": "Test",
+            "bundles": {"internal": {"include_sources": ["test"]}},
+            "build_path": "team-a/v2/staging",
+        }
+        # Should not raise an exception
+        config = validate_env_config(data)
+        assert config.build_path == "team-a/v2/staging"
+
 
 class TestDefaultsConfigValidation:
     """Test defaults configuration validation."""
