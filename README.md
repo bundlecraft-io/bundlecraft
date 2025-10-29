@@ -221,7 +221,7 @@ ______________________________________________________________________
 - **Multi-format export:** PEM, P7B, JKS, P12, ZIP
 - **Cross-format verification:** expiry, empties, count consistency
 - **Extensible config model:** defaults → environment → bundle
-- **Portable tooling:** Containerized or Python + OpenSSL + Java keytool
+- **Portable tooling:** Pure Python with OpenSSL for legacy format support
 - **Manifest and checksum generation:** for auditing and release integrity
 - **SBOM generation:** CycloneDX SBOM for supply chain transparency (enabled by default; can be disabled)
 - **GPG signing integration:** Sign release artifacts with detached signatures (`--sign`)
@@ -445,6 +445,138 @@ These can be overridden by environment or source configs.
 
 ______________________________________________________________________
 
+## 🚀 Quickstart – Fetching, Building, and Verifying Trust Bundles
+
+### 1. Install Prerequisites
+
+System dependencies
+
+```bash
+# Required for conversions and verification
+sudo apt-get install openssl
+
+# Optional: jq (required for scripts/json-output-examples.sh)
+sudo apt-get install jq
+```
+
+Python dependencies
+
+```bash
+# Install with runtime dependencies
+pip install -e .
+
+# Or install with dev/test tools
+pip install -e ".[dev]"
+```
+
+Shell completion (optional): BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags:
+
+```bash
+# Bash - run in your current shell (or add to ~/.bashrc for persistence)
+eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
+
+# Zsh - run in your current shell (or add to ~/.zshrc for persistence)
+eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
+```
+
+**Notes:**
+
+- You need to run this **after** activating your venv (if using one)
+- The completion works for all subcommands (`build`, `verify`, `convert`, etc.) and their flags
+- For persistence, add the `eval` line to your shell's rc file (`~/.bashrc` or `~/.zshrc`)
+- If completion stops working, re-run the `eval` command
+
+### 2. Prepare Certificate Sources
+
+- Place PEM files in appropriate folders under `cert_sources/`
+- Update `config/sources/` YAMLs to specify which sources to include/exclude
+- Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault)
+
+### 3. Fetch and Build
+
+```bash
+# Build a bundle (fetch runs automatically unless skipped)
+bundlecraft build --env prod --bundle internal-prod
+```
+
+Produces artifacts in `dist/prod/internal-prod/`:
+
+```text
+bundlecraft-ca-trust.pem
+bundlecraft-ca-trust.p7b
+bundlecraft-ca-trust.jks
+bundlecraft-ca-trust.p12
+manifest.json
+checksums.sha256
+package.tar.gz  # if enabled
+```
+
+### 4. Verify Outputs
+
+```bash
+bundlecraft verify --target dist/prod/internal-prod --verbose --verify-all
+```
+
+Checks:
+
+- Expiry and soon-to-expire certificates
+- Empty or missing output files
+- Certificate count consistency across all formats
+
+**Exit codes:**
+
+- `0`: Success
+- `1`: Warnings (certs expiring soon)
+- `5`: Failure (expired certs, parse errors, empty/mismatched outputs)
+
+### 5. Compare Bundles (Track Changes)
+
+```bash
+# Compare two bundle builds to identify certificate changes
+bundlecraft diff --from dist/prod/v1/internal-prod --to dist/prod/v2/internal-prod
+
+# Generate JSON diff report for CI/CD
+bundlecraft diff \
+  --from dist/prod/v1/internal-prod \
+  --to dist/prod/v2/internal-prod \
+  --output-format json
+```
+
+Shows:
+
+- Added certificates (new roots/CAs)
+- Removed certificates (deprecated/expired)
+- Unchanged certificates
+- Summary statistics
+
+Use cases:
+
+- **Release auditing** - Track certificate changes between versions
+- **Change validation** - Verify expected updates before deployment
+- **Compliance reporting** - Document trust policy evolution
+
+📖 **Full documentation:** [docs/bundlecraft-diff.md](docs/bundlecraft-diff.md)
+
+### 6. Convert Bundles Ad-hoc (if needed)
+
+```bash
+# Convert DER to PEM
+bundlecraft convert --input cert_sources/internal/rootCA.der --output-dir ./ --output-format pem
+
+# Convert to P7B
+bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --output-format p7b
+
+# Convert to ZIP (tarball of PEMs)
+bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --output-format zip
+```
+
+- Produces artifact in the output directory as `bundlecraft-ca-trust.{format}`
+- Uses environment variables (or CLI option) for passwords:
+  - `TRUST_JKS_PASSWORD` (default `"changeit"`)
+  - `TRUST_P12_PASSWORD` (default `"changeit"`)
+
+______________________________________________________________________
+
 ## 🎯 Template Repository - Get Started Quickly
 
 New to BundleCraft and looking to get up and running using it? Use the official template repository for a quick setup within your own BundleCraft config repository:
@@ -586,8 +718,8 @@ podman run --rm \
   build --env prod
 ```
 
-**Container permission issues?**
-If output files have wrong ownership, the container runs as user ID 1000. Match your user:
+- **Verifier says JKS=0?**
+  Ensure password is correct. The default password is `"changeit"`. Set `TRUST_JKS_PASSWORD` env var if using a different password.
 
 ```bash
 podman run --user $(id -u):$(id -g) --rm \
@@ -868,7 +1000,7 @@ ______________________________________________________________________
 
 ## 🏷️ Tags & Metadata
 
-- **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, openssl, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, keytool, certificates, pki-tools
+- **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, openssl, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, certificates, pki-tools
 
 ______________________________________________________________________
 
@@ -884,7 +1016,6 @@ ______________________________________________________________________
 - [RFC 5652 — Cryptographic Message Syntax (CMS / PKCS#7)](https://datatracker.ietf.org/doc/html/rfc5652)
 - [RFC 7292 — PKCS #12 v1.1 (Personal Information Exchange)](https://datatracker.ietf.org/doc/html/rfc7292)
 - OpenSSL documentation: [pkcs12](https://www.openssl.org/docs/manmaster/man1/openssl-pkcs12.html), [x509](https://www.openssl.org/docs/manmaster/man1/openssl-x509.html), [crl2pkcs7](https://www.openssl.org/docs/manmaster/man1/openssl-crl2pkcs7.html)
-- Java keytool documentation: [keytool](https://docs.oracle.com/javase/8/docs/technotes/tools/unix/keytool.html)
 - OpenSSL Cookbook (practical guide): <https://www.feistyduck.com/library/openssl-cookbook/online/>
 
 ______________________________________________________________________

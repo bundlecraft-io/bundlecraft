@@ -11,7 +11,6 @@ Capabilities:
 
 Requires:
     - openssl
-    - keytool (for JKS counting)
 """
 
 import datetime as dt
@@ -273,19 +272,18 @@ def _count_certs_in_file(file_path: Path) -> int:
             n = out.count("-----BEGIN CERTIFICATE-----") or out.count("subject=")
             return n
         if ext == ".jks":
+            import jks
+
             storepass = os.environ.get("TRUST_JKS_PASSWORD", "changeit")
-            cmd = [
-                "keytool",
-                "-list",
-                "-rfc",
-                "-keystore",
-                str(file_path),
-                "-storepass",
-                storepass,
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            out = res.stdout
-            return out.count("-----BEGIN CERTIFICATE-----")
+            keystore = jks.KeyStore.load(str(file_path), storepass)
+            count = 0
+            for alias, entry in keystore.entries.items():
+                if isinstance(entry, jks.TrustedCertEntry):
+                    count += 1
+                elif isinstance(entry, jks.PrivateKeyEntry):
+                    # Count certificates in the certificate chain
+                    count += len(entry.cert_chain)
+            return count
     except Exception as e:
         print(f"[WARN] Could not count certs in {file_path}: {e}")
         return 0
