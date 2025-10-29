@@ -459,20 +459,22 @@ class TestCountCertsInFile:
         assert count == 3
         mock_run.assert_called_once()
 
-    @patch("subprocess.run")
-    def test_count_certs_jks(self, mock_run, tmp_path):
-        """Test counting certificates in JKS file"""
+    @patch("jks.KeyStore.load")
+    def test_count_certs_jks(self, mock_jks_load, tmp_path):
+        """Test counting certificates in JKS file using pyjks"""
         jks_file = tmp_path / "bundle.jks"
         jks_file.write_bytes(b"fake jks data")
 
-        # Mock subprocess to return 1 certificate
-        mock_result = Mock()
-        mock_result.stdout = "-----BEGIN CERTIFICATE-----\ndata\n-----END CERTIFICATE-----\n"
-        mock_run.return_value = mock_result
+        # Mock jks.KeyStore with 1 TrustedCertEntry
+        import jks
+        mock_keystore = Mock()
+        mock_entry = Mock(spec=jks.TrustedCertEntry)
+        mock_keystore.entries = {"cert1": mock_entry}
+        mock_jks_load.return_value = mock_keystore
 
         count = _count_certs_in_file(jks_file)
         assert count == 1
-        mock_run.assert_called_once()
+        mock_jks_load.assert_called_once()
 
     @patch("subprocess.run")
     def test_count_certs_subprocess_error(self, mock_run, tmp_path, capsys):
