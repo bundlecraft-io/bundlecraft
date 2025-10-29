@@ -104,7 +104,7 @@ Ensure some useful system dependencies:
 
 ```bash
 # Required for conversions and verification
-sudo apt-get install openssl openjdk-21-jdk-headless  # (for keytool)
+sudo apt-get install openssl
 
 # Optional: jq (required for scripts/json-output-examples.sh)
 sudo apt-get install jq
@@ -316,7 +316,7 @@ bundlecraft/
 
 - `utils.py` – Core utilities (filters, merging, config loading)
 - `config_schema.py` – Pydantic validation schemas for all configs
-- `convert_utils.py` – Format conversion helpers (OpenSSL, keytool wrappers)
+- `convert_utils.py` – Format conversion helpers (OpenSSL and pyjks for JKS)
 - `verify_utils.py` – Verification utilities
 - `atomic_build.py` – Atomic build context manager
 - `sbom.py` – SBOM generation (CycloneDX format)

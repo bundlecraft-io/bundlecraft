@@ -68,7 +68,7 @@ ______________________________________________________________________
 - **Multi-format export:** PEM, P7B, JKS, P12, ZIP
 - **Cross-format verification:** expiry, empties, count consistency
 - **Extensible config model:** defaults → environment → bundle
-- **Portable tooling:** Python + OpenSSL + Java keytool
+- **Portable tooling:** Pure Python with OpenSSL for legacy format support
 - **Manifest and checksum generation:** for auditing and release integrity
 - **SBOM generation:** CycloneDX SBOM for supply chain transparency (enabled by default; can be disabled)
 - **GPG signing integration:** Sign release artifacts with detached signatures (`--sign`)
@@ -284,7 +284,7 @@ System dependencies
 
 ```bash
 # Required for conversions and verification
-sudo apt-get install openssl openjdk-21-jdk-headless  # (for keytool)
+sudo apt-get install openssl
 
 # Optional: jq (required for scripts/json-output-examples.sh)
 sudo apt-get install jq
@@ -531,7 +531,7 @@ ______________________________________________________________________
   Fixed in exporter - uses `-in first` + `-certfile rest` for completeness.
 
 - **Verifier says JKS=0?**
-  Ensure `keytool` is installed and on PATH. The script parses `Alias name:` and certificate blocks.
+  Ensure password is correct. The default password is `"changeit"`. Set `TRUST_JKS_PASSWORD` env var if using a different password.
 
 - **Password issues?**
   Default passwords are `"changeit"` for both JKS and P12. Set env vars for production.
@@ -740,7 +740,7 @@ ______________________________________________________________________
 
 ## 🏷️ Tags & Metadata
 
-- **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, openssl, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, keytool, certificates, pki-tools
+- **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, openssl, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, certificates, pki-tools
 
 ______________________________________________________________________
 
@@ -756,7 +756,6 @@ ______________________________________________________________________
 - [RFC 5652 — Cryptographic Message Syntax (CMS / PKCS#7)](https://datatracker.ietf.org/doc/html/rfc5652)
 - [RFC 7292 — PKCS #12 v1.1 (Personal Information Exchange)](https://datatracker.ietf.org/doc/html/rfc7292)
 - OpenSSL documentation: [pkcs12](https://www.openssl.org/docs/manmaster/man1/openssl-pkcs12.html), [x509](https://www.openssl.org/docs/manmaster/man1/openssl-x509.html), [crl2pkcs7](https://www.openssl.org/docs/manmaster/man1/openssl-crl2pkcs7.html)
-- Java keytool documentation: [keytool](https://docs.oracle.com/javase/8/docs/technotes/tools/unix/keytool.html)
 - OpenSSL Cookbook (practical guide): <https://www.feistyduck.com/library/openssl-cookbook/online/>
 
 ______________________________________________________________________

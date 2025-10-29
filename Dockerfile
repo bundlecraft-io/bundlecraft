@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir build && python -m build --wheel
 
 FROM python:3.12-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl openjdk-21-jre-headless && rm -rf /var/lib/apt/lists/*
+    openssl && rm -rf /var/lib/apt/lists/*
 ENV VIRTUAL_ENV=/opt/venv
 RUN python -m venv "$VIRTUAL_ENV"
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"

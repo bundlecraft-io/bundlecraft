@@ -112,32 +112,27 @@ def count_certs_in_store(file: Path) -> int | None:
                 certs = pkcs7.load_der_pkcs7_certificates(data)
             return len(certs)
         elif ext == ".jks":
-            result = subprocess.run(
-                [
-                    "keytool",
-                    "-list",
-                    "-rfc",
-                    "-keystore",
-                    str(file),
-                    "-storepass",
-                    "changeit",
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                timeout=8,
-            )
-            pem_blocks = re.findall(r"-----BEGIN CERTIFICATE-----", result.stdout)
-            if not pem_blocks:
-                result2 = subprocess.run(
-                    ["keytool", "-list", "-rfc", "-keystore", str(file)],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    timeout=8,
-                )
-                pem_blocks = re.findall(r"-----BEGIN CERTIFICATE-----", result2.stdout)
-            return len(pem_blocks)
+            import jks
+
+            # Try with default password first, then without password
+            for storepass in ["changeit", None]:
+                try:
+                    keystore = jks.KeyStore.load(str(file), storepass)
+                    count = 0
+                    for alias, entry in keystore.entries.items():
+                        if isinstance(entry, jks.TrustedCertEntry):
+                            count += 1
+                        elif isinstance(entry, jks.PrivateKeyEntry):
+                            # Count certificates in the certificate chain
+                            count += len(entry.cert_chain)
+                    return count
+                except Exception:
+                    if storepass is None:
+                        # Both attempts failed
+                        raise
+                    # Try next password
+                    continue
+            return 0
     except Exception as e:
         logger.debug(f"Error counting certs in {file.name}: {e}")
     return None

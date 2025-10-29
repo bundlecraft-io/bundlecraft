@@ -31,6 +31,7 @@ dependencies = [
   "pydantic>=2.0,<3.0",
   "python-gnupg>=0.5.0,<1.0",
   "cyclonedx-bom>=4.0.0,<8.0",
+  "pyjks>=20.0.0",
 ]
 
 [project.optional-dependencies]
