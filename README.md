@@ -408,6 +408,46 @@ bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --o
 
 ______________________________________________________________________
 
+## 🎯 Template Repository - Get Started Quickly
+
+New to BundleCraft and looking to get started using it? Use the official template repository for a quick setup within your own BundleCraft config repository:
+
+### 🧱 [BundleCraft Starter Template](https://github.com/bundlecraft-io/bundlecraft-starter)
+
+The template provides:
+
+- ✅ **Complete GitHub Actions workflow** with containerized builds
+- 🔄 **Dynamic build matrix** for parallel environment processing
+- 🔐 **Optional GPG signing** for artifact integrity
+- 📊 **Automatic certificate diff reports** between releases
+- ⚙️ **Highly configurable** for different organizational needs
+
+### Quick Setup
+
+```bash
+# Create a new repository from the template
+gh repo create my-org/my-certificate-bundles --template bundlecraft-io/bundlecraft-starter
+
+# Clone and customize
+git clone https://github.com/my-org/my-certificate-bundles.git
+cd my-certificate-bundles
+
+# Add your certificates
+mkdir -p cert_sources/internal
+cp /path/to/your/rootCA.pem cert_sources/internal/
+
+# Configure your bundles
+# Edit config/sources/*.yaml and config/envs/*.yaml
+
+# Commit and trigger your first build
+git add . && git commit -m "Initial certificate configuration"
+git push origin main
+```
+
+The template is perfect for anyone wanting to adopt BundleCraft with minimal setup!
+
+______________________________________________________________________
+
 ## ⚙️ Environment Variables
 
 BundleCraft supports the following environment variables for configuration:
@@ -705,6 +745,12 @@ ______________________________________________________________________
 ______________________________________________________________________
 
 ## 🔗 Related Projects & References
+
+**BundleCraft Ecosystem:**
+
+- [🧱 BundleCraft Starter](https://github.com/bundlecraft-io/bundlecraft-starter) —  Template repository with GitHub Actions workflow for orchestrating your own BundleCraft builds.
+
+**Standards & Documentation:**
 
 - [RFC 5280 — Internet X.509 PKI Certificate and CRL Profile](https://datatracker.ietf.org/doc/html/rfc5280)
 - [RFC 5652 — Cryptographic Message Syntax (CMS / PKCS#7)](https://datatracker.ietf.org/doc/html/rfc5652)
