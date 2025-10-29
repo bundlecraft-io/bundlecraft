@@ -24,7 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New BundleCraft CLI: `bundlecraft build-all`
   - This is a shortcut to invoking the build process against all config files instead of a specific one
   - This makes the tool independent for CI builds, no longer relying on `scripts/detect_env_targets.py` to provide config targets
+  - For backwards compatibility, `bundlecraft build-all --print-plan` will output the build targets that can be used to inform CI/CD
   - Users can also scope build-all to read from a specific subdir (i.e. `configs/envs/my_sub_envs/`) for more fine grained control
+- BundleCraft build manifest now includes `build_path`
 
 ### Changed
 
