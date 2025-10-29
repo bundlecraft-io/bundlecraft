@@ -152,6 +152,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3-beta.26] - 2025-10-28
+
+### Changed
+
+- feat: add build_path field to manifest
+
+---
+
 ## Stable Releases
 
 ---

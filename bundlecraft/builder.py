@@ -811,9 +811,13 @@ def main(
             else:
                 click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
             sys.exit(ExitCode.CONFIG_ERROR)
+        # Effective build_path string to include in manifest (always under dist/)
+        manifest_build_path = f"dist/{build_path_clean}"
     else:
         # Default: dist/<env>/<bundle>
         build_output_base = (Path(output_root) / safe_env).resolve()
+        # Effective default base for manifest field ignores --output-root and follows spec
+        manifest_build_path = f"dist/{safe_env}"
 
     per_bundle_results: dict[str, dict] = {}
     import shutil
@@ -899,6 +903,7 @@ def main(
                         ),
                         "certificate_count": len(pem_blocks),
                         "output_formats": output_formats,
+                        "build_path": manifest_build_path,
                     }
 
                     # Add verification summary if not skipped
@@ -1114,6 +1119,7 @@ def main(
                     ),
                     "certificate_count": len(merged_blocks),
                     "output_formats": output_formats,
+                    "build_path": manifest_build_path,
                 }
 
                 # Add verification summary if not skipped
@@ -1276,6 +1282,7 @@ def main(
                 "timestamp_utc": timestamp_utc,
                 "certificate_count": len(pem_blocks),
                 "output_formats": output_formats,
+                "build_path": manifest_build_path,
             }
             # Add verification summary if not skipped (same policy for all targets)
             if not skip_verify:
@@ -1344,6 +1351,7 @@ def main(
                 "timestamp_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "certificate_count": len(pem_blocks),
                 "output_formats": output_formats,
+                "build_path": manifest_build_path,
             }
             # Add verification summary if not skipped (same policy for all targets)
             if not skip_verify:
