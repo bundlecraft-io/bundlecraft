@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import jks
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
@@ -466,7 +467,6 @@ class TestCountCertsInFile:
         jks_file.write_bytes(b"fake jks data")
 
         # Mock jks.KeyStore with 1 TrustedCertEntry
-        import jks
         mock_keystore = Mock()
         mock_entry = Mock(spec=jks.TrustedCertEntry)
         mock_keystore.entries = {"cert1": mock_entry}
