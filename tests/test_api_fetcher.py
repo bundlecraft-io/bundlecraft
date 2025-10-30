@@ -13,10 +13,10 @@ Tests for:
 
 import urllib.error
 import urllib.request
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-import pytest
 import click
+import pytest
 
 from bundlecraft.fetchers.api import _tls_leaf_fingerprint_sha256, fetch_api
 

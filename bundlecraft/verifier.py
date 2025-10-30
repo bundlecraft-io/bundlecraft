@@ -16,7 +16,6 @@ Features:
 import hashlib
 import logging
 import re
-import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -119,7 +118,7 @@ def count_certs_in_store(file: Path) -> int | None:
                 try:
                     keystore = jks.KeyStore.load(str(file), storepass)
                     count = 0
-                    for alias, entry in keystore.entries.items():
+                    for _alias, entry in keystore.entries.items():
                         if isinstance(entry, jks.TrustedCertEntry):
                             count += 1
                         elif isinstance(entry, jks.PrivateKeyEntry):
