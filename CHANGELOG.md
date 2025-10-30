@@ -174,17 +174,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- N/A
+- OpenJDK has been replaced by PyJKS
+  - Makes BundleCraft less reliant on a system dependency and reduces image file size
+  - All keytool operations are now python native
+  - All behavior with respect to JKS bundle creation remains the same as before
 
 ---
 ## [0.1.3-beta.29] - 2025-10-30
 
 ### Changed
 
-- OpenJDK has been replaced by PyJKS
-  - Makes BundleCraft less reliant on a system dependency and reduces image file size
-  - All keytool operations are now python native
-  - All behavior with respect to JKS bundle creation remains the same as before
+- N/A, more release tests
+
+---
+## [0.1.3-beta.30] - 2025-10-30
+
+### Changed
+
+- N/A, more release tests
 
 ---
 
