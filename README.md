@@ -1,6 +1,11 @@
 # 🔐 BundleCraft - Modern PKI Trust Store Builder
 
-![GitHub license](https://img.shields.io/github/license/bundlecraft-io/bundlecraft)
+![GitHub License](https://img.shields.io/github/license/bundlecraft-io/bundlecraft)
+![GitHub Release](https://img.shields.io/github/v/release/bundlecraft-io/bundlecraft)
+![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fbundlecraft-io%2Fbundlecraft%2Fmain%2Fpyproject.toml)
+![PyPI - Version](https://img.shields.io/pypi/v/bundlecraft)
+![Codecov](https://img.shields.io/codecov/c/github/bundlecraft-io/bundlecraft)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/bundlecraft-io/bundlecraft/release.yaml?label=release)
 
 > ⚠️ **Important:** BundleCraft is in early pre-release (v0.1.1). The API, CLI, and docs may change as we iterate toward a stable v1.0.0. This is an independent, passion-driven project developed with a focus on practical PKI automation, secure engineering practices, and contributing back to the PKI community. Feedback welcome.
 
@@ -11,6 +16,104 @@ ______________________________________________________________________
 **BundleCraft** is a modern, configuration-as-code system for **fetching, building, verifying, and distributing multi-format certificate trust bundles** across environments. It securely sources certificate material from trusted remote origins or local files, then produces reproducible, auditable outputs for OS, Java, and application platforms.
 
 > In short: BundleCraft lets you define how trust is built-not just what to trust.
+
+______________________________________________________________________
+
+## 🚀 Quick Start
+
+Get started with BundleCraft in under 5 minutes using either the container image or Python package.
+
+### Option 1: Using Container (Recommended)
+
+```bash
+# Pull the latest container
+podman pull ghcr.io/bundlecraft-io/bundlecraft:latest
+
+# Create a basic project structure
+mkdir my-ca-bundles && cd my-ca-bundles
+mkdir -p cert_sources/internal config/envs config/sources
+
+# Add your certificates
+cp /path/to/your/root-ca.pem cert_sources/internal/
+
+# Create a simple source config
+cat > config/sources/internal.yaml << 'EOF'
+---
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
+source_name: internal
+description: Internal CA certificates
+repo:
+  - name: internal
+    include:
+      - cert_sources/internal/root-ca.pem
+EOF
+
+# Create an environment config
+cat > config/envs/production.yaml << 'EOF'
+---
+apiVersion: bundlecraft.io/v1alpha1
+kind: EnvConfig
+name: Production Environment
+bundles:
+  internal-prod:
+    include_sources: [internal]
+output_formats:
+  - pem
+  - jks
+  - p12
+  - p7b
+EOF
+
+# Build your trust bundle
+podman run --rm \
+  -v $(pwd)/config:/config \
+  -v $(pwd)/cert_sources:/cert_sources \
+  -v $(pwd)/dist:/dist \
+  ghcr.io/bundlecraft-io/bundlecraft:latest \
+  build --env production --bundle internal-prod
+
+# Verify the results
+podman run --rm \
+  -v $(pwd)/dist:/dist \
+  ghcr.io/bundlecraft-io/bundlecraft:latest \
+  verify --target /dist/production/internal-prod
+```
+
+### Option 2: Using Python Package
+
+```bash
+# Install BundleCraft
+pip install bundlecraft
+
+# Create project structure (same as above)
+# ... (same directory and file creation as container example)
+
+# Build your trust bundle
+bundlecraft build --env production --bundle internal-prod
+
+# Verify the results
+bundlecraft verify --target dist/production/internal-prod
+```
+
+### What You Get
+
+Every build produces a complete trust bundle in `dist/<environment>/<bundle>/`:
+
+```text
+bundlecraft-ca-trust.pem     # Canonical PEM bundle
+bundlecraft-ca-trust.jks     # Java KeyStore
+bundlecraft-ca-trust.p12     # PKCS#12 bundle  
+bundlecraft-ca-trust.p7b     # PKCS#7 bundle
+manifest.json                # Build metadata & provenance
+checksums.sha256             # Integrity verification
+```
+
+### Next Steps
+
+- 🧱 **For production use**: Start with the [BundleCraft Starter Template](https://github.com/bundlecraft-io/bundlecraft-starter)
+- 📚 **Learn more**: See the [Template Repository](#-template-repository---get-started-quickly) section below
+- 🔧 **Advanced config**: Explore the [Configuration Deep Dive](#-configuration-deep-dive) section
 
 ______________________________________________________________________
 
@@ -63,12 +166,13 @@ ______________________________________________________________________
 
 ## ✨ Features
 
+- **Multiple installation methods**: Container image (recommended) or Python package via PyPI
 - **Trusted Fetch layer**: Securely fetch certificates from HTTPS, APIs, and Vault with CA/fingerprint/sha256 pinning; staging-only (no cache) and full provenance.
 - **Reproducible builds** using layered YAML configs
 - **Multi-format export:** PEM, P7B, JKS, P12, ZIP
 - **Cross-format verification:** expiry, empties, count consistency
 - **Extensible config model:** defaults → environment → bundle
-- **Portable tooling:** Python + OpenSSL + Java keytool
+- **Portable tooling:** Containerized or Python + OpenSSL + Java keytool
 - **Manifest and checksum generation:** for auditing and release integrity
 - **SBOM generation:** CycloneDX SBOM for supply chain transparency (enabled by default; can be disabled)
 - **GPG signing integration:** Sign release artifacts with detached signatures (`--sign`)
@@ -276,138 +380,6 @@ These can be overridden by environment or source configs.
 
 ______________________________________________________________________
 
-## 🚀 Quickstart – Fetching, Building, and Verifying Trust Bundles
-
-### 1. Install Prerequisites
-
-System dependencies
-
-```bash
-# Required for conversions and verification
-sudo apt-get install openssl openjdk-21-jdk-headless  # (for keytool)
-
-# Optional: jq (required for scripts/json-output-examples.sh)
-sudo apt-get install jq
-```
-
-Python dependencies
-
-```bash
-# Install with runtime dependencies
-pip install -e .
-
-# Or install with dev/test tools
-pip install -e ".[dev]"
-```
-
-Shell completion (optional): BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags:
-
-```bash
-# Bash - run in your current shell (or add to ~/.bashrc for persistence)
-eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
-
-# Zsh - run in your current shell (or add to ~/.zshrc for persistence)
-eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
-```
-
-**Notes:**
-
-- You need to run this **after** activating your venv (if using one)
-- The completion works for all subcommands (`build`, `verify`, `convert`, etc.) and their flags
-- For persistence, add the `eval` line to your shell's rc file (`~/.bashrc` or `~/.zshrc`)
-- If completion stops working, re-run the `eval` command
-
-### 2. Prepare Certificate Sources
-
-- Place PEM files in appropriate folders under `cert_sources/`
-- Update `config/sources/` YAMLs to specify which sources to include/exclude
-- Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault)
-
-### 3. Fetch and Build
-
-```bash
-# Build a bundle (fetch runs automatically unless skipped)
-bundlecraft build --env prod --bundle internal-prod
-```
-
-Produces artifacts in `dist/prod/internal-prod/`:
-
-```text
-bundlecraft-ca-trust.pem
-bundlecraft-ca-trust.p7b
-bundlecraft-ca-trust.jks
-bundlecraft-ca-trust.p12
-manifest.json
-checksums.sha256
-package.tar.gz  # if enabled
-```
-
-### 4. Verify Outputs
-
-```bash
-bundlecraft verify --target dist/prod/internal-prod --verbose --verify-all
-```
-
-Checks:
-
-- Expiry and soon-to-expire certificates
-- Empty or missing output files
-- Certificate count consistency across all formats
-
-**Exit codes:**
-
-- `0`: Success
-- `1`: Warnings (certs expiring soon)
-- `5`: Failure (expired certs, parse errors, empty/mismatched outputs)
-
-### 5. Compare Bundles (Track Changes)
-
-```bash
-# Compare two bundle builds to identify certificate changes
-bundlecraft diff --from dist/prod/v1/internal-prod --to dist/prod/v2/internal-prod
-
-# Generate JSON diff report for CI/CD
-bundlecraft diff \
-  --from dist/prod/v1/internal-prod \
-  --to dist/prod/v2/internal-prod \
-  --output-format json
-```
-
-Shows:
-
-- Added certificates (new roots/CAs)
-- Removed certificates (deprecated/expired)
-- Unchanged certificates
-- Summary statistics
-
-Use cases:
-
-- **Release auditing** - Track certificate changes between versions
-- **Change validation** - Verify expected updates before deployment
-- **Compliance reporting** - Document trust policy evolution
-
-📖 **Full documentation:** [docs/bundlecraft-diff.md](docs/bundlecraft-diff.md)
-
-### 6. Convert Bundles Ad-hoc (if needed)
-
-```bash
-# Convert DER to PEM
-bundlecraft convert --input cert_sources/internal/rootCA.der --output-dir ./ --output-format pem
-
-# Convert to P7B
-bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --output-format p7b
-
-# Convert to ZIP (tarball of PEMs)
-bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --output-format zip
-```
-
-- Produces artifact in the output directory as `bundlecraft-ca-trust.{format}`
-- Uses environment variables (or CLI option) for passwords:
-  - `TRUST_JKS_PASSWORD` (default `"changeit"`)
-  - `TRUST_P12_PASSWORD` (default `"changeit"`)
-
-______________________________________________________________________
-
 ## 🎯 Template Repository - Get Started Quickly
 
 New to BundleCraft and looking to get started using it? Use the official template repository for a quick setup within your own BundleCraft config repository:
@@ -501,6 +473,8 @@ ______________________________________________________________________
 
 ## 🧰 Core CLI Reference
 
+All commands work with both the Python package (`bundlecraft`) and container (`podman run ghcr.io/bundlecraft-io/bundlecraft:latest`):
+
 |Script|Purpose|Example Usage|
 |---|---|---|
 | `bundlecraft.fetch` (CLI: `bundlecraft fetch`) | Securely fetch remote sources and stage them (no persistent cache) | `bundlecraft fetch --env prod --bundle internal` |
@@ -531,10 +505,16 @@ ______________________________________________________________________
   Fixed in exporter - uses `-in first` + `-certfile rest` for completeness.
 
 - **Verifier says JKS=0?**
-  Ensure `keytool` is installed and on PATH. The script parses `Alias name:` and certificate blocks.
+  Ensure `keytool` is installed and on PATH. The script parses `Alias name:` and certificate blocks. When using containers, this is handled automatically.
 
 - **Password issues?**
   Default passwords are `"changeit"` for both JKS and P12. Set env vars for production.
+
+- **Container volume mount issues?**
+  Ensure volumes are mounted correctly: `-v $(pwd)/config:/config -v $(pwd)/cert_sources:/cert_sources -v $(pwd)/dist:/dist`
+
+- **Container permission issues?**
+  If output files have wrong ownership, the container runs as user ID 1000. Use `podman run --user $(id -u):$(id -g)` to match your user.
 
 - **Fetch: Insecure HTTP rejected**
   Use only `https://` (or `file://` for local). For APIs, configure `verify.ca_file` and optionally `verify.tls_fingerprint_sha256`.
@@ -546,7 +526,7 @@ ______________________________________________________________________
   Re-check the server certificate fingerprint (leaf). If it rotated legitimately, update `verify.tls_fingerprint_sha256`.
 
 - **Vault: hvac not installed**
-  Install optional extras: `pip install -e .[fetchers]`.
+  Install optional extras: `pip install -e .[fetchers]`. When using containers, Vault support is included by default.
 
 - **Offline builds**
   Use `bundlecraft build --skip-fetch` to avoid network access. If your config includes `fetch:`, pre-stage with `bundlecraft fetch` in connected environments, then commit or package the staged inputs.
@@ -653,6 +633,8 @@ ______________________________________________________________________
 
 ### Common Commands
 
+#### Using Python Package
+
 ```bash
 # Build all bundles in the production environment
 bundlecraft build --env prod
@@ -668,12 +650,30 @@ bundlecraft diff --from dist/prod/v1/internal --to dist/prod/v2/internal
 
 # Convert formats
 bundlecraft convert --input bundlecraft-ca-trust.pem --output-dir ./ --output-format jks
+```
 
-# Build with packaging
-bundlecraft build --env prod --bundle internal --force
+#### Using Container
 
-# Force overwrite during conversion
-bundlecraft convert --input bundlecraft-ca-trust.der --output-dir ./ --output-format pem --force
+```bash
+# Build with container (mount volumes for config, sources, and output)
+podman run --rm \
+  -v $(pwd)/config:/config \
+  -v $(pwd)/cert_sources:/cert_sources \
+  -v $(pwd)/dist:/dist \
+  ghcr.io/bundlecraft-io/bundlecraft:latest \
+  build --env prod --bundle internal
+
+# Verify with container
+podman run --rm \
+  -v $(pwd)/dist:/dist \
+  ghcr.io/bundlecraft-io/bundlecraft:latest \
+  verify --target /dist/prod/internal --verify-all
+
+# Convert formats with container
+podman run --rm \
+  -v $(pwd)/dist:/dist \
+  ghcr.io/bundlecraft-io/bundlecraft:latest \
+  convert --input /dist/bundlecraft-ca-trust.pem --output-dir /dist --output-format jks
 ```
 
 ### 🤖 Machine-Readable Output (JSON)
