@@ -58,7 +58,7 @@ ______________________________________________________________________
 
 - Packaging problems
 
-  - Verify OpenSSL and keytool are installed for P7B/JKS/P12 conversions.
+  - Verify OpenSSL is installed for P7B and P12 conversions.
 
 ______________________________________________________________________
 

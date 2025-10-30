@@ -109,7 +109,7 @@ class TestConverter:
                 "jks",
             ],
         )
-        # May fail if keytool not available, but should try
+        # May fail if pyjks not available, but should try
         assert result.exit_code in [0, 1, 2]
 
     def test_convert_to_p12(self, cli_runner, temp_dir, sample_cert_path):
