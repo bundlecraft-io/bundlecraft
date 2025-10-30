@@ -75,7 +75,7 @@ class TestVerifierDirectoryMode:
 
         # Write invalid PEM
         pem_file = build_dir / "corrupt.pem"
-        pem_file.write_text("-----BEGIN CERTIFICATE-----\nINVALID DATA\n-----END CERTIFICATE-----\n")
+        pem_file.write_text("-----BEGIN CERTIFICATE-----\nINVALID DATA\n-----END CERTIFICATE-----\n", encoding="utf-8")
 
         result = cli_runner.invoke(verify_main, ["--target", str(build_dir)])
 
@@ -234,7 +234,7 @@ class TestVerifierJSONOutput:
         cli_runner = CliRunner()
 
         pem_file = temp_workspace / "corrupt.pem"
-        pem_file.write_text("INVALID CERTIFICATE DATA")
+        pem_file.write_text("INVALID CERTIFICATE DATA", encoding="utf-8")
 
         result = cli_runner.invoke(verify_main, ["--target", str(pem_file), "--json"])
 
@@ -284,7 +284,7 @@ class TestVerifierErrorHandling:
         cli_runner = CliRunner()
 
         pem_file = temp_workspace / "noperm.pem"
-        pem_file.write_text("TEST CERT")
+        pem_file.write_text("TEST CERT", encoding="utf-8")
         pem_file.chmod(0o000)
 
         result = cli_runner.invoke(verify_main, ["--target", str(pem_file)])
