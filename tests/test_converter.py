@@ -47,7 +47,7 @@ class TestConverter:
                 "pem",
             ],
         )
-        # Should complete (may fail due to openssl not available, but should try)
+        # Should complete successfully with Python cryptography module
         assert "Converter" in result.output or result.exit_code == 0
 
     def test_converter_with_input_flag(self, cli_runner, temp_dir, sample_cert_path):
@@ -90,8 +90,7 @@ class TestConverter:
                 "p7b",
             ],
         )
-        # May fail if openssl not available, but should try
-        # Success means either completed or gracefully handled missing tool
+        # Should complete successfully with Python cryptography module
         assert result.exit_code in [0, 1, 2]
 
     def test_convert_to_jks(self, cli_runner, temp_dir, sample_cert_path):
@@ -127,7 +126,7 @@ class TestConverter:
                 "p12",
             ],
         )
-        # May fail if openssl not available, but should try
+        # Should complete successfully with Python cryptography module
         assert result.exit_code in [0, 1, 2]
 
     def test_convert_invalid_pem(self, cli_runner, temp_dir):

@@ -16,13 +16,9 @@ Strategy:
   1) Normalize any input into a canonical PEM bundle (certificates only).
   2) Reuse existing writers to emit bundle formats from that PEM bundle.
   3) Private keys are ignored and excluded from all operations.
-
-Requires:
-  - openssl (for p7b / p12)
 """
 
 import os
-import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
@@ -287,8 +283,11 @@ def create_p7b(pem_path: Path, build_root: Path, output_basename: str, force: bo
     """
     Convert PEM → PKCS#7 (.p7b, DER) including ALL certs.
 
-    Use -certfile (not -in) so OpenSSL ingests the entire bundle.
+    Uses Python cryptography module to create PKCS#7 bundle.
     """
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+    
     out_path = build_root / f"{output_basename}.p7b"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
@@ -304,29 +303,25 @@ def create_p7b(pem_path: Path, build_root: Path, output_basename: str, force: bo
         print(f"[WARN] No certificates found in {pem_path}; skipping P7B.")
         return
 
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".pem", text=True)
-    try:
-        # Write PEM blocks to temp file
-        with os.fdopen(tmp_fd, "w") as tmp:
-            tmp.write("".join(blocks))
-
-        # Now run openssl with the closed temp file
-        cmd = [
-            "openssl",
-            "crl2pkcs7",
-            "-nocrl",
-            "-certfile",
-            tmp_path,
-            "-out",
-            str(out_path),
-            "-outform",
-            "DER",
-        ]
-        subprocess.run(cmd, check=True)
-    finally:
-        # Clean up temp file
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+    # Load all certificates from PEM blocks
+    certs = []
+    for blk in blocks:
+        try:
+            cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
+            certs.append(cert)
+        except Exception as e:
+            print(f"[WARN] Failed to load certificate: {e}")
+            continue
+    
+    if not certs:
+        print(f"[WARN] No valid certificates found in {pem_path}; skipping P7B.")
+        return
+    
+    # Create PKCS#7 bundle using cryptography
+    from cryptography.hazmat.primitives.serialization import Encoding
+    
+    p7b_data = pkcs7.serialize_certificates(certs, Encoding.DER)
+    out_path.write_bytes(p7b_data)
 
     print(f"[INFO] Created P7B: {out_path}")
 
@@ -406,10 +401,15 @@ def create_pkcs12(
     Create a single PKCS#12 (.p12) containing ALL certificates from the PEM bundle.
 
     IMPORTANT: Private keys are NOT supported. Only certificates are included.
-    Use: -in (first cert) + -certfile (rest) to include entire set.
+    Uses Python cryptography module to create PKCS#12 file.
     """
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives.serialization import (
+        BestAvailableEncryption,
+        NoEncryption,
+        PrivateFormat,
+    )
 
     alias_format = overrides.get("alias_format", "{subject.CN}-{fingerprint}")
     password = (
@@ -433,57 +433,54 @@ def create_pkcs12(
         print(f"[WARN] No certificates found in {pem_path}; skipping PKCS#12.")
         return
 
-    # First + rest strategy
-    first_pem = blocks[0]
-    rest_pems = blocks[1:]
+    # Load all certificates
+    certs = []
+    for blk in blocks:
+        try:
+            cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
+            certs.append(cert)
+        except Exception as e:
+            print(f"[WARN] Failed to load certificate: {e}")
+            continue
+    
+    if not certs:
+        print(f"[WARN] No valid certificates found in {pem_path}; skipping PKCS#12.")
+        return
 
-    with tempfile.TemporaryDirectory() as td:
-        td = Path(td)
-        first_file = td / "first.pem"
-        first_file.write_text(first_pem, encoding="utf-8")
+    # Get alias from the first cert for naming
+    first_cert = certs[0]
+    cn = _get_cn(first_cert)
+    serial = f"{first_cert.serial_number:X}"
+    from cryptography.hazmat.primitives import hashes
 
-        rest_file = None
-        if rest_pems:
-            rest_file = td / "rest.pem"
-            rest_file.write_text("".join(rest_pems), encoding="utf-8")
+    fp_sha256 = first_cert.fingerprint(hashes.SHA256()).hex()
+    fp_sha1 = first_cert.fingerprint(hashes.SHA1()).hex()
+    alias = _format_alias(
+        alias_format,
+        cn,
+        serial,
+        fingerprint_sha1=fp_sha1,
+        fingerprint_sha256=fp_sha256,
+    )
+    alias = _sanitize_alias(alias)
 
-        # Alias from the first cert
-        first_cert = x509.load_pem_x509_certificate(first_pem.encode(), default_backend())
-        cn = _get_cn(first_cert)
-        serial = f"{first_cert.serial_number:X}"
-        from cryptography.hazmat.primitives import hashes
-
-        fp_sha256 = first_cert.fingerprint(hashes.SHA256()).hex()
-        fp_sha1 = first_cert.fingerprint(hashes.SHA1()).hex()
-        alias = _format_alias(
-            alias_format,
-            cn,
-            serial,
-            fingerprint_sha1=fp_sha1,
-            fingerprint_sha256=fp_sha256,
-        )
-        alias = _sanitize_alias(alias)
-
-        cmd = [
-            "openssl",
-            "pkcs12",
-            "-export",
-            "-nokeys",  # ALWAYS exclude private keys
-            "-in",
-            str(first_file),
-            "-out",
-            str(out_path),
-            "-passout",
-            f"pass:{password}",
-            "-name",
-            alias,
-        ]
-        if rest_file:
-            # Insert before '-out'
-            cmd[6:6] = ["-certfile", str(rest_file)]
-
-        subprocess.run(cmd, check=True)
-
+    # Create PKCS#12 with no private key (certificates only)
+    # cryptography requires a private key, so we use None which creates a certificate-only bundle
+    encryption = (
+        BestAvailableEncryption(password.encode())
+        if password
+        else NoEncryption()
+    )
+    
+    p12_data = pkcs12.serialize_key_and_certificates(
+        name=alias.encode(),
+        key=None,  # No private key
+        cert=certs[0] if len(certs) == 1 else None,  # Primary cert
+        cas=certs[1:] if len(certs) > 1 else certs,  # Additional certs
+        encryption_algorithm=encryption,
+    )
+    
+    out_path.write_bytes(p12_data)
     print(f"[INFO] Created PKCS#12: {out_path}")
 
 

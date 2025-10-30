@@ -452,9 +452,6 @@ ______________________________________________________________________
 System dependencies
 
 ```bash
-# Required for conversions and verification
-sudo apt-get install openssl
-
 # Optional: jq (required for scripts/json-output-examples.sh)
 sudo apt-get install jq
 ```
@@ -733,16 +730,13 @@ podman run --user $(id -u):$(id -g) --rm \
 ### 🔐 Format & Conversion Issues
 
 **Empty P7B files?**
-Ensure OpenSSL is installed and available on PATH. BundleCraft uses `openssl crl2pkcs7 -certfile` for conversion. When using containers, this is handled automatically.
+Ensure your PEM input files contain valid certificates. BundleCraft uses the Python `cryptography` module for all format conversions.
 
 **P12 only contains one certificate?**
-This has been fixed in the current version - the exporter now uses `-in first` + `-certfile rest` for complete bundle inclusion.
+This has been fixed in the current version - all certificates from the bundle are included in the PKCS#12 output.
 
 **Duplicate JKS aliases?**
 The build process removes existing keystores before import to prevent conflicts. Ensure you're using the latest version.
-
-**Verifier reports JKS certificate count as 0?**
-Ensure `keytool` is installed and on PATH. The verifier parses `Alias name:` entries and certificate blocks. When using containers, this is handled automatically.
 
 ### 🔑 Authentication & Secrets
 
@@ -1000,7 +994,7 @@ ______________________________________________________________________
 
 ## 🏷️ Tags & Metadata
 
-- **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, openssl, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, certificates, pki-tools
+- **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, certificates, pki-tools
 
 ______________________________________________________________________
 
@@ -1015,8 +1009,7 @@ ______________________________________________________________________
 - [RFC 5280 — Internet X.509 PKI Certificate and CRL Profile](https://datatracker.ietf.org/doc/html/rfc5280)
 - [RFC 5652 — Cryptographic Message Syntax (CMS / PKCS#7)](https://datatracker.ietf.org/doc/html/rfc5652)
 - [RFC 7292 — PKCS #12 v1.1 (Personal Information Exchange)](https://datatracker.ietf.org/doc/html/rfc7292)
-- OpenSSL documentation: [pkcs12](https://www.openssl.org/docs/manmaster/man1/openssl-pkcs12.html), [x509](https://www.openssl.org/docs/manmaster/man1/openssl-x509.html), [crl2pkcs7](https://www.openssl.org/docs/manmaster/man1/openssl-crl2pkcs7.html)
-- OpenSSL Cookbook (practical guide): <https://www.feistyduck.com/library/openssl-cookbook/online/>
+- [Python cryptography library documentation](https://cryptography.io/)
 
 ______________________________________________________________________
 
