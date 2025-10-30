@@ -13,7 +13,6 @@ A concise guide to contributing changes to BundleCraft and releasing new package
 
 ______________________________________________________________________
 
-
 ## ⚡ Quickstart
 
 **Contributing code? Get started in 60 seconds:**
@@ -244,7 +243,6 @@ Notes:
 - These targets do not publish anything; they're strictly local tests.
 - The inline configs are created/cleaned by `scripts/prepare_test_configs.sh`.
 
-
 ### Step 6: Commit and push
 
 ```bash
@@ -421,7 +419,6 @@ Releases are driven by tags and handled by GitHub Actions:
 - Tag format for pre-release: `vMAJOR.MINOR.PATCH-(alpha|beta).N` (e.g., `v1.2.3-beta.1`)
 
 When you push a valid tag to GitHub, CI builds the package, publishes (after environment approval), builds/pushes the container image, and creates a GitHub Release. See `docs/CI-CD.md` for details.
-
 
 ### Release Security
 
