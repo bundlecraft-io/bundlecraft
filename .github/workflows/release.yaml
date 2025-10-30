@@ -132,6 +132,8 @@ jobs:
           name: python-package-distributions
           path: dist/
   # Build and push container images to GHCR
+  # Note: Uses Docker directly in CI (standard for GitHub Actions)
+  # For local testing, use: make build-test-image (auto-detects Docker/Podman)
   build-image:
     name: Build Container Image
     needs: [test, determine-channel]

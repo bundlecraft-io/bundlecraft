@@ -1,4 +1,12 @@
-CONTAINER ?= podman
+# Auto-detect container runtime and set appropriate flags
+CONTAINER_CMD := $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
+CONTAINER ?= $(notdir $(CONTAINER_CMD))
+
+# Podman-specific flags for better compatibility
+ifeq ($(CONTAINER),podman)
+    CONTAINER_FLAGS := --cgroup-manager=cgroupfs
+endif
+
 HATCH_BUILD_VERSION ?= 0.0.0+local
 IMAGE_NAME ?= bundlecraft
 IMAGE_TAG ?= local
@@ -45,14 +53,14 @@ help:
 	@echo "  ci-lint                 Run ruff linting for CI"
 
 build-test-image:
-	$(CONTAINER) build --build-arg HATCH_BUILD_VERSION=$(HATCH_BUILD_VERSION) -t $(IMAGE_REF) .
+	$(CONTAINER) build $(CONTAINER_FLAGS) --build-arg HATCH_BUILD_VERSION=$(HATCH_BUILD_VERSION) -t $(IMAGE_REF) .
 
 # Build a release image tagged with the latest git tag.
 # - Uses $(GIT_TAG) for the image tag.
 # - Uses $(VERSION) (without leading 'v') for HATCH_BUILD_VERSION inside the wheel.
 build-image:
 	@test -n "$(GIT_TAG)" || (echo "No git tag found. Create a tag (e.g. v1.2.3) or call: make release-image GIT_TAG=v1.2.3" >&2; exit 1)
-	$(CONTAINER) build \
+	$(CONTAINER) build $(CONTAINER_FLAGS) \
 	  --build-arg HATCH_BUILD_VERSION=$(VERSION) \
 	  -t $(RELEASE_IMAGE_REF) \
 	  .
