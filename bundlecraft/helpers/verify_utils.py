@@ -277,7 +277,7 @@ def _count_certs_in_file(file_path: Path) -> int:
             storepass = os.environ.get("TRUST_JKS_PASSWORD", "changeit")
             keystore = jks.KeyStore.load(str(file_path), storepass)
             count = 0
-            for alias, entry in keystore.entries.items():
+            for _alias, entry in keystore.entries.items():
                 if isinstance(entry, jks.TrustedCertEntry):
                     count += 1
                 elif isinstance(entry, jks.PrivateKeyEntry):
