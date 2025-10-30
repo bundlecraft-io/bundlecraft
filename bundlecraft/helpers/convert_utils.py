@@ -465,7 +465,7 @@ def create_pkcs12(
     alias = _sanitize_alias(alias)
 
     # Create PKCS#12 with no private key (certificates only)
-    # cryptography requires a private key, so we use None which creates a certificate-only bundle
+    # When there's no private key, all certs go into the cas parameter
     encryption = (
         BestAvailableEncryption(password.encode())
         if password
@@ -475,8 +475,8 @@ def create_pkcs12(
     p12_data = pkcs12.serialize_key_and_certificates(
         name=alias.encode(),
         key=None,  # No private key
-        cert=certs[0] if len(certs) == 1 else None,  # Primary cert
-        cas=certs[1:] if len(certs) > 1 else certs,  # Additional certs
+        cert=None,  # No primary cert (would require private key)
+        cas=certs,  # All certificates as additional certs
         encryption_algorithm=encryption,
     )
     
