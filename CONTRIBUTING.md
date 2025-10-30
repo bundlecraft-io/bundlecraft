@@ -13,7 +13,6 @@ A concise guide to contributing changes to BundleCraft and releasing new package
 
 ______________________________________________________________________
 
-
 ## ⚡ Quickstart
 
 **Contributing code? Get started in 60 seconds:**
@@ -136,6 +135,25 @@ This installs:
 
 > **Tip:** Keep your output directory named `dist/` (not `build/`) to avoid conflicts with Python's build tool.
 
+#### Shell Completion (Optional but Recommended for Development)
+
+BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags during development:
+
+```bash
+# Bash - run in your current shell (or add to ~/.bashrc for persistence)
+eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
+
+# Zsh - run in your current shell (or add to ~/.zshrc for persistence)  
+eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
+```
+
+**Notes:**
+
+- Run this **after** activating your venv
+- Completion works for all subcommands (`build`, `verify`, `convert`, etc.) and their flags
+- For persistence, add the `eval` line to your shell's rc file (`~/.bashrc` or `~/.zshrc`)
+- If completion stops working, re-run the `eval` command
+
 ### Step 3: Configure Repository (when testing builds/fetches)
 
 > Tip: To skip manual setup for a quick smoke test, run `scripts/prepare_test_configs.sh`.
@@ -224,7 +242,6 @@ Notes:
 
 - These targets do not publish anything; they're strictly local tests.
 - The inline configs are created/cleaned by `scripts/prepare_test_configs.sh`.
-
 
 ### Step 6: Commit and push
 
@@ -402,7 +419,6 @@ Releases are driven by tags and handled by GitHub Actions:
 - Tag format for pre-release: `vMAJOR.MINOR.PATCH-(alpha|beta).N` (e.g., `v1.2.3-beta.1`)
 
 When you push a valid tag to GitHub, CI builds the package, publishes (after environment approval), builds/pushes the container image, and creates a GitHub Release. See `docs/CI-CD.md` for details.
-
 
 ### Release Security
 
