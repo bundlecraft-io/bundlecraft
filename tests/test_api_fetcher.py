@@ -13,12 +13,21 @@ Tests for:
 
 import urllib.error
 import urllib.request
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 
 import pytest
 import click
 
 from bundlecraft.fetchers.api import _tls_leaf_fingerprint_sha256, fetch_api
+
+
+def create_mock_response(data: bytes) -> Mock:
+    """Create a mock response object that supports context manager protocol."""
+    mock_response = Mock()
+    mock_response.read.return_value = data
+    mock_response.__enter__ = Mock(return_value=mock_response)
+    mock_response.__exit__ = Mock(return_value=False)
+    return mock_response
 
 
 class TestAPIFetcherHTTPS:
@@ -35,9 +44,7 @@ class TestAPIFetcherHTTPS:
 
     def test_accepts_https_endpoint(self, tmp_path):
         """Test that HTTPS endpoints are accepted."""
-        # Mock the urllib request
-        mock_response = Mock()
-        mock_response.read.return_value = b"-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----"
+        mock_response = create_mock_response(b"-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----")
 
         with patch("urllib.request.urlopen", return_value=mock_response):
             result = fetch_api(
@@ -59,8 +66,7 @@ class TestAPIFetcherAuthentication:
         test_token = "secret_api_token_12345"
         monkeypatch.setenv("TEST_API_TOKEN", test_token)
 
-        mock_response = Mock()
-        mock_response.read.return_value = b"CERT DATA"
+        mock_response = create_mock_response(b"CERT DATA")
 
         captured_request = None
 
@@ -98,8 +104,7 @@ class TestAPIFetcherAuthentication:
 
     def test_works_without_token(self, tmp_path):
         """Test that API fetch works without authentication."""
-        mock_response = Mock()
-        mock_response.read.return_value = b"PUBLIC CERT DATA"
+        mock_response = create_mock_response(b"PUBLIC CERT DATA")
 
         with patch("urllib.request.urlopen", return_value=mock_response):
             result = fetch_api(
@@ -118,8 +123,7 @@ class TestAPIFetcherHeaders:
 
     def test_default_accept_header(self, tmp_path):
         """Test that default Accept header is set."""
-        mock_response = Mock()
-        mock_response.read.return_value = b"CERT"
+        mock_response = create_mock_response(b"CERT")
 
         captured_request = None
 
@@ -145,8 +149,7 @@ class TestAPIFetcherHeaders:
             "X-API-Version": "v2",
         }
 
-        mock_response = Mock()
-        mock_response.read.return_value = b"CERT"
+        mock_response = create_mock_response(b"CERT")
 
         captured_request = None
 
@@ -164,9 +167,14 @@ class TestAPIFetcherHeaders:
                 timeout=5,
             )
 
+            # Headers are case-insensitive, so check with lowercase
             for key, value in custom_headers.items():
-                assert key in captured_request.headers
-                assert captured_request.headers[key] == value
+                # Headers may be normalized to different cases
+                header_found = any(k.lower() == key.lower() for k in captured_request.headers)
+                assert header_found, f"Header {key} not found in request"
+                # Get the actual key used in the request
+                actual_key = next(k for k in captured_request.headers if k.lower() == key.lower())
+                assert captured_request.headers[actual_key] == value
 
 
 class TestAPIFetcherTLSVerification:
@@ -182,8 +190,13 @@ class TestAPIFetcherTLSVerification:
                 mock_ssock = Mock()
                 mock_ssock.getpeercert.return_value = mock_cert_der
 
+                # Create a proper context manager mock
+                mock_wrapped_socket = MagicMock()
+                mock_wrapped_socket.__enter__.return_value = mock_ssock
+                mock_wrapped_socket.__exit__.return_value = False
+
                 mock_ctx = Mock()
-                mock_ctx.wrap_socket.return_value.__enter__.return_value = mock_ssock
+                mock_ctx.wrap_socket.return_value = mock_wrapped_socket
                 mock_ssl_ctx.return_value = mock_ctx
 
                 fingerprint = _tls_leaf_fingerprint_sha256("example.com", 443)
@@ -195,8 +208,7 @@ class TestAPIFetcherTLSVerification:
         """Test successful verification when fingerprint matches."""
         expected_fingerprint = "a" * 64  # Mock SHA256 hash
 
-        mock_response = Mock()
-        mock_response.read.return_value = b"CERT DATA"
+        mock_response = create_mock_response(b"CERT DATA")
 
         with patch("urllib.request.urlopen", return_value=mock_response):
             with patch(
@@ -207,7 +219,7 @@ class TestAPIFetcherTLSVerification:
                     endpoint="https://api.example.com/certs",
                     dest_dir=tmp_path,
                     name="test",
-                    verify={"tls_leaf_fingerprint_sha256": expected_fingerprint},
+                    verify={"tls_fingerprint_sha256": expected_fingerprint},
                     timeout=5,
                 )
 
@@ -218,6 +230,7 @@ class TestAPIFetcherTLSVerification:
         expected_fingerprint = "a" * 64
         actual_fingerprint = "b" * 64
 
+        # Note: fingerprint check happens before the actual fetch, so we don't need to mock urlopen
         with patch(
             "bundlecraft.fetchers.api._tls_leaf_fingerprint_sha256",
             return_value=actual_fingerprint,
@@ -227,7 +240,7 @@ class TestAPIFetcherTLSVerification:
                     endpoint="https://api.example.com/certs",
                     dest_dir=tmp_path,
                     name="test",
-                    verify={"tls_leaf_fingerprint_sha256": expected_fingerprint},
+                    verify={"tls_fingerprint_sha256": expected_fingerprint},
                     timeout=5,
                 )
 
@@ -237,8 +250,7 @@ class TestAPIFetcherRetryLogic:
 
     def test_respects_timeout_setting(self, tmp_path):
         """Test that custom timeout is used."""
-        mock_response = Mock()
-        mock_response.read.return_value = b"CERT"
+        mock_response = create_mock_response(b"CERT")
 
         captured_timeout = None
 
@@ -265,9 +277,7 @@ class TestAPIFetcherRetryLogic:
             attempt_count[0] += 1
             if attempt_count[0] < 3:
                 raise urllib.error.URLError("Temporary network error")
-            mock_response = Mock()
-            mock_response.read.return_value = b"CERT"
-            return mock_response
+            return create_mock_response(b"CERT")
 
         with patch("urllib.request.urlopen", side_effect=mock_urlopen):
             result = fetch_api(
@@ -339,8 +349,7 @@ class TestAPIFetcherErrorHandling:
 
     def test_handles_empty_response(self, tmp_path):
         """Test handling of empty API responses."""
-        mock_response = Mock()
-        mock_response.read.return_value = b""
+        mock_response = create_mock_response(b"")
 
         with patch("urllib.request.urlopen", return_value=mock_response):
             result = fetch_api(
@@ -358,8 +367,7 @@ class TestAPIFetcherErrorHandling:
         """Test that destination directory is created if it doesn't exist."""
         dest_dir = tmp_path / "nested" / "path" / "to" / "certs"
 
-        mock_response = Mock()
-        mock_response.read.return_value = b"CERT"
+        mock_response = create_mock_response(b"CERT")
 
         with patch("urllib.request.urlopen", return_value=mock_response):
             result = fetch_api(
@@ -378,8 +386,7 @@ class TestAPIFetcherOutputFormats:
 
     def test_appends_pem_extension(self, tmp_path):
         """Test that .pem extension is added if missing."""
-        mock_response = Mock()
-        mock_response.read.return_value = b"CERT"
+        mock_response = create_mock_response(b"CERT")
 
         with patch("urllib.request.urlopen", return_value=mock_response):
             result = fetch_api(
@@ -393,8 +400,7 @@ class TestAPIFetcherOutputFormats:
 
     def test_preserves_pem_extension(self, tmp_path):
         """Test that existing .pem extension is preserved."""
-        mock_response = Mock()
-        mock_response.read.return_value = b"CERT"
+        mock_response = create_mock_response(b"CERT")
 
         with patch("urllib.request.urlopen", return_value=mock_response):
             result = fetch_api(
@@ -412,8 +418,7 @@ class TestAPIFetcherOutputFormats:
         # DER-encoded certificate (binary)
         binary_cert = b"\x30\x82\x03\x48\x30\x82\x02\x30"
 
-        mock_response = Mock()
-        mock_response.read.return_value = binary_cert
+        mock_response = create_mock_response(binary_cert)
 
         with patch("urllib.request.urlopen", return_value=mock_response):
             result = fetch_api(
