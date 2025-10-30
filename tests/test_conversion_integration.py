@@ -126,7 +126,7 @@ class TestP7BConversion:
 class TestP12Conversion:
     """Test PKCS#12 conversion without openssl"""
     
-    def test_single_cert_to_p12(self, test_certs, tmp_path):
+    def test_single_cert_to_p12(self, test_certs, tmp_path, monkeypatch):
         """Convert single certificate to P12"""
         overrides = {"password": "testpassword"}
         create_pkcs12(test_certs["single"], tmp_path, "single_bundle", overrides, force=True)
@@ -136,11 +136,11 @@ class TestP12Conversion:
         assert p12_file.stat().st_size > 0
         
         # Verify certificate count
-        os.environ["TRUST_P12_PASSWORD"] = "testpassword"
+        monkeypatch.setenv("TRUST_P12_PASSWORD", "testpassword")
         count = _count_certs_in_file(p12_file)
         assert count == test_certs["count_single"]
     
-    def test_multi_cert_to_p12(self, test_certs, tmp_path):
+    def test_multi_cert_to_p12(self, test_certs, tmp_path, monkeypatch):
         """Convert multiple certificates to P12"""
         overrides = {"password": "testpassword"}
         create_pkcs12(test_certs["multi"], tmp_path, "multi_bundle", overrides, force=True)
@@ -150,7 +150,7 @@ class TestP12Conversion:
         assert p12_file.stat().st_size > 0
         
         # Verify certificate count
-        os.environ["TRUST_P12_PASSWORD"] = "testpassword"
+        monkeypatch.setenv("TRUST_P12_PASSWORD", "testpassword")
         count = _count_certs_in_file(p12_file)
         assert count == test_certs["count_multi"]
     
@@ -177,7 +177,7 @@ class TestP12Conversion:
         cert_count = text.count("-----BEGIN CERTIFICATE-----")
         assert cert_count == test_certs["count_multi"]
     
-    def test_p12_with_default_password(self, test_certs, tmp_path):
+    def test_p12_with_default_password(self, test_certs, tmp_path, monkeypatch):
         """Test P12 creation with default password"""
         overrides = {}  # Use default password
         create_pkcs12(test_certs["single"], tmp_path, "default_pw", overrides, force=True)
@@ -186,7 +186,7 @@ class TestP12Conversion:
         assert p12_file.exists()
         
         # Should be readable with default password
-        os.environ["TRUST_P12_PASSWORD"] = "changeit"
+        monkeypatch.setenv("TRUST_P12_PASSWORD", "changeit")
         count = _count_certs_in_file(p12_file)
         assert count == test_certs["count_single"]
 
