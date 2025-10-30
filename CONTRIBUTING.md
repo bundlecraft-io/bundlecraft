@@ -136,6 +136,25 @@ This installs:
 
 > **Tip:** Keep your output directory named `dist/` (not `build/`) to avoid conflicts with Python's build tool.
 
+#### Shell Completion (Optional but Recommended for Development)
+
+BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags during development:
+
+```bash
+# Bash - run in your current shell (or add to ~/.bashrc for persistence)
+eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
+
+# Zsh - run in your current shell (or add to ~/.zshrc for persistence)  
+eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
+```
+
+**Notes:**
+
+- Run this **after** activating your venv
+- Completion works for all subcommands (`build`, `verify`, `convert`, etc.) and their flags
+- For persistence, add the `eval` line to your shell's rc file (`~/.bashrc` or `~/.zshrc`)
+- If completion stops working, re-run the `eval` command
+
 ### Step 3: Configure Repository (when testing builds/fetches)
 
 > Tip: To skip manual setup for a quick smoke test, run `scripts/prepare_test_configs.sh`.
