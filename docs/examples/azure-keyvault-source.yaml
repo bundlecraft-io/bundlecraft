@@ -1,0 +1,74 @@
+---
+# Example Azure Key Vault source configuration
+# This demonstrates fetching certificates from Azure Key Vault
+
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
+source_name: azure-keyvault-example
+description: Example configuration for fetching certificates from Azure Key Vault
+
+# Fetch certificates from Azure Key Vault
+fetch:
+  # Example 1: Using DefaultAzureCredential (recommended for production)
+  # This uses environment variables (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
+  # or managed identity, Azure CLI, etc.
+  - name: production-roots
+    type: azure_keyvault
+    vault_url: https://company-kv.vault.azure.net
+    secret_name: production-root-certificates
+    credential_type: default  # Uses DefaultAzureCredential
+    # Optional: Override retry/timeout settings
+    timeout: 30
+    retries: 3
+    backoff_factor: 2.0
+    retry_on_status: [429, 502, 503, 504]
+
+  # Example 2: Using a specific secret version
+  # Useful for pinning to a known good certificate version
+  - name: pinned-intermediate
+    type: azure_keyvault
+    vault_url: https://company-kv.vault.azure.net
+    secret_name: intermediate-ca
+    secret_version: abc123def456789  # Specific version ID
+    credential_type: default
+
+  # Example 3: Using Service Principal with Client Secret
+  # Explicit authentication with service principal credentials
+  - name: partner-roots
+    type: azure_keyvault
+    vault_url: https://partner-kv.vault.azure.net
+    secret_name: partner-root-certificates
+    credential_type: client_secret
+    tenant_id: 12345678-1234-1234-1234-123456789012
+    client_id: 87654321-4321-4321-4321-210987654321
+    client_secret_ref: AZURE_CLIENT_SECRET  # Environment variable name
+
+  # Example 4: Using Managed Identity (Azure VMs, App Service, Functions)
+  # No credentials needed - uses the Azure resource's managed identity
+  - name: internal-roots
+    type: azure_keyvault
+    vault_url: https://internal-kv.vault.azure.net
+    secret_name: internal-root-certificates
+    credential_type: managed_identity
+    # Optional: Specify client_id for user-assigned managed identity
+    # client_id: 11111111-2222-3333-4444-555555555555
+
+  # Example 5: Using Azure CLI credentials (local development)
+  # Uses credentials from 'az login' - good for testing locally
+  - name: dev-roots
+    type: azure_keyvault
+    vault_url: https://dev-kv.vault.azure.net
+    secret_name: dev-root-certificates
+    credential_type: cli
+
+# Optional: Include local certificates alongside fetched ones
+repo:
+  - name: local-roots
+    include:
+      - cert_sources/local/company-root.pem
+      - cert_sources/local/legacy-root.pem
+
+metadata:
+  owner: security-team@company.com
+  purpose: Production trust bundle with Azure Key Vault integration
+  tags: [production, azure, cloud]
