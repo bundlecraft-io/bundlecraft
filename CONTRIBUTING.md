@@ -553,6 +553,7 @@ Handy commands for common tasks:
 | Format code | `black .` |
 | Lint code | `ruff check . --fix` |
 | Run tests | `pytest -v` |
+| Scan vulnerabilities | `pip-audit --desc --require pyproject.toml` |
 | Build bundle | `bundlecraft build --env test-example-envconfig --bundle internal` |
 | Verify bundle | `bundlecraft verify --target dist/.test-inline --verify-all` |
 | Fetch remote sources | `bundlecraft fetch --source-config-file config/cert_sources/*.yaml` |
