@@ -21,6 +21,14 @@ import pytest
 from bundlecraft.fetchers.gcs import fetch_gcs
 
 
+class MockGCSException(Exception):
+    """Mock exception for simulating GCS errors."""
+
+    def __init__(self, message: str, code: int | None = None):
+        super().__init__(message)
+        self.code = code
+
+
 class MockBlob:
     """Mock GCS Blob object."""
 
@@ -42,9 +50,9 @@ class MockBlob:
 class MockBucket:
     """Mock GCS Bucket object."""
 
-    def __init__(self, name: str, blobs: dict[str, MockBlob] = None):
+    def __init__(self, name: str, blobs: dict[str, MockBlob] | None = None):
         self.name = name
-        self.blobs = blobs or {}
+        self.blobs = blobs if blobs is not None else {}
 
     def blob(self, object_path: str) -> MockBlob:
         """Get a blob by path."""
@@ -57,8 +65,8 @@ class MockBucket:
 class MockStorageClient:
     """Mock GCS Storage Client."""
 
-    def __init__(self, buckets: dict[str, MockBucket] = None):
-        self.buckets = buckets or {}
+    def __init__(self, buckets: dict[str, MockBucket] | None = None):
+        self.buckets = buckets if buckets is not None else {}
 
     def bucket(self, bucket_name: str) -> MockBucket:
         """Get a bucket by name."""
@@ -233,7 +241,7 @@ class TestGCSFetcherErrors:
 
         # Make download raise a 403 error
         def raise_403(*args, **kwargs):
-            raise Exception("403 Forbidden: Insufficient permissions")
+            raise MockGCSException("403 Forbidden: Insufficient permissions", code=403)
 
         mock_blob.download_to_filename = raise_403
 
@@ -262,7 +270,7 @@ class TestGCSFetcherErrors:
 
         # Make download raise a 404 error
         def raise_404(*args, **kwargs):
-            raise Exception("404 Not Found")
+            raise MockGCSException("404 Not Found", code=404)
 
         mock_blob.download_to_filename = raise_404
 
@@ -288,7 +296,7 @@ class TestGCSFetcherErrors:
 
         # Make download raise a 401 error
         def raise_401(*args, **kwargs):
-            raise Exception("401 Unauthorized")
+            raise MockGCSException("401 Unauthorized", code=401)
 
         mock_blob.download_to_filename = raise_401
 
