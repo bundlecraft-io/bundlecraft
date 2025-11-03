@@ -119,7 +119,7 @@ bundlecraft/
 
 - `utils.py` – Core utilities (filters, merging, config loading)
 - `config_schema.py` – Pydantic validation schemas for all configs
-- `convert_utils.py` – Format conversion helpers (OpenSSL and pyjks for JKS)
+- `convert_utils.py` – Format conversion helpers
 - `verify_utils.py` – Verification utilities
 - `atomic_build.py` – Atomic build context manager
 - `sbom.py` – SBOM generation (CycloneDX format)
@@ -405,8 +405,8 @@ ______________________________________________________________________
 
 Releases are driven by tags and handled by GitHub Actions:
 
-- Tag format for production: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.3`) — Tagged from `main` branch
-- Tag format for pre-release: `vMAJOR.MINOR.PATCH-(alpha|beta).N` (e.g., `v1.2.3-beta.1`) — Tagged from `pre-release` branch
+- Tag format for production: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.3`) - Tagged from `main` branch
+- Tag format for pre-release: `vMAJOR.MINOR.PATCH-(alpha|beta).N` (e.g., `v1.2.3-beta.1`) - Tagged from `pre-release` branch
 
 **Release Workflow:**
 
@@ -489,9 +489,9 @@ docker run --rm -it \
 
 #### Available Pre-Release Tags
 
-- `pre-release` — Always points to the latest pre-release version
-- `1.2.3-beta.1` — Specific pre-release version tags
-- `1.2.3-alpha.1` — Alpha versions for early testing
+- `pre-release` - Always points to the latest pre-release version
+- `1.2.3-beta.1` - Specific pre-release version tags
+- `1.2.3-alpha.1` - Alpha versions for early testing
 
 #### When to Use Pre-Release Versions
 

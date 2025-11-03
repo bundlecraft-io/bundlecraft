@@ -210,7 +210,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 - **Problem:** "It works on my machine" but fails in CI. Different Python versions, missing tools, inconsistent outputs.
 - **Solution:** Configuration-as-code with deterministic builds. Same inputs = same outputs, every time. Perfect for GitOps workflows.
-- 
+
 ______________________________________________________________________
 
 ## ✨ Features
@@ -221,7 +221,7 @@ ______________________________________________________________________
 - **Multi-format export:** PEM, P7B, JKS, P12, ZIP
 - **Cross-format verification:** expiry, empties, count consistency
 - **Extensible config model:** defaults → environment → bundle
-- **Portable tooling:** Pure Python with OpenSSL for legacy format support
+- **Portable tooling:** Pure Python, no system dependencies like OpenSSL or JDK needed
 - **Manifest and checksum generation:** for auditing and release integrity
 - **SBOM generation:** CycloneDX SBOM for supply chain transparency (enabled by default; can be disabled)
 - **GPG signing integration:** Sign release artifacts with detached signatures (`--sign`)
@@ -445,6 +445,30 @@ These can be overridden by environment or source configs.
 
 ______________________________________________________________________
 
+## ⚙️ Environment Variables
+
+BundleCraft supports the following environment variables for configuration:
+
+| Variable | Purpose | Default Value | Used By |
+|------------------------|-----------------------------------------------|----------------|------------------|
+| `TRUST_JKS_PASSWORD` | Password for Java KeyStore operations | `"changeit"` | Convert, Verify |
+| `TRUST_P12_PASSWORD` | Password for PKCS#12 operations | `"changeit"` | Convert, Verify |
+| `BUNDLECRAFT_WORKSPACE` | Override workspace directory for builds | Current directory | Builder |
+| `VAULT_TOKEN` | HashiCorp Vault authentication token | - | Vault Fetcher |
+| `VAULT_ADDR` | HashiCorp Vault server address | - | Vault Fetcher |
+| `KEYFACTOR_TOKEN` | Keyfactor API authentication token | - | API Fetcher |
+| `GPG_KEY_ID` | GPG key identifier for signing operations | - | Signing |
+| `GPG_PASSPHRASE` | GPG key passphrase for signing | `""` (empty) | Signing |
+
+**Note:**
+
+- Password variables are used as fallback values and can be overridden via CLI options or config files
+- Authentication tokens (`*_TOKEN`) are required when using their respective fetchers
+- Signing variables are only needed when using `--sign` option
+- Workspace variable is primarily used for development and testing environments
+
+______________________________________________________________________
+
 ## 🚀 Quickstart – Fetching, Building, and Verifying Trust Bundles
 
 ### 1. Install Prerequisites
@@ -611,30 +635,6 @@ git push origin main
 ```
 
 The template is perfect for anyone wanting to adopt BundleCraft with minimal setup!
-
-______________________________________________________________________
-
-## ⚙️ Environment Variables
-
-BundleCraft supports the following environment variables for configuration:
-
-| Variable | Purpose | Default Value | Used By |
-|------------------------|-----------------------------------------------|----------------|------------------|
-| `TRUST_JKS_PASSWORD` | Password for Java KeyStore operations | `"changeit"` | Convert, Verify |
-| `TRUST_P12_PASSWORD` | Password for PKCS#12 operations | `"changeit"` | Convert, Verify |
-| `BUNDLECRAFT_WORKSPACE` | Override workspace directory for builds | Current directory | Builder |
-| `VAULT_TOKEN` | HashiCorp Vault authentication token | - | Vault Fetcher |
-| `VAULT_ADDR` | HashiCorp Vault server address | - | Vault Fetcher |
-| `KEYFACTOR_TOKEN` | Keyfactor API authentication token | - | API Fetcher |
-| `GPG_KEY_ID` | GPG key identifier for signing operations | - | Signing |
-| `GPG_PASSPHRASE` | GPG key passphrase for signing | `""` (empty) | Signing |
-
-**Note:**
-
-- Password variables are used as fallback values and can be overridden via CLI options or config files
-- Authentication tokens (`*_TOKEN`) are required when using their respective fetchers
-- Signing variables are only needed when using `--sign` option
-- Workspace variable is primarily used for development and testing environments
 
 ______________________________________________________________________
 
@@ -981,8 +981,8 @@ ______________________________________________________________________
 ## 🤝 Contributing
 
 - Issues and PRs are welcome!
-- Please ensure all changes are reflected in relevant docs in [`docs/`](docs/).
-- For more info, see: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
+- Check out [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) before getting started for come community guidelines.
+- See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details on how to interact with the codebase and release process.
 
 ______________________________________________________________________
 
@@ -1002,13 +1002,14 @@ ______________________________________________________________________
 
 **BundleCraft Ecosystem:**
 
-- [🧱 BundleCraft Starter](https://github.com/bundlecraft-io/bundlecraft-starter) —  Template repository with GitHub Actions workflow for orchestrating your own BundleCraft builds.
+- [🧱 BundleCraft Starter](https://github.com/bundlecraft-io/bundlecraft-starter) -  Template repository with GitHub Actions workflow for orchestrating your own BundleCraft builds.
+- [🧑🏽‍💻 BundleCraft Demo](https://github.com/bundlecraft-io/bundlecraft-demo) -  Mock environment for showcasing BundleCraft's usages and potential applications in the format of sample scenario.
 
 **Standards & Documentation:**
 
-- [RFC 5280 — Internet X.509 PKI Certificate and CRL Profile](https://datatracker.ietf.org/doc/html/rfc5280)
-- [RFC 5652 — Cryptographic Message Syntax (CMS / PKCS#7)](https://datatracker.ietf.org/doc/html/rfc5652)
-- [RFC 7292 — PKCS #12 v1.1 (Personal Information Exchange)](https://datatracker.ietf.org/doc/html/rfc7292)
+- [RFC 5280 - Internet X.509 PKI Certificate and CRL Profile](https://datatracker.ietf.org/doc/html/rfc5280)
+- [RFC 5652 - Cryptographic Message Syntax (CMS / PKCS#7)](https://datatracker.ietf.org/doc/html/rfc5652)
+- [RFC 7292 - PKCS #12 v1.1 (Personal Information Exchange)](https://datatracker.ietf.org/doc/html/rfc7292)
 - [Python cryptography library documentation](https://cryptography.io/)
 
 ______________________________________________________________________

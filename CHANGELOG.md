@@ -180,6 +180,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All behavior with respect to JKS bundle creation remains the same as before
 
 ---
+
 ## [0.1.3-beta.29] - 2025-10-30
 
 ### Changed
@@ -187,11 +188,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A, more release tests
 
 ---
+
 ## [0.1.3-beta.30] - 2025-10-30
 
 ### Changed
 
 - N/A, more release tests
+
+---
+
+## [0.1.3-beta.31] - 2025-10-30
+
+### Changed
+
+- Openssl dependencies removed
+  - BundleCraft is now 100% python native - no more system dependencies!
+  - Operations that relied on openssl (like p7b conversions) now use python deps
 
 ---
 
