@@ -22,6 +22,7 @@ from typing import Any
 import click
 
 from bundlecraft.fetchers.api import fetch_api
+from bundlecraft.fetchers.azure_keyvault import fetch_azure_keyvault
 from bundlecraft.fetchers.http import fetch_url
 from bundlecraft.fetchers.vault import fetch_vault
 from bundlecraft.helpers.config_schema import validate_source_config
@@ -225,6 +226,49 @@ def _fetch_from_config(
                     addr=addr,
                     token_ref=token_ref,
                     namespace=namespace,
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "azure_keyvault" or ftype == "azure-keyvault":
+                vault_url = src.get("vault_url")
+                if not vault_url:
+                    raise click.ClickException(
+                        "Azure Key Vault fetch source requires 'vault_url' "
+                        "(e.g., https://myvault.vault.azure.net)"
+                    )
+                secret_name = src.get("secret_name")
+                if not secret_name:
+                    raise click.ClickException("Azure Key Vault fetch source requires 'secret_name'")
+                secret_version = src.get("secret_version")
+                credential_type = src.get("credential_type")
+                tenant_id = src.get("tenant_id")
+                client_id = src.get("client_id")
+                client_secret_ref = src.get("client_secret_ref")
+                logger.info("  Fetching from Azure Key Vault:")
+                logger.info(f"    Vault URL: {vault_url}")
+                logger.info(f"    Secret: {secret_name}")
+                if secret_version:
+                    logger.info(f"    Version: {secret_version}")
+                if verbose:
+                    logger.debug(f"    Credential type: {credential_type or 'default'}")
+                    if tenant_id:
+                        logger.debug(f"    Tenant ID: {tenant_id}")
+                    if client_id:
+                        logger.debug(f"    Client ID: {client_id}")
+                out_path = fetch_azure_keyvault(
+                    dest_dir,
+                    name=name,
+                    vault_url=vault_url,
+                    secret_name=secret_name,
+                    secret_version=secret_version,
+                    credential_type=credential_type,
+                    tenant_id=tenant_id,
+                    client_id=client_id,
+                    client_secret_ref=client_secret_ref,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
                     verify=verify if isinstance(verify, dict) else None,
                 )
             else:
@@ -527,6 +571,10 @@ def _fetch_each_to_named_dirs(
                 )
                 path = src.get("path")
                 logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
+            elif ftype == "azure_keyvault" or ftype == "azure-keyvault":
+                vault_url = src.get("vault_url")
+                secret_name = src.get("secret_name")
+                logger.info(f"[dry-run]   from Azure Key Vault: {vault_url}/{secret_name}")
             logger.info(f"[dry-run]   to directory: {staging_root / 'fetch' / name}")
             continue
 

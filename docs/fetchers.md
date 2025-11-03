@@ -90,6 +90,31 @@ Integrates with HashiCorp Vault for certificate retrieval from KV stores or PKI 
 - Address validation
 - Field-specific PEM extraction
 
+### 4. Azure Key Vault Fetcher (`type: azure_keyvault`)
+
+Integrates with Azure Key Vault for certificate retrieval from Azure secrets storage.
+
+**Use cases:**
+
+- Internal root certificates stored in Azure Key Vault
+- PKI certificates managed in Azure
+- Certificate collections for Azure-based infrastructure
+- Multi-cloud certificate management with Azure presence
+
+**Security features:**
+
+- Multiple authentication methods (DefaultAzureCredential, ClientSecretCredential, ManagedIdentityCredential, AzureCliCredential)
+- Azure RBAC integration
+- Versioned secret support
+- Native Azure SDK integration
+
+**Authentication methods:**
+
+- **Default** - Uses Azure DefaultAzureCredential (environment variables, managed identity, Azure CLI)
+- **Client Secret** - Service principal authentication with client secret
+- **Managed Identity** - For Azure VMs, App Service, Function Apps
+- **Azure CLI** - Uses `az login` credentials for local development
+
 ## Configuration
 
 ### Basic Fetch Configuration
@@ -153,6 +178,29 @@ fetch:
     token_ref: VAULT_TOKEN      # environment variable name
     verify:
       ca_file: config/certs/vault-ca.pem
+```
+
+### Azure Key Vault Fetcher Configuration
+
+```yaml
+fetch:
+  - name: azure_roots
+    type: azure_keyvault
+    vault_url: https://myvault.vault.azure.net  # Azure Key Vault URL
+    secret_name: root-certificates              # Secret name in Key Vault
+    secret_version: abc123def456                # Optional: specific version
+    credential_type: default                    # Auth method: default, client_secret, managed_identity, cli
+    
+    # Optional: For client_secret authentication
+    tenant_id: 12345678-1234-1234-1234-123456789012
+    client_id: 87654321-4321-4321-4321-210987654321
+    client_secret_ref: AZURE_CLIENT_SECRET      # Environment variable name
+    
+    # Optional: Retry configuration
+    timeout: 30
+    retries: 3
+    backoff_factor: 2.0
+    retry_on_status: [429, 502, 503, 504]
 ```
 
 ## Security Features
@@ -262,6 +310,62 @@ fetch:
       ca_file: config/certs/api-ca.pem
 ```
 
+### Azure Key Vault Integration
+
+#### Using Default Credential (Recommended for Production)
+
+```yaml
+fetch:
+  - name: azure_internal_roots
+    type: azure_keyvault
+    vault_url: https://company-kv.vault.azure.net
+    secret_name: internal-root-certificates
+    credential_type: default  # Uses DefaultAzureCredential
+```
+
+With environment variables set:
+```bash
+export AZURE_TENANT_ID="12345678-1234-1234-1234-123456789012"
+export AZURE_CLIENT_ID="87654321-4321-4321-4321-210987654321"
+export AZURE_CLIENT_SECRET="your-client-secret"
+```
+
+#### Using Managed Identity (Azure VMs, App Service, Functions)
+
+```yaml
+fetch:
+  - name: azure_roots
+    type: azure_keyvault
+    vault_url: https://company-kv.vault.azure.net
+    secret_name: root-certificates
+    credential_type: managed_identity
+```
+
+#### Using Azure CLI (Local Development)
+
+```yaml
+fetch:
+  - name: azure_roots
+    type: azure_keyvault
+    vault_url: https://company-kv.vault.azure.net
+    secret_name: root-certificates
+    credential_type: cli  # Uses 'az login' credentials
+```
+
+#### Using Service Principal with Client Secret
+
+```yaml
+fetch:
+  - name: azure_roots
+    type: azure_keyvault
+    vault_url: https://company-kv.vault.azure.net
+    secret_name: root-certificates
+    credential_type: client_secret
+    tenant_id: 12345678-1234-1234-1234-123456789012
+    client_id: 87654321-4321-4321-4321-210987654321
+    client_secret_ref: AZURE_CLIENT_SECRET
+```
+
 ## Environment Variables
 
 ### Required for Authentication
@@ -272,6 +376,9 @@ fetch:
 | API (Generic) | `CUSTOM_API_TOKEN` | Custom API token (configurable name) |
 | Vault | `VAULT_TOKEN` | Vault authentication token |
 | Vault | `VAULT_ADDR` | Vault server address (optional, can be in config) |
+| Azure Key Vault | `AZURE_TENANT_ID` | Azure AD tenant ID (for DefaultAzureCredential) |
+| Azure Key Vault | `AZURE_CLIENT_ID` | Azure AD application/client ID (for DefaultAzureCredential) |
+| Azure Key Vault | `AZURE_CLIENT_SECRET` | Azure client secret (for DefaultAzureCredential or client_secret auth) |
 
 ### Setting Environment Variables
 
@@ -282,6 +389,11 @@ export KEYFACTOR_TOKEN="your-keyfactor-api-token"
 # For Vault fetchers
 export VAULT_TOKEN="hvs.your-vault-token"
 export VAULT_ADDR="https://vault.example.com:8200"
+
+# For Azure Key Vault fetchers
+export AZURE_TENANT_ID="12345678-1234-1234-1234-123456789012"
+export AZURE_CLIENT_ID="87654321-4321-4321-4321-210987654321"
+export AZURE_CLIENT_SECRET="your-client-secret-value"
 
 # For custom APIs
 export CUSTOM_API_TOKEN="your-custom-token"
@@ -353,7 +465,59 @@ export KEYFACTOR_TOKEN="your-actual-token"
 pip install bundlecraft[fetchers]
 ```
 
-Note: When using containers, Vault support is included by default.
+Note: When using containers, Vault and Azure Key Vault support is included by default.
+
+#### "Azure Key Vault: authentication failed" Error
+
+**Problem:** Missing or invalid Azure credentials
+
+**Solution:** Verify authentication is properly configured:
+
+1. For DefaultAzureCredential, ensure environment variables are set:
+```bash
+echo $AZURE_TENANT_ID
+echo $AZURE_CLIENT_ID
+echo $AZURE_CLIENT_SECRET
+```
+
+2. For Managed Identity, verify the Azure resource has been assigned the identity and permissions
+
+3. For Azure CLI, ensure you're logged in:
+```bash
+az login
+az account show
+```
+
+4. Verify Key Vault access permissions:
+   - RBAC: Grant "Key Vault Secrets User" role
+   - Access Policy: Grant "Get" permission for secrets
+
+#### "Azure Key Vault: secret not found" Error
+
+**Problem:** Secret doesn't exist or name is incorrect
+
+**Solution:**
+
+1. Verify the secret exists in the Key Vault:
+```bash
+az keyvault secret list --vault-name your-vault-name
+az keyvault secret show --vault-name your-vault-name --name your-secret-name
+```
+
+2. Check for typos in the `secret_name` configuration
+
+3. Ensure the authenticated principal has "List" permission to discover secrets
+
+#### "Azure Key Vault: azure-keyvault-secrets not installed" Error
+
+**Problem:** Missing Azure SDK dependencies
+
+**Solution:** Install with fetcher dependencies:
+```bash
+pip install bundlecraft[fetchers]
+```
+
+This installs both `azure-keyvault-secrets` and `azure-identity` packages.
 
 ### Debugging Commands
 

@@ -176,7 +176,18 @@ fetch:
     pem_field: pem
     addr: http://127.0.0.1:8200
     token_ref: VAULT_TOKEN
-```yaml
+
+  - name: azure_roots
+    type: azure_keyvault
+    vault_url: https://myvault.vault.azure.net
+    secret_name: root-certificates
+    secret_version: abc123  # Optional: specific version
+    credential_type: default  # default, client_secret, managed_identity, or cli
+    # Optional for client_secret auth:
+    tenant_id: 12345678-1234-1234-1234-123456789012
+    client_id: 87654321-4321-4321-4321-210987654321
+    client_secret_ref: AZURE_CLIENT_SECRET
+```
 
 **Fetch Retry and Timeout Configuration:**
 
