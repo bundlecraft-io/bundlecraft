@@ -34,15 +34,45 @@ The fetch layer is an optional component that runs during the `bundlecraft build
 
 ## Supported Fetchers
 
-### 1. URL Fetcher (`type: url`)
+### 1. Mozilla CA Bundle Fetcher (`type: mozilla`)
 
-Retrieves certificates from HTTPS URLs. Ideal for public certificate bundles like Mozilla's CA collection.
+Convenient shortcut to fetch the official Mozilla CA Bundle from curl.se. This is a curated list of Certificate Authorities included in Mozilla products (Firefox, Thunderbird, etc.), extracted from the Network Security Services (NSS) library.
 
 **Use cases:**
 
-- Mozilla CA bundle from curl.se
+- Quick setup for public web trust
+- Testing and development environments
+- Baseline trust bundle for internet-facing services
+- Reference bundle for CA comparison
+
+**Key features:**
+
+- Pre-configured URL to https://curl.se/ca/cacert.pem
+- No configuration required beyond specifying type
+- Supports all standard verification options (SHA256, TLS fingerprint)
+- Respects fetch retry and timeout configuration
+
+**Security features:**
+
+- HTTPS-only connection to curl.se
+- Optional SHA256 content verification (recommended)
+- Custom CA certificate validation
+- TLS leaf certificate fingerprint pinning
+
+**Note:** The Mozilla CA Bundle is updated regularly as CAs are added, removed, or modified. Always verify the bundle's SHA256 hash to ensure you're using an expected version.
+
+**Reference:** https://curl.se/docs/caextract.html
+
+### 2. URL Fetcher (`type: url`)
+
+Retrieves certificates from arbitrary HTTPS URLs. Use this for custom certificate bundles or when you need full URL control.
+
+**Use cases:**
+
+- Custom certificate bundles
 - Public certificate repositories
 - Static certificate files hosted on secure servers
+- Internal certificate distribution points
 
 **Security features:**
 
@@ -51,7 +81,7 @@ Retrieves certificates from HTTPS URLs. Ideal for public certificate bundles lik
 - Custom CA certificate validation
 - TLS leaf certificate fingerprint pinning
 
-### 2. API Fetcher (`type: api`)
+### 3. API Fetcher (`type: api`)
 
 Generic REST API client with support for various enterprise PKI systems.
 
@@ -73,7 +103,7 @@ Generic REST API client with support for various enterprise PKI systems.
 - TLS fingerprint pinning
 - Response content validation
 
-### 3. Vault Fetcher (`type: vault`)
+### 4. Vault Fetcher (`type: vault`)
 
 Integrates with HashiCorp Vault for certificate retrieval from KV stores or PKI secrets engines.
 
@@ -104,19 +134,63 @@ description: Example remote certificates
 
 fetch:
   - name: remote_certs
-    type: url  # or 'api', 'vault'
+    type: url  # or 'mozilla', 'api', 'vault'
     url: https://example.com/certificates.pem
     verify:
       sha256: "abc123..."  # optional content verification
 ```
 
-### URL Fetcher Configuration
+### Mozilla CA Bundle Configuration
+
+The simplest fetcher configuration - just specify the type:
 
 ```yaml
 fetch:
-  - name: mozilla_bundle
+  - name: mozilla_roots
+    type: mozilla
+    # No URL needed - automatically uses https://curl.se/ca/cacert.pem
+    
+    # Optional: Content verification (recommended)
+    verify:
+      sha256: "expected-sha256-hash-of-mozilla-bundle"
+    
+    # Optional: Retry/timeout overrides
+    timeout: 60
+    retries: 5
+```
+
+**Minimal example:**
+
+```yaml
+fetch:
+  - name: mozilla_roots
+    type: mozilla
+```
+
+**With verification (recommended):**
+
+```yaml
+fetch:
+  - name: mozilla_roots
+    type: mozilla
+    verify:
+      sha256: "1794c1d4f7055b7d02c2170a0f8e91cb2799d1d18c7e95c5d5f8f36e8e2a6d6e"
+```
+
+**Access Requirements:**
+- No authentication required (public resource)
+- Requires HTTPS access to curl.se domain
+- No API keys or tokens needed
+
+### URL Fetcher Configuration
+
+For custom URLs or when you need more control:
+
+```yaml
+fetch:
+  - name: custom_bundle
     type: url
-    url: https://curl.se/ca/cacert.pem
+    url: https://example.com/certificates.pem
     verify:
       # Content integrity verification
       sha256: "expected-sha256-hash-of-content"
@@ -211,6 +285,18 @@ token_ref: MY_API_TOKEN
 
 ### Mozilla CA Bundle (Public Roots)
 
+**Recommended - Using the mozilla fetcher type:**
+
+```yaml
+fetch:
+  - name: mozilla_roots
+    type: mozilla
+    verify:
+      sha256: "current-mozilla-bundle-sha256-hash"
+```
+
+**Alternative - Using the url fetcher directly:**
+
 ```yaml
 fetch:
   - name: mozilla_roots
@@ -219,6 +305,8 @@ fetch:
     verify:
       sha256: "current-mozilla-bundle-sha256-hash"
 ```
+
+The `mozilla` type is preferred as it simplifies configuration and documents intent more clearly.
 
 ### Keyfactor Enterprise PKI
 

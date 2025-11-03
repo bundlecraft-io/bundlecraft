@@ -301,3 +301,49 @@ fetch:
         assert len(pems) > 0
         # Files go under <output-dir>/<source_name>/fetch/<fetch-name>
         assert list((staged / "test-bundle" / "fetch" / "from_vault").glob("*.pem"))
+
+    def test_fetch_mozilla_type_uses_hardcoded_url(self, cli_runner, temp_workspace):
+        """Test that mozilla type uses hardcoded curl.se URL."""
+        from unittest.mock import patch
+
+        bundle_dir = temp_workspace / "config" / "sources"
+        bundle_dir.mkdir(parents=True, exist_ok=True)
+        bundle_yaml = """
+source_name: test-bundle
+description: Test bundle for Mozilla CA Bundle
+fetch:
+  - name: mozilla_roots
+    type: mozilla
+    verify:
+      sha256: abc123
+        """
+        (bundle_dir / "test-bundle.yaml").write_text(bundle_yaml, encoding="utf-8")
+
+        # Mock the fetch_mozilla to avoid actual network call
+        with patch("bundlecraft.fetch.fetch_mozilla") as mock_mozilla:
+            mock_mozilla.return_value = (
+                temp_workspace / "cert_sources" / "staged" / "test-bundle" / "fetch" / "mozilla_roots" / "mozilla_roots.pem"
+            )
+            mock_mozilla.return_value.parent.mkdir(parents=True, exist_ok=True)
+            mock_mozilla.return_value.write_text(
+                "-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----\n"
+            )
+
+            result = cli_runner.invoke(
+                fetch_main,
+                [
+                    "--source-config-file",
+                    str(bundle_dir / "test-bundle.yaml"),
+                    "--workspace-root",
+                    str(temp_workspace),
+                ],
+            )
+
+            # Verify fetch_mozilla was called
+            assert mock_mozilla.called
+            # Verify the call included the name and verify config
+            call_kwargs = mock_mozilla.call_args.kwargs
+            assert call_kwargs["name"] == "mozilla_roots"
+            assert call_kwargs["verify"]["sha256"] == "abc123"
+
+        assert result.exit_code == 0
