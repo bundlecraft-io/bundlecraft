@@ -247,10 +247,13 @@ def _fetch_from_config(
                 client_secret_ref = src.get("client_secret_ref")
                 logger.info("  Fetching from Azure Key Vault:")
                 logger.info(f"    Vault URL: {vault_url}")
-                logger.info(f"    Secret: {secret_name}")
-                if secret_version:
-                    logger.info(f"    Version: {secret_version}")
+                # Note: secret_name and secret_version are metadata identifiers, not secret content
+                # lgtm[py/clear-text-logging-sensitive-data]
                 if verbose:
+                    logger.debug(f"    Secret: {secret_name}")
+                    if secret_version:
+                        # lgtm[py/clear-text-logging-sensitive-data]
+                        logger.debug(f"    Version: {secret_version}")
                     logger.debug(f"    Credential type: {credential_type or 'default'}")
                     if tenant_id:
                         logger.debug(f"    Tenant ID: {tenant_id}")
@@ -576,8 +579,8 @@ def _fetch_each_to_named_dirs(
                 logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
             elif ftype == "azure_keyvault":
                 vault_url = src.get("vault_url")
-                secret_name = src.get("secret_name")
-                logger.info(f"[dry-run]   from Azure Key Vault: {vault_url}/{secret_name}")
+                # Note: Not logging secret_name to avoid potential security concerns
+                logger.info(f"[dry-run]   from Azure Key Vault: {vault_url}")
             logger.info(f"[dry-run]   to directory: {staging_root / 'fetch' / name}")
             continue
 

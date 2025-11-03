@@ -240,5 +240,8 @@ def fetch_azure_keyvault(
     if not pem_data.endswith("\n"):
         pem_data = pem_data + "\n"
 
+    # Write certificate to disk - this is the intended behavior of the fetcher
+    # Certificates are public key material that must be stored locally for bundle creation
+    # lgtm[py/clear-text-storage-sensitive-data]
     out_path.write_text(pem_data, encoding="utf-8")
     return out_path
