@@ -135,7 +135,7 @@ bundlecraft/
 
 ______________________________________________________________________
 
-## Part 1: Contributing Code Changes
+## Contributing Code Changes
 
 This section covers how to develop features or fixes and merge them into the `pre-release` branch for staging.
 

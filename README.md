@@ -25,7 +25,7 @@ ______________________________________________________________________
 
 Get started with BundleCraft in under 5 minutes using either the container image or Python package.
 
-### Option 1: Using Container (Recommended)
+### Option 1: Using a Container
 
 ```bash
 # Pull the latest container
@@ -168,12 +168,6 @@ tls:
   truststore: /etc/ssl/bundlecraft-ca-trust.jks
   truststore_password: changeit
 ```
-
-### Next Steps
-
-- 🧱 **For production use**: Start with the [BundleCraft Starter Template](https://github.com/bundlecraft-io/bundlecraft-starter)
-- 📚 **Learn more**: See the [Template Repository](#-template-repository---get-started-quickly) section below
-- 🔧 **Advanced config**: Explore the [Configuration Deep Dive](#-configuration-deep-dive) section
 
 ______________________________________________________________________
 
@@ -469,175 +463,6 @@ BundleCraft supports the following environment variables for configuration:
 
 ______________________________________________________________________
 
-## 🚀 Quickstart – Fetching, Building, and Verifying Trust Bundles
-
-### 1. Install Prerequisites
-
-System dependencies
-
-```bash
-# Optional: jq (required for scripts/json-output-examples.sh)
-sudo apt-get install jq
-```
-
-Python dependencies
-
-```bash
-# Install with runtime dependencies
-pip install -e .
-
-# Or install with dev/test tools
-pip install -e ".[dev]"
-```
-
-Shell completion (optional): BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags:
-
-```bash
-# Bash - run in your current shell (or add to ~/.bashrc for persistence)
-eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
-
-# Zsh - run in your current shell (or add to ~/.zshrc for persistence)
-eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
-```
-
-**Notes:**
-
-- You need to run this **after** activating your venv (if using one)
-- The completion works for all subcommands (`build`, `verify`, `convert`, etc.) and their flags
-- For persistence, add the `eval` line to your shell's rc file (`~/.bashrc` or `~/.zshrc`)
-- If completion stops working, re-run the `eval` command
-
-### 2. Prepare Certificate Sources
-
-- Place PEM files in appropriate folders under `cert_sources/`
-- Update `config/sources/` YAMLs to specify which sources to include/exclude
-- Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault)
-
-### 3. Fetch and Build
-
-```bash
-# Build a bundle (fetch runs automatically unless skipped)
-bundlecraft build --env prod --bundle internal-prod
-```
-
-Produces artifacts in `dist/prod/internal-prod/`:
-
-```text
-bundlecraft-ca-trust.pem
-bundlecraft-ca-trust.p7b
-bundlecraft-ca-trust.jks
-bundlecraft-ca-trust.p12
-manifest.json
-checksums.sha256
-package.tar.gz  # if enabled
-```
-
-### 4. Verify Outputs
-
-```bash
-bundlecraft verify --target dist/prod/internal-prod --verbose --verify-all
-```
-
-Checks:
-
-- Expiry and soon-to-expire certificates
-- Empty or missing output files
-- Certificate count consistency across all formats
-
-**Exit codes:**
-
-- `0`: Success
-- `1`: Warnings (certs expiring soon)
-- `5`: Failure (expired certs, parse errors, empty/mismatched outputs)
-
-### 5. Compare Bundles (Track Changes)
-
-```bash
-# Compare two bundle builds to identify certificate changes
-bundlecraft diff --from dist/prod/v1/internal-prod --to dist/prod/v2/internal-prod
-
-# Generate JSON diff report for CI/CD
-bundlecraft diff \
-  --from dist/prod/v1/internal-prod \
-  --to dist/prod/v2/internal-prod \
-  --output-format json
-```
-
-Shows:
-
-- Added certificates (new roots/CAs)
-- Removed certificates (deprecated/expired)
-- Unchanged certificates
-- Summary statistics
-
-Use cases:
-
-- **Release auditing** - Track certificate changes between versions
-- **Change validation** - Verify expected updates before deployment
-- **Compliance reporting** - Document trust policy evolution
-
-📖 **Full documentation:** [docs/bundlecraft-diff.md](docs/bundlecraft-diff.md)
-
-### 6. Convert Bundles Ad-hoc (if needed)
-
-```bash
-# Convert DER to PEM
-bundlecraft convert --input cert_sources/internal/rootCA.der --output-dir ./ --output-format pem
-
-# Convert to P7B
-bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --output-format p7b
-
-# Convert to ZIP (tarball of PEMs)
-bundlecraft convert --input cert_sources/internal/rootCA.pem --output-dir ./ --output-format zip
-```
-
-- Produces artifact in the output directory as `bundlecraft-ca-trust.{format}`
-- Uses environment variables (or CLI option) for passwords:
-  - `TRUST_JKS_PASSWORD` (default `"changeit"`)
-  - `TRUST_P12_PASSWORD` (default `"changeit"`)
-
-______________________________________________________________________
-
-## 🎯 Template Repository - Get Started Quickly
-
-New to BundleCraft and looking to get up and running using it? Use the official template repository for a quick setup within your own BundleCraft config repository:
-
-### 🧱 [BundleCraft Starter Template](https://github.com/bundlecraft-io/bundlecraft-starter)
-
-The template provides:
-
-- ✅ **Complete GitHub Actions workflow** with containerized builds
-- 🔄 **Dynamic build matrix** for parallel environment processing
-- 🔐 **Optional GPG signing** for artifact integrity
-- 📊 **Automatic certificate diff reports** between releases
-- ⚙️ **Highly configurable** for different organizational needs
-
-### Quick Setup
-
-```bash
-# Create a new repository from the template
-gh repo create my-org/my-certificate-bundles --template bundlecraft-io/bundlecraft-starter
-
-# Clone and customize
-git clone https://github.com/my-org/my-certificate-bundles.git
-cd my-certificate-bundles
-
-# Add your certificates
-mkdir -p cert_sources/internal
-cp /path/to/your/rootCA.pem cert_sources/internal/
-
-# Configure your bundles
-# Edit config/sources/*.yaml and config/envs/*.yaml
-
-# Commit and trigger your first build
-git add . && git commit -m "Initial certificate configuration"
-git push origin main
-```
-
-The template is perfect for anyone wanting to adopt BundleCraft with minimal setup!
-
-______________________________________________________________________
-
 ## 🔐 Security & Verification
 
 - **Strict Expiry Handling:** Build fails if any cert is expired (unless configured otherwise)
@@ -650,6 +475,8 @@ ______________________________________________________________________
 - **GPG signing:** Sign all release artifacts with detached GPG signatures (.asc files)
 - **SBOM generation:** Automatic Software Bill of Materials in CycloneDX format
 - **Signature verification:** Built-in verification for signed releases with keyring support
+
+For more, see: [`SECURITY.md`](./SECURITY.md)
 
 ### ✍🏽 Signing Release Artifacts (optional)
 
@@ -690,6 +517,18 @@ All commands work with both the Python package (`bundlecraft`) and container (`p
 | `bundlecraft convert` | Convert any supported input to any supported output (PEM, P7B, JKS, P12, ZIP) | `bundlecraft convert --input bundlecraft-ca-trust.pem --output-dir ./ --output-format jks` |
 
 For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/README.md).
+
+______________________________________________________________________
+
+## 💽 Related Repositories
+
+### 🧱 BundleCraft Starter Template Repository
+
+New to BundleCraft and looking to quickly get up and running using it? Use the official template repository for a quick setup within your own BundleCraft config repository: [`BundleCraft Starter Template`](https://github.com/bundlecraft-io/bundlecraft-starter)
+
+### 🧑🏽‍💻 BundleCraft Demo Repository
+
+Want to see a (made up) case study on how BundleCraft solved an organization's PKI problems? Or, want to see some config samples? Check out the BundleCraft demo repo: [`BundleCraft Demo`](https://github.com/bundlecraft-io/bundlecraft-demo)
 
 ______________________________________________________________________
 
