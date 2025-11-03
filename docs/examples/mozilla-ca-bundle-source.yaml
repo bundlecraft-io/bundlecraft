@@ -25,7 +25,7 @@ fetch:
     # Update this hash when Mozilla releases a new version
     # Get current hash: curl -s https://curl.se/ca/cacert.pem | sha256sum
     verify:
-      sha256: "1794c1d4f7055b7d02c2170a0f8e91cb2799d1d18c7e95c5d5f8f36e8e2a6d6e"
+      sha256: "your-actual-mozilla-bundle-sha256-hash-here"  # REPLACE with actual hash!
     
     # Optional: Override fetch retry/timeout settings
     # Defaults are usually sufficient for curl.se

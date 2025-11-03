@@ -181,7 +181,7 @@ fetch:
   - name: mozilla_roots
     type: mozilla
     verify:
-      sha256: "1794c1d4f7055b7d02c2170a0f8e91cb2799d1d18c7e95c5d5f8f36e8e2a6d6e"
+      sha256: "your-actual-mozilla-bundle-sha256-hash-here"
 ```
 
 **Access Requirements:**
@@ -299,7 +299,7 @@ fetch:
   - name: mozilla_roots
     type: mozilla
     verify:
-      sha256: "current-mozilla-bundle-sha256-hash"
+      sha256: "your-actual-mozilla-bundle-sha256-hash-here"
 ```
 
 **Alternative - Using the url fetcher directly:**
@@ -310,7 +310,7 @@ fetch:
     type: url
     url: https://curl.se/ca/cacert.pem
     verify:
-      sha256: "current-mozilla-bundle-sha256-hash"
+      sha256: "your-actual-mozilla-bundle-sha256-hash-here"
 ```
 
 The `mozilla` type is preferred as it simplifies configuration and documents intent more clearly.
