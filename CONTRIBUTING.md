@@ -492,6 +492,10 @@ git tag -v v1.2.3
 # Import a maintainer's public key first (if needed)
 curl -sL https://raw.githubusercontent.com/bundlecraft-io/bundlecraft/main/docs/public-gpg-key.asc | gpg --import
 
+# Verify the key fingerprint matches the one published in the repository
+# Expected fingerprint can be found at: https://github.com/bundlecraft-io/bundlecraft/blob/main/docs/public-gpg-key.asc
+gpg --fingerprint YOUR_KEY_ID
+
 # Then verify the tag
 git tag -v v1.2.3
 ```
@@ -505,7 +509,7 @@ To enforce signed commits and tags at the repository level, maintainers with adm
 3. Enable **Require signed commits**
 4. This ensures all commits (and by extension, tags) must be signed with a verified GPG key
 
-**Note:** This is optional and should be discussed with the maintainer team before enabling, as it requires all contributors to set up GPG signing.
+**Note:** This is optional and should be discussed with the maintainer team before enabling, as it requires anyone who pushes directly to protected branches (typically maintainers) to set up GPG signing. Contributors who submit pull requests are not affected.
 
 ### Deploying a new Release / Pre-Release
 
@@ -526,10 +530,12 @@ git tag -s v1.2.3-beta.1 -m "Release v1.2.3-beta.1"  # For tags in pre-release
 git tag -s v1.2.3 -m "Release v1.2.3"                # For tags in main
 
 # 5. Verify the tag signature before pushing
-git tag -v v1.2.3  # or v1.2.3-beta.1
+git tag -v v1.2.3-beta.1  # For pre-release tags
+git tag -v v1.2.3         # For production tags
 
 # 6. Push the tag to GitHub, trigger the release job
-git push origin v1.2.3  # or v1.2.3-beta.1
+git push origin v1.2.3-beta.1  # For pre-release tags
+git push origin v1.2.3         # For production tags
 ```
 
 **Note:** Using signed tags (`-s` flag) is strongly recommended for security. See the [GPG Tag Signing](#gpg-tag-signing) section above for setup instructions.
