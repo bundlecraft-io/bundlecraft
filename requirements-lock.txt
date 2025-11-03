@@ -11,27 +11,73 @@
 #
 # See CONTRIBUTING.md for detailed instructions
 
-# Core dependencies from pyproject.toml
+# Core dependencies from pyproject.toml with all transitive dependencies
+
+# certifi - Root certificates for TLS
 certifi==2024.8.30
+
+# cffi - C Foreign Function Interface for cryptography
 cffi==1.17.1
+
+# charset-normalizer - Character encoding detection (transitive from requests)
 charset-normalizer==3.4.0
+
+# click - CLI framework (direct dependency)
 click==8.1.7
+
+# cryptography - Cryptographic primitives (direct dependency)
 cryptography==43.0.3
+
+# cyclonedx-bom - SBOM generation tool (direct dependency)
 cyclonedx-bom==6.1.0
+
+# cyclonedx-python-lib - CycloneDX library (transitive from cyclonedx-bom)
 cyclonedx-python-lib==7.6.1
+
+# idna - Internationalized Domain Names (transitive from requests)
 idna==3.10
+
+# javaobj-py3 - Java object serialization (transitive from pyjks)
 javaobj-py3==0.4.4
+
+# packageurl-python - Package URL parsing (transitive from cyclonedx-python-lib)
 packageurl-python==0.15.6
+
+# py-serializable - Serialization utilities (transitive from cyclonedx-python-lib)
 py-serializable==1.1.1
+
+# pycparser - C parser (transitive from cffi)
 pycparser==2.22
+
+# pydantic - Data validation (direct dependency)
 pydantic==2.10.3
+
+# pydantic-core - Pydantic core validation (transitive from pydantic)
 pydantic-core==2.27.2
+
+# pyjks - Java KeyStore support (direct dependency)
 pyjks==20.0.0
+
+# pyOpenSSL - OpenSSL wrapper (direct dependency)
 pyOpenSSL==24.3.0
+
+# python-gnupg - GPG signing support (direct dependency)
 python-gnupg==0.5.3
+
+# PyYAML - YAML parser (direct dependency)
 PyYAML==6.0.2
+
+# requests - HTTP library (transitive from multiple sources)
 requests==2.32.3
+
+# sortedcontainers - Sorted data structures (transitive from cyclonedx-python-lib)
 sortedcontainers==2.4.0
+
+# twofish - Encryption for JKS (transitive from pyjks)
 twofish==0.3.0
+
+# typing-extensions - Backported typing features (transitive from pydantic)
 typing-extensions==4.12.2
+
+# urllib3 - HTTP client (transitive from requests)
 urllib3==2.2.3

@@ -37,6 +37,7 @@ ______________________________________________________________________
 ### Development & Testing
 
 - **[CI/CD Workflows](CI-CD.md)** - GitHub Actions workflows for testing, building, and releasing trust bundles
+- **[Dependency Lock File Management](dependency-lock-file.md)** - Managing requirements-lock.txt for deterministic production builds
 - **[Test CA Generator](test-ca-generator.md)** - Tool for generating test certificates for development and CI
 - **[Troubleshooting](troubleshooting.md)** - Common issues, debugging tips, and solutions
 
