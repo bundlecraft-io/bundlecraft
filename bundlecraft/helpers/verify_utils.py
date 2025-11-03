@@ -242,7 +242,7 @@ def _count_certs_in_file(file_path: Path) -> int:
         if ext == ".p7b":
             # Use cryptography module to load and count PKCS#7 certificates
             from cryptography.hazmat.primitives.serialization import pkcs7
-            
+
             data = file_path.read_bytes()
             try:
                 # Try DER format first (most common for .p7b)
@@ -254,7 +254,7 @@ def _count_certs_in_file(file_path: Path) -> int:
         if ext == ".p12":
             # Use cryptography module to load and count PKCS#12 certificates
             from cryptography.hazmat.primitives.serialization import pkcs12
-            
+
             data = file_path.read_bytes()
             password = os.environ.get("TRUST_P12_PASSWORD", "changeit")
             # Try with password, then without
@@ -269,7 +269,7 @@ def _count_certs_in_file(file_path: Path) -> int:
                 except Exception:
                     # Last attempt with different password
                     pkey, cert, addl = pkcs12.load_key_and_certificates(data, password=b"")
-            
+
             count = 0
             if cert:
                 count += 1

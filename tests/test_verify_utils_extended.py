@@ -429,14 +429,14 @@ class TestCountCertsInFile:
     def test_count_certs_p7b(self, tmp_path):
         """Test counting certificates in P7B file"""
         from cryptography.hazmat.primitives.serialization import Encoding, pkcs7
-        
+
         # Generate two test certificates
         cert1_pem = generate_test_cert_pem(subject_cn="CA 1")
         cert2_pem = generate_test_cert_pem(subject_cn="CA 2")
-        
+
         cert1 = x509.load_pem_x509_certificate(cert1_pem.encode(), default_backend())
         cert2 = x509.load_pem_x509_certificate(cert2_pem.encode(), default_backend())
-        
+
         # Create a real P7B file with the certificates
         p7b_file = tmp_path / "bundle.p7b"
         p7b_data = pkcs7.serialize_certificates([cert1, cert2], Encoding.DER)
@@ -448,16 +448,16 @@ class TestCountCertsInFile:
     def test_count_certs_p12(self, tmp_path):
         """Test counting certificates in P12 file"""
         from cryptography.hazmat.primitives.serialization import BestAvailableEncryption, pkcs12
-        
+
         # Generate three test certificates
         cert1_pem = generate_test_cert_pem(subject_cn="CA 1")
         cert2_pem = generate_test_cert_pem(subject_cn="CA 2")
         cert3_pem = generate_test_cert_pem(subject_cn="CA 3")
-        
+
         cert1 = x509.load_pem_x509_certificate(cert1_pem.encode(), default_backend())
         cert2 = x509.load_pem_x509_certificate(cert2_pem.encode(), default_backend())
         cert3 = x509.load_pem_x509_certificate(cert3_pem.encode(), default_backend())
-        
+
         # Create a real P12 file with the certificates
         # The test_env fixture sets TRUST_P12_PASSWORD="test-password" by default
         # Use that password so _count_certs_in_file can read it back

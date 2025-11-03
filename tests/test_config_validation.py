@@ -294,7 +294,7 @@ class TestCraftConfigValidation:
     def test_build_path_empty_components(self):
         """build_path cannot have empty path components."""
         data = {
-            "name": "Test", 
+            "name": "Test",
             "description": "Test",
             "bundles": {"internal": {"include_sources": ["test"]}},
             "build_path": "valid//empty",

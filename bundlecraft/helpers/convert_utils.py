@@ -287,7 +287,7 @@ def create_p7b(pem_path: Path, build_root: Path, output_basename: str, force: bo
     """
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
-    
+
     out_path = build_root / f"{output_basename}.p7b"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
@@ -312,14 +312,14 @@ def create_p7b(pem_path: Path, build_root: Path, output_basename: str, force: bo
         except Exception as e:
             print(f"[WARN] Failed to load certificate: {e}")
             continue
-    
+
     if not certs:
         print(f"[WARN] No valid certificates found in {pem_path}; skipping P7B.")
         return
-    
+
     # Create PKCS#7 bundle using cryptography
     from cryptography.hazmat.primitives.serialization import Encoding
-    
+
     p7b_data = pkcs7.serialize_certificates(certs, Encoding.DER)
     out_path.write_bytes(p7b_data)
 
@@ -408,7 +408,6 @@ def create_pkcs12(
     from cryptography.hazmat.primitives.serialization import (
         BestAvailableEncryption,
         NoEncryption,
-        PrivateFormat,
     )
 
     alias_format = overrides.get("alias_format", "{subject.CN}-{fingerprint}")
@@ -442,7 +441,7 @@ def create_pkcs12(
         except Exception as e:
             print(f"[WARN] Failed to load certificate: {e}")
             continue
-    
+
     if not certs:
         print(f"[WARN] No valid certificates found in {pem_path}; skipping PKCS#12.")
         return
@@ -466,12 +465,8 @@ def create_pkcs12(
 
     # Create PKCS#12 with no private key (certificates only)
     # When there's no private key, all certs go into the cas parameter
-    encryption = (
-        BestAvailableEncryption(password.encode())
-        if password
-        else NoEncryption()
-    )
-    
+    encryption = BestAvailableEncryption(password.encode()) if password else NoEncryption()
+
     p12_data = pkcs12.serialize_key_and_certificates(
         name=alias.encode(),
         key=None,  # No private key
@@ -479,7 +474,7 @@ def create_pkcs12(
         cas=certs,  # All certificates as additional certs
         encryption_algorithm=encryption,
     )
-    
+
     out_path.write_bytes(p12_data)
     print(f"[INFO] Created PKCS#12: {out_path}")
 
@@ -589,13 +584,13 @@ def normalize_to_pem(
             raise ValueError(
                 "Password required for JKS input; set TRUST_JKS_PASSWORD or provide --password"
             )
-        
+
         # Load JKS using pyjks
         try:
             keystore = jks.KeyStore.load(str(input_path), pw)
         except Exception as e:
             raise RuntimeError(f"Failed to read JKS: {e}") from e
-        
+
         # Extract certificates
         pem_blocks = []
         for alias, entry in keystore.entries.items():
@@ -618,10 +613,10 @@ def normalize_to_pem(
                         pem_blocks.append(pem_block)
                     except Exception as e:
                         print(f"[WARN] Failed to load certificate from chain in '{alias}': {e}")
-        
+
         if not pem_blocks:
             raise ValueError("No certificates found in JKS input")
-        
+
         # Write certificates ONLY
         output_pem_path.write_text("".join(pem_blocks), encoding="utf-8")
         return output_pem_path, has_keys
