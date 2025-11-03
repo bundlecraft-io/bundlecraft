@@ -1,0 +1,78 @@
+---
+# Example BundleCraft source configuration for Vault PKI Issuer fetcher
+# This demonstrates how to fetch certificates from HashiCorp Vault's PKI secrets engine
+
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
+source_name: vault_pki_example
+description: Example configuration for fetching certificates from Vault PKI issuer endpoint
+
+# Fetch certificates from Vault PKI issuer endpoints
+fetch:
+  # Example 1: Basic PKI issuer fetch with defaults
+  - name: vault_root_ca
+    type: vault_pki
+    # Uses default mount_point: 'pki' and issuer_ref: 'default'
+    # Vault address from VAULT_ADDR environment variable
+
+  # Example 2: Custom mount point and issuer reference
+  - name: vault_intermediate_ca
+    type: vault_pki
+    mount_point: pki_int              # Custom PKI mount
+    issuer_ref: issuer-2024-q1        # Specific issuer reference
+    addr: https://vault.example.com:8200
+    verify:
+      ca_file: config/certs/vault-ca.pem  # Custom CA for Vault TLS verification
+
+  # Example 3: Vault Enterprise with namespace
+  - name: vault_prod_issuer
+    type: vault_pki
+    mount_point: pki_prod
+    issuer_ref: root-prod-2024
+    addr: https://vault.company.com:8200
+    namespace: production             # Vault Enterprise namespace
+    token_ref: VAULT_TOKEN            # Optional authentication
+    verify:
+      ca_file: config/certs/vault-ca.pem
+
+  # Example 4: Custom retry/timeout configuration
+  - name: vault_external_issuer
+    type: vault_pki
+    mount_point: pki_external
+    issuer_ref: partner-ca-2024
+    addr: https://vault-dr.example.com:8200
+    # Custom retry/timeout for slower/remote Vault instance
+    timeout: 60                       # 60 second timeout
+    retries: 5                        # 5 retry attempts
+    backoff_factor: 3.0               # Slower exponential backoff
+    retry_on_status: [429, 502, 503, 504]
+    verify:
+      ca_file: config/certs/vault-dr-ca.pem
+
+  # Example 5: Multiple issuers from same mount
+  - name: vault_issuer_chain_root
+    type: vault_pki
+    mount_point: pki
+    issuer_ref: root-ca
+
+  - name: vault_issuer_chain_intermediate
+    type: vault_pki
+    mount_point: pki
+    issuer_ref: intermediate-ca-1
+
+metadata:
+  owner: security-team@example.com
+  purpose: PKI certificate chains from Vault
+  tags: [vault, pki, automated]
+  labels:
+    team: security
+    environment: production
+    automation: vault-pki
+
+# Notes:
+# 1. The Vault PKI issuer endpoint is unauthenticated by design
+# 2. token_ref is optional - use it if your environment requires authentication
+# 3. Endpoint format: /v1/{mount_point}/issuer/{issuer_ref}/pem
+# 4. Reference: https://developer.hashicorp.com/vault/api-docs/secret/pki#read-issuer-certificate
+# 5. Set VAULT_ADDR environment variable or specify 'addr' in config
+# 6. For Vault Enterprise, use 'namespace' to target specific namespaces
