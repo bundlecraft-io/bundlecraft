@@ -66,8 +66,9 @@ def test_requirements_lock_file_has_exact_versions():
         lines = f.readlines()
     
     # Pattern for exact version pinning (package==version)
-    # Handles package names with hyphens, underscores, and multiple version segments
-    exact_version_pattern = re.compile(r"^[a-zA-Z0-9_\-]+==\d+(\.\d+)*")
+    # Handles package names with hyphens, underscores, dots, and multiple version segments
+    # Version can be single segment (e.g., "1") or multiple segments (e.g., "1.2.3")
+    exact_version_pattern = re.compile(r"^[a-zA-Z0-9_.\-]+==\d+(\.\d+)*")
     
     dependency_found = False
     for line in lines:
