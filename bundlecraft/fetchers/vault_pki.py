@@ -114,7 +114,6 @@ def fetch_vault_pki_issuer(
         retries=fetch_config["retries"],
         backoff_factor=fetch_config["backoff_factor"],
         retry_on_status=fetch_config["retry_on_status"],
-        timeout=fetch_config["timeout"],
     )
     def _do_fetch():
         try:

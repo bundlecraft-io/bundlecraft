@@ -121,11 +121,9 @@ These settings can also be configured globally in `config/defaults.yaml` under t
     - cert_sources/partners/
   exclude:
     - cert_sources/partners/deprecated.pem
-  ```yaml
+  ````
 
   Staging layout (legacy include): `cert_sources/staged/<source_name>/include/...`
-
-  ````
 
 Validation rules for names:
 
@@ -148,7 +146,7 @@ repo:
           -----BEGIN CERTIFICATE-----
           ...
           -----END CERTIFICATE-----
-```yaml
+````
 
 Legacy form (paths only):
 
@@ -156,7 +154,7 @@ Legacy form (paths only):
 include:
   - cert_sources/internal/roots/
   - cert_sources/internal/rootCA.pem
-```yaml
+```
 
 ### Fetch Definitions
 
@@ -205,7 +203,7 @@ fetch:
     timeout: 45
     retries: 5
     backoff_factor: 2.5
-```yaml
+```
 
 **Fetch Type: `vault_pki`**
 
@@ -254,7 +252,7 @@ metadata:
   change_control: CAB-2025-001
   tags: [internal, production]
   labels: { team: security, tier: core }
-```yaml
+```
 
 ### Complete Source Config Example
 
@@ -273,7 +271,7 @@ metadata:
   owner: example@bundlecraft.io
   purpose: Internal service mesh authentication
   tags: [internal, ca-bundle]
-```yaml
+```
 
 ---
 
