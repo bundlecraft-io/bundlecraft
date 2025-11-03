@@ -145,37 +145,114 @@ include:
 
 ### Fetch Definitions
 
+BundleCraft supports multiple fetcher types for retrieving certificates from various sources:
+
+**Supported Fetcher Types:**
+- `url` - HTTPS/file URLs
+- `api` - Generic REST APIs with bearer token auth
+- `vault` - HashiCorp Vault KV secrets
+- `vault_pki` - HashiCorp Vault PKI issuer certificates
+- `s3` - AWS S3 and S3-compatible object storage
+- `azure_blob` - Azure Blob Storage
+- `azure_keyvault` - Azure Key Vault certificates
+- `gcs` - Google Cloud Storage
+- `mozilla` - Mozilla root certificate store (convenience wrapper)
+
 ```yaml
 fetch:
+  # URL Fetcher - HTTPS or file:// URLs
   - name: mozilla_roots
     type: url
     url: https://curl.se/ca/cacert.pem
     verify:
       sha256: <expected_sha256>  # Content pinning (recommended)
-    # Optional: Override fetch retry/timeout settings
     timeout: 60         # Request timeout in seconds (default: 30)
     retries: 5          # Number of retry attempts (default: 3)
     backoff_factor: 2.0 # Exponential backoff multiplier (default: 2.0)
     retry_on_status: [429, 502, 503, 504]  # HTTP status codes to retry
 
+  # Mozilla Fetcher - Convenience wrapper for Mozilla root store
+  - name: mozilla_roots_simple
+    type: mozilla
+    verify:
+      sha256: <expected_sha256>
+
+  # API Fetcher - Generic REST APIs
   - name: partner_roots
     type: api
     endpoint: https://api.partner.com/pki/roots
-    token_ref: PARTNER_API_TOKEN
+    token_ref: PARTNER_API_TOKEN  # Environment variable name
+    provider: generic             # or 'keyfactor'
     verify:
       ca_file: cert_sources/partner-ca.pem
       tls_fingerprint_sha256: <cert_pin>
-    # Example: Slower API needs longer timeout
     timeout: 120
     retries: 5
 
+  # Vault KV Fetcher - HashiCorp Vault KV secrets
   - name: vault_roots
     type: vault
-    mount: secret
+    mount_point: secret           # or 'mount' or 'engine'
     path: pki/trusted_roots
-    pem_field: pem
-    addr: http://127.0.0.1:8200
+    pem_field: pem                # Field containing PEM data
+    addr: https://vault.example.com:8200  # Optional, uses VAULT_ADDR
+    token_ref: VAULT_TOKEN        # Optional, defaults to VAULT_TOKEN
+    namespace: admin/prod         # Optional, for Vault Enterprise
+    verify:
+      ca_file: cert_sources/vault-ca.pem
+
+  # Vault PKI Fetcher - HashiCorp Vault PKI issuer certificates
+  - name: pki_issuer
+    type: vault_pki
+    mount_point: pki              # PKI engine mount point
+    issuer_ref: default           # Issuer reference (default, name, or ID)
+    addr: https://vault.example.com:8200
     token_ref: VAULT_TOKEN
+    namespace: admin/prod         # Optional, for Vault Enterprise
+
+  # S3 Fetcher - AWS S3 or S3-compatible storage
+  - name: s3_certs
+    type: s3
+    bucket: my-certificates-bucket
+    key: prod/ca-bundle.pem
+    region: us-east-1             # Optional, defaults to AWS_DEFAULT_REGION or us-east-1
+    access_key_id_ref: AWS_ACCESS_KEY_ID        # Optional, uses IAM role if not set
+    secret_access_key_ref: AWS_SECRET_ACCESS_KEY # Optional
+    session_token_ref: AWS_SESSION_TOKEN         # Optional, for temporary credentials
+    endpoint_url: https://s3.example.com         # Optional, for S3-compatible services
+    verify:
+      ca_file: cert_sources/s3-ca.pem
+    timeout: 60
+    retries: 3
+
+  # Azure Blob Storage Fetcher
+  - name: azure_blob_certs
+    type: azure_blob
+    account_name: mystorageaccount
+    container: certificates
+    blob_name: prod/ca-bundle.pem
+    connection_string_ref: AZURE_STORAGE_CONNECTION_STRING  # Optional
+    account_key_ref: AZURE_STORAGE_KEY                      # Optional
+    sas_token_ref: AZURE_STORAGE_SAS_TOKEN                  # Optional
+    endpoint_url: https://mystorageaccount.blob.core.windows.net  # Optional
+
+  # Google Cloud Storage Fetcher
+  - name: gcs_certs
+    type: gcs
+    bucket: my-certificates-bucket
+    blob_name: prod/ca-bundle.pem
+    project_id: my-gcp-project    # Optional, inferred from credentials
+    credentials_file_ref: GOOGLE_APPLICATION_CREDENTIALS  # Optional
+
+  # Azure Key Vault Fetcher
+  - name: akv_cert
+    type: azure_keyvault
+    vault_url: https://myvault.vault.azure.net
+    certificate_name: production-ca
+    version: abc123def456          # Optional, uses latest if not specified
+    client_id_ref: AZURE_CLIENT_ID          # Optional, for service principal
+    client_secret_ref: AZURE_CLIENT_SECRET  # Optional, for service principal
+    tenant_id_ref: AZURE_TENANT_ID          # Optional, for service principal
 ```yaml
 
 **Fetch Retry and Timeout Configuration:**
