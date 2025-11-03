@@ -512,6 +512,70 @@ docker run --rm -it \
 
 ______________________________________________________________________
 
+## 🔒 Managing the Requirements Lock File
+
+BundleCraft uses a `requirements-lock.txt` file to ensure deterministic and reproducible production builds. This file contains exact versions of all dependencies, preventing unexpected changes in production releases.
+
+### When to Update the Lock File
+
+The lock file should be updated:
+
+- **Before major releases** - To capture the latest stable dependency versions
+- **After security updates** - When a dependency has a critical security fix
+- **When adding new dependencies** - After modifying `pyproject.toml`
+- **Periodically** - Every few months to stay current with dependency updates
+
+### How to Update the Lock File
+
+```bash
+# 1. Create a clean Python 3.11 virtual environment
+python3.11 -m venv .venv-lock
+source .venv-lock/bin/activate  # or: .venv-lock\Scripts\activate on Windows
+
+# 2. Install the package with all dependencies
+pip install --upgrade pip
+pip install -e .
+
+# 3. Generate the lock file
+pip freeze > requirements-lock.txt
+
+# 4. Review the changes
+git diff requirements-lock.txt
+
+# 5. Commit the updated lock file
+git add requirements-lock.txt
+git commit -m "chore: update requirements lock file"
+
+# 6. Clean up
+deactivate
+rm -rf .venv-lock
+```
+
+### Lock File Validation
+
+The CI pipeline automatically validates the lock file on every push:
+
+- Checks that `requirements-lock.txt` exists
+- Verifies all dependencies can be installed successfully
+- Ensures the lock file is in sync with production builds
+
+If validation fails, update the lock file following the steps above.
+
+### Why Use a Lock File?
+
+From the [SECURITY.md](SECURITY.md) supply chain section:
+
+> Minimum version constraints for dependencies in `pyproject.toml`; lock files recommended for production deployments.
+
+Lock files provide:
+
+- **Deterministic builds** - Same versions every time
+- **Security** - Protection against supply chain attacks
+- **Reproducibility** - Exact dependency versions are documented
+- **Auditability** - Clear record of what's deployed to production
+
+______________________________________________________________________
+
 ## 🌐 Notes on the Fetch Layer
 
 - Fetch is staging-only: do not introduce persistent caches; use `cert_sources/staged/<source_name>/` which is cleaned per run.

@@ -7,6 +7,35 @@ on:
   pull_request:
     branches: [main, develop]
 jobs:
+  validate-lockfile:
+    name: 🔒 Validate Requirements Lock File
+    runs-on: ubuntu-latest
+    # Only run on push if it's NOT a PR merge commit
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'Merge pull request'))
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: 🔍 Check lock file exists
+        run: |
+          if [ ! -f requirements-lock.txt ]; then
+            echo "❌ requirements-lock.txt not found"
+            exit 1
+          fi
+          echo "✅ requirements-lock.txt exists"
+      - name: 🔧 Install from lock file
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-lock.txt
+      - name: ✅ Verify installation
+        run: |
+          pip list
+          echo "✅ Lock file dependencies installed successfully"
   test:
     name: 🧪 PyTest Suite
     runs-on: ubuntu-latest

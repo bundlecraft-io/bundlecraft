@@ -40,9 +40,11 @@ ______________________________________________________________________
 **Risk:** Malicious dependency or injected helper module.
 **Controls:**
 
-- Minimum version constraints for dependencies in `pyproject.toml`; lock files recommended for production deployments.
+- Minimum version constraints for dependencies in `pyproject.toml`; exact versions locked in `requirements-lock.txt` for production deployments.
+- Production releases use `requirements-lock.txt` to ensure deterministic builds with verified dependency versions.
 - No dynamic runtime dependency fetching.
 - Dependency vulnerability scanning via automated tools (recommended: Dependabot, pip-audit).
+- Lock file is validated in CI to ensure consistency and reproducibility.
 
 ### 3. Input Tampering
 

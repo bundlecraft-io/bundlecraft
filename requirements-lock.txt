@@ -1,0 +1,37 @@
+# This file is auto-generated using: pip freeze > requirements-lock.txt
+# Generated on: 2025-11-03 (Python 3.11)
+#
+# Purpose: Lock exact dependency versions for deterministic production builds
+# 
+# Update Instructions:
+# 1. Create a clean Python 3.11 virtual environment
+# 2. Install dependencies: pip install -e .
+# 3. Freeze versions: pip freeze > requirements-lock.txt
+# 4. Review and commit changes before releases
+#
+# See CONTRIBUTING.md for detailed instructions
+
+# Core dependencies from pyproject.toml
+certifi==2024.8.30
+cffi==1.17.1
+charset-normalizer==3.4.0
+click==8.1.7
+cryptography==43.0.3
+cyclonedx-bom==6.1.0
+cyclonedx-python-lib==7.6.1
+idna==3.10
+javaobj-py3==0.4.4
+packageurl-python==0.15.6
+py-serializable==1.1.1
+pycparser==2.22
+pydantic==2.10.3
+pydantic-core==2.27.2
+pyjks==20.0.0
+pyOpenSSL==24.3.0
+python-gnupg==0.5.3
+PyYAML==6.0.2
+requests==2.32.3
+sortedcontainers==2.4.0
+twofish==0.3.0
+typing-extensions==4.12.2
+urllib3==2.2.3
