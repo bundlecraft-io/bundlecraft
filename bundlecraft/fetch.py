@@ -24,6 +24,7 @@ import click
 from bundlecraft.fetchers.api import fetch_api
 from bundlecraft.fetchers.http import fetch_url
 from bundlecraft.fetchers.vault import fetch_vault
+from bundlecraft.fetchers.vault_pki import fetch_vault_pki_issuer
 from bundlecraft.helpers.config_schema import validate_source_config
 from bundlecraft.helpers.exit_codes import ExitCode
 from bundlecraft.helpers.ui import print_banner
@@ -226,6 +227,33 @@ def _fetch_from_config(
                     token_ref=token_ref,
                     namespace=namespace,
                     verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "vault_pki":
+                mount_point = src.get("mount_point") or src.get("mount") or "pki"
+                issuer_ref = src.get("issuer_ref") or src.get("issuer") or "default"
+                addr = src.get("addr")  # fallback to VAULT_ADDR if not provided
+                token_ref = src.get("token_ref")  # optional, endpoint is unauthenticated
+                namespace = src.get("namespace")
+                logger.info("  Fetching from Vault PKI Issuer:")
+                logger.info(f"    Address: {addr or 'from VAULT_ADDR env'}")
+                logger.info(f"    Mount: {mount_point}, Issuer: {issuer_ref}")
+                if verbose:
+                    logger.debug(f"    Namespace: {namespace or 'default'}")
+                    logger.debug(f"    Token ref: {token_ref or 'unauthenticated'}")
+                out_path = fetch_vault_pki_issuer(
+                    dest_dir,
+                    name=name,
+                    mount_point=mount_point,
+                    issuer_ref=issuer_ref,
+                    addr=addr,
+                    token_ref=token_ref,
+                    namespace=namespace,
+                    verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
                 )
             else:
                 raise click.ClickException(f"Unsupported fetch type: {ftype}")
@@ -527,6 +555,10 @@ def _fetch_each_to_named_dirs(
                 )
                 path = src.get("path")
                 logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
+            elif ftype == "vault_pki":
+                mount_point = src.get("mount_point") or src.get("mount") or "pki"
+                issuer_ref = src.get("issuer_ref") or src.get("issuer") or "default"
+                logger.info(f"[dry-run]   from Vault PKI: {mount_point}/issuer/{issuer_ref}")
             logger.info(f"[dry-run]   to directory: {staging_root / 'fetch' / name}")
             continue
 

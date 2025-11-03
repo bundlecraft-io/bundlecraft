@@ -90,6 +90,31 @@ Integrates with HashiCorp Vault for certificate retrieval from KV stores or PKI 
 - Address validation
 - Field-specific PEM extraction
 
+### 4. Vault PKI Issuer Fetcher (`type: vault_pki`)
+
+Retrieves certificates directly from HashiCorp Vault's PKI secrets engine issuer endpoint.
+
+**Use cases:**
+
+- PKI root CA certificates from Vault PKI
+- Intermediate CA certificates from Vault PKI issuers
+- Dynamic certificate retrieval from managed PKI infrastructure
+
+**Security features:**
+
+- Unauthenticated access (endpoint is publicly readable by design)
+- Optional token-based authentication for Enterprise environments
+- Custom Vault CA certificate validation
+- Namespace support for Vault Enterprise
+- Configurable retry and timeout policies
+
+**Key differences from Vault KV fetcher:**
+
+- Accesses PKI issuer endpoint (`/v1/{mount}/issuer/{issuer_ref}/pem`)
+- Returns certificate directly in PEM format (no field extraction needed)
+- Endpoint is unauthenticated by design per Vault API documentation
+- Optimized for PKI certificate chain retrieval
+
 ## Configuration
 
 ### Basic Fetch Configuration
@@ -153,6 +178,26 @@ fetch:
     token_ref: VAULT_TOKEN      # environment variable name
     verify:
       ca_file: config/certs/vault-ca.pem
+```
+
+### Vault PKI Issuer Configuration
+
+```yaml
+fetch:
+  - name: vault_pki_root
+    type: vault_pki
+    mount_point: pki            # PKI secrets engine mount (default: 'pki')
+    issuer_ref: default         # Issuer reference or UUID (default: 'default')
+    addr: https://vault.example.com:8200  # optional, uses VAULT_ADDR env var
+    token_ref: VAULT_TOKEN      # optional, endpoint is unauthenticated
+    namespace: prod             # optional, for Vault Enterprise
+    verify:
+      ca_file: config/certs/vault-ca.pem  # optional custom CA
+    # Fetch retry/timeout configuration (optional)
+    timeout: 30                 # request timeout in seconds
+    retries: 3                  # number of retry attempts
+    backoff_factor: 2.0         # exponential backoff multiplier
+    retry_on_status: [429, 502, 503, 504]  # HTTP codes to retry
 ```
 
 ## Security Features
@@ -234,7 +279,7 @@ fetch:
       tls_fingerprint_sha256: "keyfactor-server-fingerprint"
 ```
 
-### HashiCorp Vault Integration
+### HashiCorp Vault KV Integration
 
 ```yaml
 fetch:
@@ -247,6 +292,39 @@ fetch:
     token_ref: VAULT_TOKEN
     verify:
       ca_file: config/certs/vault-ca.pem
+```
+
+### HashiCorp Vault PKI Issuer
+
+```yaml
+fetch:
+  - name: pki_root_ca
+    type: vault_pki
+    mount_point: pki
+    issuer_ref: root-2024
+    addr: https://vault.internal.company.com:8200
+    # Optional: token_ref not required as endpoint is unauthenticated
+    verify:
+      ca_file: config/certs/vault-ca.pem
+```
+
+### Vault PKI with Enterprise Namespace
+
+```yaml
+fetch:
+  - name: prod_pki_issuer
+    type: vault_pki
+    mount_point: pki_prod
+    issuer_ref: issuer-prod-2024
+    addr: https://vault.company.com:8200
+    namespace: production       # Vault Enterprise namespace
+    token_ref: VAULT_TOKEN      # Optional authentication
+    verify:
+      ca_file: config/certs/vault-ca.pem
+    # Custom retry/timeout for production
+    timeout: 45
+    retries: 5
+    backoff_factor: 2.5
 ```
 
 ### Generic REST API
@@ -272,6 +350,8 @@ fetch:
 | API (Generic) | `CUSTOM_API_TOKEN` | Custom API token (configurable name) |
 | Vault | `VAULT_TOKEN` | Vault authentication token |
 | Vault | `VAULT_ADDR` | Vault server address (optional, can be in config) |
+| Vault PKI | `VAULT_ADDR` | Vault server address (optional, can be in config) |
+| Vault PKI | `VAULT_TOKEN` | Optional authentication token (endpoint is unauthenticated) |
 
 ### Setting Environment Variables
 
@@ -279,9 +359,13 @@ fetch:
 # For API fetchers
 export KEYFACTOR_TOKEN="your-keyfactor-api-token"
 
-# For Vault fetchers
+# For Vault KV fetchers
 export VAULT_TOKEN="hvs.your-vault-token"
 export VAULT_ADDR="https://vault.example.com:8200"
+
+# For Vault PKI fetchers (token optional, endpoint is unauthenticated)
+export VAULT_ADDR="https://vault.example.com:8200"
+# export VAULT_TOKEN="hvs.your-vault-token"  # Optional
 
 # For custom APIs
 export CUSTOM_API_TOKEN="your-custom-token"
@@ -354,6 +438,45 @@ pip install bundlecraft[fetchers]
 ```
 
 Note: When using containers, Vault support is included by default.
+
+### Vault PKI Access Policies
+
+The Vault PKI Issuer endpoint (`/v1/{mount}/issuer/{issuer_ref}/pem`) is **unauthenticated by design** according to HashiCorp's Vault API documentation. This means:
+
+1. **No special Vault policies are required** for reading issuer certificates
+2. The endpoint is publicly accessible to any client that can reach the Vault server
+3. Authentication tokens are optional and not required for basic certificate retrieval
+
+**Reference:** [Vault PKI API - Read Issuer Certificate](https://developer.hashicorp.com/vault/api-docs/secret/pki#read-issuer-certificate)
+
+However, if you're operating in a Vault Enterprise environment with namespaces or have custom access controls, you may need:
+
+**Minimal Vault Policy (if authentication is enforced):**
+```hcl
+# Allow reading PKI issuer certificates
+path "pki/issuer/+/pem" {
+  capabilities = ["read"]
+}
+
+# For specific issuers only
+path "pki/issuer/default/pem" {
+  capabilities = ["read"]
+}
+```
+
+**For Vault Enterprise with Namespaces:**
+```hcl
+# Within a specific namespace
+path "pki/issuer/+/pem" {
+  capabilities = ["read"]
+}
+```
+
+**Note on Security:**
+- The issuer certificate endpoint returns public certificates only
+- No private keys or sensitive data are exposed through this endpoint
+- This aligns with PKI best practices where CA certificates are public by design
+- TLS verification is still performed for the Vault connection itself
 
 ### Debugging Commands
 

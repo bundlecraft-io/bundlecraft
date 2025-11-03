@@ -98,6 +98,21 @@ You can declare local certificate sources in two ways. The new preferred schema 
 
   ````
 
+### Remote Fetch Configuration
+
+Remote certificate sources are declared under `fetch:` as a list of fetch entries.
+
+#### Common Fetch Fields
+
+All fetch types support these optional retry/timeout fields:
+
+- `timeout`: Request timeout in seconds (default: 30)
+- `retries`: Number of retry attempts (default: 3)
+- `backoff_factor`: Exponential backoff multiplier (default: 2.0)
+- `retry_on_status`: HTTP status codes to retry (default: [429, 502, 503, 504])
+
+These settings can also be configured globally in `config/defaults.yaml` under the `fetch:` section.
+
 - Legacy: flat `include`/`exclude` keys at the top level
 
   ````yaml
@@ -176,7 +191,43 @@ fetch:
     pem_field: pem
     addr: http://127.0.0.1:8200
     token_ref: VAULT_TOKEN
+
+  - name: vault_pki_issuer
+    type: vault_pki
+    mount_point: pki              # PKI secrets engine mount (default: 'pki')
+    issuer_ref: root-2024         # Issuer reference or UUID (default: 'default')
+    addr: https://vault.example.com:8200  # Optional, uses VAULT_ADDR env var
+    token_ref: VAULT_TOKEN        # Optional, endpoint is unauthenticated
+    namespace: production         # Optional, for Vault Enterprise
+    verify:
+      ca_file: config/certs/vault-ca.pem
+    # Custom retry/timeout settings
+    timeout: 45
+    retries: 5
+    backoff_factor: 2.5
 ```yaml
+
+**Fetch Type: `vault_pki`**
+
+Retrieves certificates from HashiCorp Vault PKI secrets engine issuer endpoints.
+
+Required fields:
+- None (uses defaults if not specified)
+
+Optional fields:
+- `mount_point` or `mount`: PKI secrets engine mount path (default: 'pki')
+- `issuer_ref` or `issuer`: Issuer reference name or UUID (default: 'default')
+- `addr`: Vault server address (uses VAULT_ADDR env var if not set)
+- `token_ref`: Environment variable containing Vault token (optional, endpoint is unauthenticated)
+- `namespace`: Vault namespace for Enterprise deployments
+- `verify`: TLS verification options
+  - `ca_file`: Path to custom CA certificate for Vault server TLS validation
+- `timeout`, `retries`, `backoff_factor`, `retry_on_status`: Retry configuration (inherits defaults)
+
+**Reference:** [Vault PKI API - Read Issuer Certificate](https://developer.hashicorp.com/vault/api-docs/secret/pki#read-issuer-certificate)
+
+**Note on Authentication:**
+The Vault PKI issuer endpoint is documented as unauthenticated, meaning it returns public certificates without requiring a token. The `token_ref` parameter is optional and provided for environments that may have custom access controls or Enterprise features enabled.
 
 **Fetch Retry and Timeout Configuration:**
 
