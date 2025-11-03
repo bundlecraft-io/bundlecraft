@@ -16,7 +16,7 @@ def _import_azure_keyvault():
         from azure.keyvault.secrets import SecretClient  # type: ignore
 
         return SecretClient, DefaultAzureCredential
-    except Exception as e:  # pragma: no cover - tested via behavior
+    except (ImportError, ModuleNotFoundError) as e:  # pragma: no cover - tested via behavior
         raise click.ClickException(
             "Azure Key Vault fetcher requires 'azure-keyvault-secrets' and 'azure-identity' packages. "
             "Install with: pip install 'bundlecraft[fetchers]'"
@@ -183,23 +183,46 @@ def fetch_azure_keyvault(
             else:
                 secret = client.get_secret(secret_name)
             return secret.value
+        except ImportError as e:
+            # Should not happen if _import_azure_keyvault succeeded, but handle gracefully
+            raise click.ClickException(
+                f"Azure SDK import error during fetch: {e}. "
+                f"Ensure azure-keyvault-secrets and azure-identity are installed."
+            ) from e
         except Exception as e:
-            # Provide more helpful error messages
+            # Provide more helpful error messages based on error type and content
             error_msg = str(e)
-            if "AuthenticationError" in type(e).__name__ or "403" in error_msg:
+            error_type = type(e).__name__
+            
+            # Check for authentication/authorization errors
+            if "AuthenticationError" in error_type or "ClientAuthenticationError" in error_type:
                 raise click.ClickException(
                     f"Azure Key Vault authentication failed for {vault_url}. "
-                    f"Ensure credentials are valid and have 'Get' permission on secrets. "
+                    f"Ensure credentials are valid. Error: {error_msg}"
+                ) from e
+            elif "403" in error_msg or "Forbidden" in error_msg or error_type == "HttpResponseError":
+                raise click.ClickException(
+                    f"Azure Key Vault access denied for {vault_url}. "
+                    f"Ensure the identity has 'Get' permission on secrets. "
                     f"Error: {error_msg}"
                 ) from e
-            elif "404" in error_msg or "SecretNotFound" in type(e).__name__:
+            # Check for resource not found errors
+            elif "404" in error_msg or "NotFound" in error_msg or "SecretNotFound" in error_type:
                 raise click.ClickException(
                     f"Azure Key Vault secret '{secret_name}' not found in {vault_url}. "
                     f"Verify the secret name and that it exists."
                 ) from e
+            # Check for network/connectivity errors
+            elif "ResourceNotFoundError" in error_type:
+                raise click.ClickException(
+                    f"Azure Key Vault '{vault_url}' not found or not accessible. "
+                    f"Verify the vault URL and network connectivity."
+                ) from e
+            # Generic error with context
             else:
                 raise click.ClickException(
-                    f"Azure Key Vault fetch failed for secret '{secret_name}' in {vault_url}: {error_msg}"
+                    f"Azure Key Vault fetch failed for secret '{secret_name}' in {vault_url}. "
+                    f"Error type: {error_type}, Message: {error_msg}"
                 ) from e
 
     pem_data = _fetch_secret()

@@ -138,7 +138,9 @@ def _fetch_from_config(
     provenance: list[dict[str, Any]] = []
 
     for idx, src in enumerate(fetch_cfg, start=1):
-        ftype = (src.get("type") or "url").lower()
+        ftype_raw = (src.get("type") or "url").lower()
+        # Normalize type aliases for consistency
+        ftype = ftype_raw.replace("-", "_")  # azure-keyvault -> azure_keyvault
         name = src.get("name") or f"fetched-{idx}"
         verify = src.get("verify") or {}
 
@@ -228,7 +230,7 @@ def _fetch_from_config(
                     namespace=namespace,
                     verify=verify if isinstance(verify, dict) else None,
                 )
-            elif ftype == "azure_keyvault" or ftype == "azure-keyvault":
+            elif ftype == "azure_keyvault":
                 vault_url = src.get("vault_url")
                 if not vault_url:
                     raise click.ClickException(
@@ -556,8 +558,9 @@ def _fetch_each_to_named_dirs(
             continue
 
         if dry_run:
-            ftype = (src.get("type") or "url").lower()
-            logger.info(f"[dry-run] Would fetch: {name} (type: {ftype})")
+            ftype_raw = (src.get("type") or "url").lower()
+            ftype = ftype_raw.replace("-", "_")  # Normalize type aliases
+            logger.info(f"[dry-run] Would fetch: {name} (type: {ftype_raw})")
             if ftype == "url":
                 url = src.get("url")
                 logger.info(f"[dry-run]   from URL: {url}")
@@ -571,7 +574,7 @@ def _fetch_each_to_named_dirs(
                 )
                 path = src.get("path")
                 logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
-            elif ftype == "azure_keyvault" or ftype == "azure-keyvault":
+            elif ftype == "azure_keyvault":
                 vault_url = src.get("vault_url")
                 secret_name = src.get("secret_name")
                 logger.info(f"[dry-run]   from Azure Key Vault: {vault_url}/{secret_name}")
