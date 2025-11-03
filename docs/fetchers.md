@@ -13,6 +13,7 @@ The BundleCraft **Fetch layer** enables secure retrieval of certificates from ex
 - [Environment Variables](#environment-variables)
 - [Troubleshooting](#troubleshooting)
 - [Best Practices](#best-practices)
+- [Examples](#examples)
 
 ## Overview
 
@@ -60,6 +61,12 @@ Convenient shortcut to fetch the official Mozilla CA Bundle from curl.se. This i
 - TLS leaf certificate fingerprint pinning
 
 **Note:** The Mozilla CA Bundle is updated regularly as CAs are added, removed, or modified. Always verify the bundle's SHA256 hash to ensure you're using an expected version.
+
+**Access Requirements:**
+- No authentication or API keys required (public resource)
+- HTTPS access to curl.se domain required
+- No rate limiting or access policies
+- Available globally without restrictions
 
 **Reference:** https://curl.se/docs/caextract.html
 
@@ -513,10 +520,32 @@ bundlecraft fetch --env prod --bundle example --verbose
 
 4. **Monitor fetch operation duration in CI/CD pipelines**
 
+## Examples
+
+Complete configuration examples are available in the `docs/examples/` directory:
+
+- **`mozilla-ca-bundle-source.yaml`** - Fetch Mozilla CA Bundle using the mozilla fetcher type
+  - Pre-configured for curl.se
+  - Includes SHA256 verification
+  - Documents all available options
+  - Ready to use or copy to your config directory
+
+To use an example:
+
+```bash
+# Use directly
+bundlecraft fetch --source-config-file docs/examples/mozilla-ca-bundle-source.yaml
+
+# Or copy to your config directory
+cp docs/examples/mozilla-ca-bundle-source.yaml config/sources/mozilla.yaml
+bundlecraft build --env production --bundle mozilla
+```
+
 ---
 
 For additional help, see:
 
 - [BundleCraft Troubleshooting Guide](troubleshooting.md)
 - [Configuration Specification](CONFIG-SPEC.md)
+- [Configuration Examples](examples/)
 - [GitHub Discussions](https://github.com/bundlecraft-io/bundlecraft/discussions)

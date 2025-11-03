@@ -1,0 +1,52 @@
+---
+# Example source config for fetching Mozilla CA Bundle
+# This demonstrates the mozilla fetcher type which provides a convenient
+# shortcut to fetch the official Mozilla CA Bundle from curl.se.
+#
+# Usage:
+#   bundlecraft fetch --source-config-file config/sources/mozilla.yaml
+#
+# The Mozilla CA Bundle is a curated list of Certificate Authorities included
+# in Mozilla products (Firefox, Thunderbird), extracted from NSS.
+#
+# Reference: https://curl.se/docs/caextract.html
+
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
+source_name: mozilla
+description: Mozilla CA Bundle - Public root certificates from Mozilla NSS
+
+fetch:
+  - name: mozilla_roots
+    type: mozilla
+    # No URL needed - automatically uses https://curl.se/ca/cacert.pem
+    
+    # Optional: Content verification (highly recommended)
+    # Update this hash when Mozilla releases a new version
+    # Get current hash: curl -s https://curl.se/ca/cacert.pem | sha256sum
+    verify:
+      sha256: "1794c1d4f7055b7d02c2170a0f8e91cb2799d1d18c7e95c5d5f8f36e8e2a6d6e"
+    
+    # Optional: Override fetch retry/timeout settings
+    # Defaults are usually sufficient for curl.se
+    timeout: 60         # Request timeout in seconds (default: 30)
+    retries: 5          # Number of retry attempts (default: 3)
+    backoff_factor: 2.0 # Exponential backoff multiplier (default: 2.0)
+    retry_on_status: [429, 502, 503, 504]  # HTTP status codes to retry
+
+metadata:
+  owner: security@example.com
+  purpose: Public web service trust anchors
+  change_control: PKI-2024-001
+  tags: [public, mozilla, web-pki]
+  labels:
+    tier: baseline
+    source: mozilla
+    distribution: public
+
+# Notes:
+# - No authentication required (public resource)
+# - The Mozilla CA Bundle is updated regularly (approximately monthly)
+# - Always verify the SHA256 hash to ensure integrity
+# - Consider combining with internal roots using the bundle composition feature
+# - The fetched bundle will be staged under: cert_sources/staged/mozilla/fetch/mozilla_roots/
