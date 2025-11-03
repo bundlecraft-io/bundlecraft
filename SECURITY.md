@@ -153,7 +153,7 @@ ______________________________________________________________________
 - **Primary Contact:** <security@bundlecraft.io>
 - **PGP Key:** [`docs/public-gpg-key.asc`](docs/public-gpg-key.asc)
 - **Key Fingerprint:** `E836 154B DAC9 16D3 449A  629A B180 BB07 EBF8 E354`
-- **Keyserver:** https://keys.openpgp.org/search?q=security%40bundlecraft.io
+- **Keyserver:** https://keys.openpgp.org/search?q=E836154BDAC916D3449A629AB180BB07EBF8E354
 - **Project Website:** [https://github.com/bundlecraft](https://github.com/bundlecraft)
 
 ### Verifying Signed Releases
