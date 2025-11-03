@@ -34,6 +34,4 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: 🔒 Run pip-audit for dependency vulnerabilities
-        run: |
-          pip install pip-audit
-          pip-audit --desc --require pyproject.toml --vulnerability-service osv
+        run: pip-audit --desc --require pyproject.toml --vulnerability-service osv

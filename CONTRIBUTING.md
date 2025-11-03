@@ -407,7 +407,7 @@ Scan against pyproject.toml requirements:
 pip-audit --desc --require pyproject.toml
 ```
 
-The CI pipeline automatically runs pip-audit on every push and pull request to detect vulnerabilities in dependencies. The build will fail if high or critical vulnerabilities are found, ensuring supply chain security.
+The CI pipeline automatically runs pip-audit on every push and pull request to detect vulnerabilities in dependencies. The build will fail if any vulnerabilities are found, ensuring supply chain security.
 
 ______________________________________________________________________
 
