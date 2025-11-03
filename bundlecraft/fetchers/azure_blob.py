@@ -149,7 +149,9 @@ def fetch_azure_blob(
                 "account_name is required when using managed identity or default credential authentication"
             )
         account_url = f"https://{account_name}.blob.core.windows.net"
-        credential = DefaultAzureCredential() if not use_managed_identity else DefaultAzureCredential()
+        # DefaultAzureCredential already tries managed identity as part of its credential chain
+        # The use_managed_identity flag is informational/documentation but both paths use the same credential
+        credential = DefaultAzureCredential()
         blob_service_client = BlobServiceClient(
             account_url=account_url,
             credential=credential,

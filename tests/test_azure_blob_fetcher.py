@@ -18,6 +18,12 @@ import pytest
 from bundlecraft.fetchers.azure_blob import fetch_azure_blob
 
 
+# Mock Azure exception class used across multiple tests
+class MockAzureError(Exception):
+    """Mock Azure exception for testing error handling."""
+    pass
+
+
 class MockBlobDownloadStream:
     """Mock Azure blob download stream."""
 
@@ -477,10 +483,6 @@ class TestAzureBlobFetcherErrors:
 
         mock_blob_client = Mock()
         
-        # Create a custom exception that simulates Azure's BlobNotFound
-        class MockAzureError(Exception):
-            pass
-        
         blob_error = MockAzureError("BlobNotFound: The specified blob does not exist.")
         mock_blob_client.download_blob.side_effect = blob_error
 
@@ -517,9 +519,6 @@ class TestAzureBlobFetcherErrors:
 
         mock_blob_client = Mock()
         
-        class MockAzureError(Exception):
-            pass
-        
         auth_error = MockAzureError("AuthenticationFailed: Server failed to authenticate")
         mock_blob_client.download_blob.side_effect = auth_error
 
@@ -555,9 +554,6 @@ class TestAzureBlobFetcherErrors:
         monkeypatch.setenv("AZURE_CONNECTION_STRING", "test_connection_string")
 
         mock_blob_client = Mock()
-        
-        class MockAzureError(Exception):
-            pass
         
         generic_error = MockAzureError("Something went wrong")
         mock_blob_client.download_blob.side_effect = generic_error
