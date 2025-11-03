@@ -10,7 +10,6 @@ Focuses on improving coverage from 19% to 70%+, covering:
 """
 
 import json
-import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -427,38 +426,52 @@ class TestCountCertsInFile:
         count = _count_certs_in_file(pem_file)
         assert count == 0
 
-    @patch("subprocess.run")
-    def test_count_certs_p7b(self, mock_run, tmp_path):
+    def test_count_certs_p7b(self, tmp_path):
         """Test counting certificates in P7B file"""
+        from cryptography.hazmat.primitives.serialization import Encoding, pkcs7
+        
+        # Generate two test certificates
+        cert1_pem = generate_test_cert_pem(subject_cn="CA 1")
+        cert2_pem = generate_test_cert_pem(subject_cn="CA 2")
+        
+        cert1 = x509.load_pem_x509_certificate(cert1_pem.encode(), default_backend())
+        cert2 = x509.load_pem_x509_certificate(cert2_pem.encode(), default_backend())
+        
+        # Create a real P7B file with the certificates
         p7b_file = tmp_path / "bundle.p7b"
-        p7b_file.write_bytes(b"fake p7b data")
-
-        # Mock subprocess to return 2 certificates
-        mock_result = Mock()
-        mock_result.stdout = (
-            "-----BEGIN CERTIFICATE-----\ndata1\n-----END CERTIFICATE-----\n"
-            "-----BEGIN CERTIFICATE-----\ndata2\n-----END CERTIFICATE-----\n"
-        )
-        mock_run.return_value = mock_result
+        p7b_data = pkcs7.serialize_certificates([cert1, cert2], Encoding.DER)
+        p7b_file.write_bytes(p7b_data)
 
         count = _count_certs_in_file(p7b_file)
         assert count == 2
-        mock_run.assert_called_once()
 
-    @patch("subprocess.run")
-    def test_count_certs_p12(self, mock_run, tmp_path):
+    def test_count_certs_p12(self, tmp_path):
         """Test counting certificates in P12 file"""
+        from cryptography.hazmat.primitives.serialization import BestAvailableEncryption, pkcs12
+        
+        # Generate three test certificates
+        cert1_pem = generate_test_cert_pem(subject_cn="CA 1")
+        cert2_pem = generate_test_cert_pem(subject_cn="CA 2")
+        cert3_pem = generate_test_cert_pem(subject_cn="CA 3")
+        
+        cert1 = x509.load_pem_x509_certificate(cert1_pem.encode(), default_backend())
+        cert2 = x509.load_pem_x509_certificate(cert2_pem.encode(), default_backend())
+        cert3 = x509.load_pem_x509_certificate(cert3_pem.encode(), default_backend())
+        
+        # Create a real P12 file with the certificates
         p12_file = tmp_path / "bundle.p12"
-        p12_file.write_bytes(b"fake p12 data")
-
-        # Mock subprocess to return 3 certificates
-        mock_result = Mock()
-        mock_result.stdout = "-----BEGIN CERTIFICATE-----\n" * 3
-        mock_run.return_value = mock_result
+        password = b"changeit"
+        p12_data = pkcs12.serialize_key_and_certificates(
+            name=b"test",
+            key=None,
+            cert=cert1,
+            cas=[cert2, cert3],
+            encryption_algorithm=BestAvailableEncryption(password),
+        )
+        p12_file.write_bytes(p12_data)
 
         count = _count_certs_in_file(p12_file)
         assert count == 3
-        mock_run.assert_called_once()
 
     @patch("jks.KeyStore.load")
     def test_count_certs_jks(self, mock_jks_load, tmp_path):
@@ -476,13 +489,10 @@ class TestCountCertsInFile:
         assert count == 1
         mock_jks_load.assert_called_once()
 
-    @patch("subprocess.run")
-    def test_count_certs_subprocess_error(self, mock_run, tmp_path, capsys):
-        """Test handling of subprocess errors"""
+    def test_count_certs_parsing_error(self, tmp_path, capsys):
+        """Test handling of parsing errors with invalid P7B data"""
         p7b_file = tmp_path / "bad.p7b"
         p7b_file.write_bytes(b"invalid data")
-
-        mock_run.side_effect = subprocess.CalledProcessError(1, "openssl")
 
         count = _count_certs_in_file(p7b_file)
         assert count == 0

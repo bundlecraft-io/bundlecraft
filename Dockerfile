@@ -17,9 +17,9 @@ RUN python -m venv "$VIRTUAL_ENV"
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 COPY --from=builder /build/dist/*.whl /tmp/
 # Install temporary build dependencies, install wheels, then remove build deps to keep image small
-# Keep runtime deps (openssl). All in one RUN layer so build dependencies aren't in final image
+# All in one RUN layer so build dependencies aren't in final image
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential python3-dev openssl && \
+    build-essential python3-dev && \
     pip install --no-cache-dir /tmp/*.whl && \
     apt-get remove -y build-essential python3-dev && apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/* /tmp/*.whl

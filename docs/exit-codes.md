@@ -57,7 +57,7 @@ BundleCraft uses standardized exit codes to communicate command outcomes to call
 
 | Code | Name | Description |
 |------|------|-------------|
-| `50` | `DEPENDENCY_ERROR` | Missing required system dependency (openssl, etc.) |
+| `50` | `DEPENDENCY_ERROR` | Missing required system dependency |
 | `51` | `PERMISSION_ERROR` | Insufficient permissions to perform operation |
 
 ______________________________________________________________________
@@ -110,7 +110,7 @@ fi
 | `0` | Conversion successful |
 | `10` | Missing or invalid input file |
 | `11` | Cannot write to output directory |
-| `41` | Conversion failed (format error, openssl failure) |
+| `41` | Conversion failed (format error) |
 
 **Example:**
 
@@ -243,11 +243,11 @@ ______________________________________________________________________
 | `21` | Auth error | Verify credentials, API tokens, certificate paths |
 | `22` | Fetch error | Check remote resource exists, URL is correct |
 | `30` | Validation failed | Review verification output, check checksums |
-| `31` | Expired certs | Update certificates, check expiry dates with `openssl x509 -noout -dates` |
+| `31` | Expired certs | Update certificates, check expiry dates |
 | `32` | Invalid cert | Verify PEM format, check for corruption |
-| `40` | Build error | Check logs, verify dependencies (openssl) |
+| `40` | Build error | Check logs, verify dependencies |
 | `41` | Conversion error | Ensure input format is correct, check conversion target is supported |
-| `50` | Missing dependency | Install required tools: `openssl` |
+| `50` | Missing dependency | Install required tools |
 | `51` | Permission error | Check file/directory permissions, run with appropriate user |
 
 ### Common Patterns
