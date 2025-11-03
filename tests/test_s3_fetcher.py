@@ -18,6 +18,15 @@ from unittest.mock import MagicMock, Mock, patch
 import click
 import pytest
 
+# Import botocore exceptions for testing
+try:
+    from botocore.exceptions import ClientError, EndpointConnectionError, NoCredentialsError
+except ImportError:
+    # Mock these if botocore not available
+    ClientError = type("ClientError", (Exception,), {})
+    NoCredentialsError = type("NoCredentialsError", (Exception,), {})
+    EndpointConnectionError = type("EndpointConnectionError", (Exception,), {})
+
 from bundlecraft.fetchers.s3 import _parse_s3_url, _safe_filename_from_key, fetch_s3
 
 
@@ -226,17 +235,17 @@ class TestS3FetcherErrorHandling:
 
     def test_missing_url_and_bucket_key(self, tmp_path):
         """Test that error is raised when neither URL nor bucket/key provided."""
-        with pytest.raises(click.ClickException, match="requires either 'url'|both 'bucket' and 'key'"):
+        with pytest.raises(click.ClickException, match=r"requires either.*url.*bucket.*key"):
             fetch_s3(dest_dir=tmp_path, timeout=30)
 
     def test_missing_key_parameter(self, tmp_path):
         """Test that error is raised when bucket provided without key."""
-        with pytest.raises(click.ClickException, match="requires either 'url'|both 'bucket' and 'key'"):
+        with pytest.raises(click.ClickException, match=r"requires either.*url.*bucket.*key"):
             fetch_s3(dest_dir=tmp_path, bucket="my-bucket", timeout=30)
 
     def test_missing_bucket_parameter(self, tmp_path):
         """Test that error is raised when key provided without bucket."""
-        with pytest.raises(click.ClickException, match="requires either 'url'|both 'bucket' and 'key'"):
+        with pytest.raises(click.ClickException, match=r"requires either.*url.*bucket.*key"):
             fetch_s3(dest_dir=tmp_path, key="cert.pem", timeout=30)
 
     @patch("bundlecraft.fetchers.s3.boto3")
@@ -246,7 +255,6 @@ class TestS3FetcherErrorHandling:
         mock_boto3.client.return_value = mock_client
         
         # Simulate NoCredentialsError
-        from botocore.exceptions import NoCredentialsError
         mock_client.download_file.side_effect = NoCredentialsError()
 
         with pytest.raises(click.ClickException, match="AWS credentials not found"):
@@ -264,7 +272,6 @@ class TestS3FetcherErrorHandling:
         mock_boto3.client.return_value = mock_client
         
         # Simulate NoSuchBucket error
-        from botocore.exceptions import ClientError
         error_response = {"Error": {"Code": "NoSuchBucket", "Message": "The specified bucket does not exist"}}
         mock_client.download_file.side_effect = ClientError(error_response, "GetObject")
 

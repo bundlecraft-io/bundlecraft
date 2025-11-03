@@ -200,6 +200,19 @@ def fetch_s3(
     client_config["config"] = boto_config
     client_config["verify"] = verify_ssl
 
+    # Import botocore exceptions for proper error handling
+    try:
+        from botocore.exceptions import (
+            ClientError,
+            NoCredentialsError,
+            EndpointConnectionError,
+        )
+    except ImportError:  # pragma: no cover
+        # Fallback if botocore is not available (should not happen if boto3 is installed)
+        ClientError = Exception
+        NoCredentialsError = Exception
+        EndpointConnectionError = Exception
+
     # Apply retry logic wrapper
     @retry_with_backoff(
         retries=fetch_config["retries"],
@@ -216,39 +229,43 @@ def fetch_s3(
             s3_client.download_file(bucket, key, str(out_path))
             
             return out_path
-        except Exception as e:
-            # Provide helpful error messages for common issues
-            error_name = type(e).__name__
-            error_msg = str(e)
+        except NoCredentialsError as e:
+            raise click.ClickException(
+                "AWS credentials not found. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY "
+                "environment variables, configure ~/.aws/credentials, or use an IAM role."
+            ) from e
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+            error_msg = e.response.get("Error", {}).get("Message", str(e))
             
-            if "NoCredentialsError" in error_name or "CredentialsNotFound" in error_name:
-                raise click.ClickException(
-                    "AWS credentials not found. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY "
-                    "environment variables, configure ~/.aws/credentials, or use an IAM role."
-                ) from e
-            elif "NoSuchBucket" in error_name or "NoSuchBucket" in error_msg:
+            if error_code == "NoSuchBucket":
                 raise click.ClickException(
                     f"S3 bucket not found: {bucket}. "
                     "Check the bucket name and ensure it exists in the specified region."
                 ) from e
-            elif "NoSuchKey" in error_name or "NoSuchKey" in error_msg:
+            elif error_code == "NoSuchKey":
                 raise click.ClickException(
                     f"S3 object not found: {key} in bucket {bucket}. "
                     "Check the object key and ensure the file exists."
                 ) from e
-            elif "AccessDenied" in error_name or "AccessDenied" in error_msg:
+            elif error_code in ("AccessDenied", "403"):
                 raise click.ClickException(
                     f"Access denied to S3 bucket {bucket} or object {key}. "
                     "Check IAM permissions and bucket policies."
                 ) from e
-            elif "EndpointConnectionError" in error_name or "EndpointConnectionError" in error_msg:
-                raise click.ClickException(
-                    f"Cannot connect to S3 endpoint. Check region setting and network connectivity. "
-                    f"Bucket: {bucket}, Region: {region or 'default'}"
-                ) from e
             else:
-                # Generic S3 error
-                raise click.ClickException(f"S3 fetch failed for {bucket}/{key}: {error_msg}") from e
+                # Generic ClientError
+                raise click.ClickException(
+                    f"S3 error ({error_code}): {error_msg} for {bucket}/{key}"
+                ) from e
+        except EndpointConnectionError as e:
+            raise click.ClickException(
+                f"Cannot connect to S3 endpoint. Check region setting and network connectivity. "
+                f"Bucket: {bucket}, Region: {region or 'default'}"
+            ) from e
+        except Exception as e:
+            # Generic catch-all for unexpected errors
+            raise click.ClickException(f"S3 fetch failed for {bucket}/{key}: {str(e)}") from e
 
     # Execute fetch with retries
     result = _do_fetch()
