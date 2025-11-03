@@ -179,14 +179,15 @@ class TestP12Conversion:
     
     def test_p12_with_default_password(self, test_certs, tmp_path, monkeypatch):
         """Test P12 creation with default password"""
-        overrides = {}  # Use default password
+        # The test_env fixture sets TRUST_P12_PASSWORD="test-password" by default
+        # So we create with that password and verify we can read it back
+        overrides = {}  # Use default password from environment
         create_pkcs12(test_certs["single"], tmp_path, "default_pw", overrides, force=True)
         
         p12_file = tmp_path / "default_pw.p12"
         assert p12_file.exists()
         
-        # Should be readable with default password
-        monkeypatch.setenv("TRUST_P12_PASSWORD", "changeit")
+        # Should be readable with the same password from environment (test-password)
         count = _count_certs_in_file(p12_file)
         assert count == test_certs["count_single"]
 
