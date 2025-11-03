@@ -10,6 +10,8 @@ jobs:
   validate-lockfile:
     name: 🔒 Validate Requirements Lock File
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     # Only run on push if it's NOT a PR merge commit
     if: |
       github.event_name == 'pull_request' ||
