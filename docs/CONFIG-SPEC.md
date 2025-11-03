@@ -176,7 +176,23 @@ fetch:
     pem_field: pem
     addr: http://127.0.0.1:8200
     token_ref: VAULT_TOKEN
-```yaml
+
+  - name: azure_prod_certs
+    type: azure_blob
+    container: certificates              # Azure Blob container name (required)
+    blob_name: production/ca-bundle.pem  # Blob path within container (required)
+    account_name: prodstorageaccount     # Storage account name (required unless using connection string)
+    # Authentication options (choose one):
+    connection_string_ref: AZURE_STORAGE_CONNECTION_STRING  # Option 1: Connection string
+    # account_key_ref: AZURE_ACCOUNT_KEY                    # Option 2: Account key
+    # sas_token_ref: AZURE_SAS_TOKEN                        # Option 3: SAS token
+    # use_managed_identity: true                            # Option 4: Managed identity
+    # (default: DefaultAzureCredential if none specified)    # Option 5: Default credential chain
+    verify:
+      sha256: <expected_content_hash>
+    timeout: 45
+    retries: 4
+```
 
 **Fetch Retry and Timeout Configuration:**
 

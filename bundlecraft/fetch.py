@@ -22,6 +22,7 @@ from typing import Any
 import click
 
 from bundlecraft.fetchers.api import fetch_api
+from bundlecraft.fetchers.azure_blob import fetch_azure_blob
 from bundlecraft.fetchers.http import fetch_url
 from bundlecraft.fetchers.vault import fetch_vault
 from bundlecraft.helpers.config_schema import validate_source_config
@@ -226,6 +227,47 @@ def _fetch_from_config(
                     token_ref=token_ref,
                     namespace=namespace,
                     verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "azure_blob":
+                container = src.get("container")
+                blob_name = src.get("blob_name")
+                if not container:
+                    raise click.ClickException("Azure Blob fetch source requires 'container'")
+                if not blob_name:
+                    raise click.ClickException("Azure Blob fetch source requires 'blob_name'")
+                account_name = src.get("account_name")
+                connection_string_ref = src.get("connection_string_ref")
+                account_key_ref = src.get("account_key_ref")
+                sas_token_ref = src.get("sas_token_ref")
+                use_managed_identity = src.get("use_managed_identity", False)
+                logger.info("  Fetching from Azure Blob Storage:")
+                logger.info(f"    Container: {container}")
+                logger.info(f"    Blob: {blob_name}")
+                if account_name:
+                    logger.info(f"    Account: {account_name}")
+                if verbose:
+                    auth_method = "connection_string" if connection_string_ref else \
+                                  "account_key" if account_key_ref else \
+                                  "sas_token" if sas_token_ref else \
+                                  "managed_identity" if use_managed_identity else \
+                                  "default_credential"
+                    logger.debug(f"    Auth method: {auth_method}")
+                out_path = fetch_azure_blob(
+                    dest_dir,
+                    name=name,
+                    container=container,
+                    blob_name=blob_name,
+                    account_name=account_name,
+                    connection_string_ref=connection_string_ref,
+                    account_key_ref=account_key_ref,
+                    sas_token_ref=sas_token_ref,
+                    use_managed_identity=use_managed_identity,
+                    verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
                 )
             else:
                 raise click.ClickException(f"Unsupported fetch type: {ftype}")
@@ -527,6 +569,11 @@ def _fetch_each_to_named_dirs(
                 )
                 path = src.get("path")
                 logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
+            elif ftype == "azure_blob":
+                container = src.get("container")
+                blob_name = src.get("blob_name")
+                account_name = src.get("account_name") or "default"
+                logger.info(f"[dry-run]   from Azure Blob: {account_name}/{container}/{blob_name}")
             logger.info(f"[dry-run]   to directory: {staging_root / 'fetch' / name}")
             continue
 

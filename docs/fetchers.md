@@ -90,6 +90,32 @@ Integrates with HashiCorp Vault for certificate retrieval from KV stores or PKI 
 - Address validation
 - Field-specific PEM extraction
 
+### 4. Azure Blob Fetcher (`type: azure_blob`)
+
+Retrieves certificates from Azure Blob Storage, supporting multiple authentication methods.
+
+**Use cases:**
+
+- Certificates stored in Azure Blob Storage
+- Enterprise certificate repositories in Azure
+- Cloud-native certificate distribution
+- Multi-region certificate management
+
+**Security features:**
+
+- Multiple authentication methods (connection string, account key, SAS token, managed identity)
+- HTTPS-only access
+- Azure RBAC integration
+- Content integrity verification
+
+**Authentication methods (in priority order):**
+
+1. **Connection String** - Full connection string including account credentials
+2. **Account Key** - Storage account name with account key
+3. **SAS Token** - Storage account name with shared access signature
+4. **Managed Identity** - Azure Managed Identity for authentication
+5. **Default Credential** - Azure SDK default credential chain (environment, managed identity, Azure CLI)
+
 ## Configuration
 
 ### Basic Fetch Configuration
@@ -153,6 +179,57 @@ fetch:
     token_ref: VAULT_TOKEN      # environment variable name
     verify:
       ca_file: config/certs/vault-ca.pem
+```
+
+### Azure Blob Fetcher Configuration
+
+```yaml
+# Option 1: Using Connection String
+fetch:
+  - name: azure_certs
+    type: azure_blob
+    container: certificates           # Azure Blob container name
+    blob_name: production/roots.pem   # Blob path within container
+    connection_string_ref: AZURE_STORAGE_CONNECTION_STRING  # env var
+    verify:
+      sha256: "expected-content-hash"  # optional content verification
+
+# Option 2: Using Account Key
+fetch:
+  - name: azure_certs
+    type: azure_blob
+    container: certificates
+    blob_name: intermediate-ca.pem
+    account_name: mystorageaccount    # Storage account name
+    account_key_ref: AZURE_ACCOUNT_KEY  # env var with account key
+
+# Option 3: Using SAS Token
+fetch:
+  - name: azure_certs
+    type: azure_blob
+    container: certificates
+    blob_name: partner-ca.pem
+    account_name: mystorageaccount
+    sas_token_ref: AZURE_SAS_TOKEN    # env var with SAS token
+
+# Option 4: Using Managed Identity (Azure VMs, AKS, etc.)
+fetch:
+  - name: azure_certs
+    type: azure_blob
+    container: certificates
+    blob_name: internal-ca.pem
+    account_name: mystorageaccount
+    use_managed_identity: true        # Use Azure Managed Identity
+
+# Option 5: Using Default Credential Chain (recommended for Azure environments)
+fetch:
+  - name: azure_certs
+    type: azure_blob
+    container: certificates
+    blob_name: trusted-roots.pem
+    account_name: mystorageaccount
+    # No explicit auth - uses DefaultAzureCredential
+    # Tries: environment vars, managed identity, Azure CLI, etc.
 ```
 
 ## Security Features
@@ -262,6 +339,32 @@ fetch:
       ca_file: config/certs/api-ca.pem
 ```
 
+### Azure Blob Storage
+
+```yaml
+# Production certificates from Azure Blob
+fetch:
+  - name: azure_prod_roots
+    type: azure_blob
+    container: production-certificates
+    blob_name: trusted-roots/ca-bundle.pem
+    account_name: prodstorageaccount
+    sas_token_ref: AZURE_PROD_SAS_TOKEN
+    verify:
+      sha256: "production-bundle-sha256-hash"
+
+# Using managed identity in Azure Kubernetes Service (AKS)
+fetch:
+  - name: azure_internal_ca
+    type: azure_blob
+    container: internal-pki
+    blob_name: ca-certificates/root-ca.pem
+    account_name: internalstorage
+    use_managed_identity: true
+    timeout: 45
+    retries: 5
+```
+
 ## Environment Variables
 
 ### Required for Authentication
@@ -272,6 +375,11 @@ fetch:
 | API (Generic) | `CUSTOM_API_TOKEN` | Custom API token (configurable name) |
 | Vault | `VAULT_TOKEN` | Vault authentication token |
 | Vault | `VAULT_ADDR` | Vault server address (optional, can be in config) |
+| Azure Blob | `AZURE_STORAGE_CONNECTION_STRING` | Full Azure Storage connection string |
+| Azure Blob | `AZURE_ACCOUNT_KEY` | Azure Storage account key |
+| Azure Blob | `AZURE_SAS_TOKEN` | Azure Storage SAS token |
+
+**Note:** Azure Blob also supports managed identity and DefaultAzureCredential, which don't require environment variables when running in Azure environments (VMs, AKS, Functions, etc.).
 
 ### Setting Environment Variables
 
@@ -285,6 +393,16 @@ export VAULT_ADDR="https://vault.example.com:8200"
 
 # For custom APIs
 export CUSTOM_API_TOKEN="your-custom-token"
+
+# For Azure Blob Storage
+# Option 1: Connection String (includes account name and key)
+export AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=mykey;EndpointSuffix=core.windows.net"
+
+# Option 2: Account Key (requires account_name in config)
+export AZURE_ACCOUNT_KEY="your-storage-account-key"
+
+# Option 3: SAS Token (requires account_name in config)
+export AZURE_SAS_TOKEN="sv=2021-06-08&ss=bfqt&srt=sco&sp=rwdlacupitfx&se=2024-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=..."
 ```
 
 ## Troubleshooting
@@ -355,6 +473,49 @@ pip install bundlecraft[fetchers]
 
 Note: When using containers, Vault support is included by default.
 
+#### "Azure Blob not found" Error
+
+**Problem:** Container or blob doesn't exist, or incorrect names specified
+
+**Solution:** Verify the container and blob names:
+```bash
+# Using Azure CLI to list containers
+az storage container list --account-name mystorageaccount
+
+# List blobs in a container
+az storage blob list --container-name certificates --account-name mystorageaccount
+```
+
+#### "Azure authentication failed" Error
+
+**Problem:** Invalid credentials or insufficient permissions
+
+**Solution:** 
+1. Verify credentials are correct and not expired
+2. Check that the storage account exists and is accessible
+3. Ensure proper RBAC roles are assigned (e.g., "Storage Blob Data Reader")
+4. For managed identity, verify the identity is assigned to the resource and has proper permissions
+
+```bash
+# Test connection using Azure CLI
+az storage blob download --account-name mystorageaccount \
+  --container-name certificates --name test.pem --file /tmp/test.pem
+
+# Check managed identity assignment (for Azure VMs)
+az vm identity show --resource-group myResourceGroup --name myVM
+```
+
+#### "azure-storage-blob not installed" Error
+
+**Problem:** Missing Azure SDK when using Python package installation
+
+**Solution:** Install with fetcher dependencies:
+```bash
+pip install bundlecraft[fetchers]
+```
+
+Note: When using containers, Azure Blob support is included by default.
+
 ### Debugging Commands
 
 ```bash
@@ -424,6 +585,103 @@ bundlecraft fetch --env prod --bundle example --verbose
    ```
 
 4. **Monitor fetch operation duration in CI/CD pipelines**
+
+### Azure Blob-Specific Best Practices
+
+1. **Use SAS tokens with minimal permissions and time-bound access:**
+   - Generate SAS tokens with read-only permissions
+   - Set expiration dates appropriate to your rotation schedule
+   - Use account or service-level SAS, not container-level
+
+2. **Prefer managed identity in Azure environments:**
+   ```yaml
+   # Best practice for Azure VMs, AKS, Azure Functions
+   fetch:
+     - name: azure_certs
+       type: azure_blob
+       container: certificates
+       blob_name: ca-bundle.pem
+       account_name: mystorageaccount
+       use_managed_identity: true
+   ```
+
+3. **Implement proper RBAC:**
+   - Assign "Storage Blob Data Reader" role for read-only access
+   - Avoid using account keys when possible
+   - Use Azure AD authentication (managed identity or service principal)
+
+4. **Enable Azure Storage logging and monitoring:**
+   - Track certificate access patterns
+   - Monitor for authentication failures
+   - Set up alerts for unusual access
+
+5. **Use private endpoints for enhanced security:**
+   - Restrict storage account access to specific VNets
+   - Disable public access when running in Azure
+
+6. **Organize blobs with clear naming conventions:**
+   ```
+   certificates/
+     production/
+       roots/ca-bundle.pem
+       intermediate/issuing-ca.pem
+     staging/
+       roots/ca-bundle.pem
+   ```
+
+7. **Enable blob versioning for rollback capability:**
+   - Track certificate updates over time
+   - Quickly revert to previous versions if needed
+
+### Azure Access and Authentication Policies
+
+**Required Azure Permissions:**
+
+For connection string or account key auth:
+- Storage account key access (usually admin-level)
+
+For SAS token:
+- Read permission on blobs (`r`)
+- List permission on container (`l`) - optional but recommended
+
+For managed identity or DefaultAzureCredential:
+- Azure role assignment: `Storage Blob Data Reader` (or `Storage Blob Data Contributor` if write access needed)
+- Role assignment can be at storage account, container, or blob level
+
+**Setting up Managed Identity:**
+
+```bash
+# 1. Enable managed identity on your resource (VM, AKS, Function, etc.)
+az vm identity assign --resource-group myResourceGroup --name myVM
+
+# 2. Get the principal ID
+PRINCIPAL_ID=$(az vm identity show --resource-group myResourceGroup --name myVM --query principalId -o tsv)
+
+# 3. Assign Storage Blob Data Reader role
+az role assignment create \
+  --role "Storage Blob Data Reader" \
+  --assignee $PRINCIPAL_ID \
+  --scope /subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Storage/storageAccounts/{storage-account}
+```
+
+**Setting up SAS Token:**
+
+```bash
+# Generate a read-only SAS token with 90-day expiration
+az storage container generate-sas \
+  --account-name mystorageaccount \
+  --name certificates \
+  --permissions rl \
+  --expiry $(date -u -d "90 days" '+%Y-%m-%dT%H:%MZ') \
+  --https-only \
+  --output tsv
+```
+
+**Azure Blob Storage Documentation:**
+- [Authentication overview](https://learn.microsoft.com/en-us/azure/storage/common/storage-auth)
+- [Managed identities](https://learn.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview)
+- [SAS tokens](https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview)
+- [RBAC roles](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-reader)
 
 ---
 
