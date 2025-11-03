@@ -22,8 +22,14 @@ from typing import Any
 import click
 
 from bundlecraft.fetchers.api import fetch_api
+from bundlecraft.fetchers.azure_blob import fetch_azure_blob
+from bundlecraft.fetchers.azure_keyvault import fetch_azure_keyvault
+from bundlecraft.fetchers.gcs import fetch_gcs
 from bundlecraft.fetchers.http import fetch_url
+from bundlecraft.fetchers.mozilla import fetch_mozilla
+from bundlecraft.fetchers.s3 import fetch_s3
 from bundlecraft.fetchers.vault import fetch_vault
+from bundlecraft.fetchers.vault_pki import fetch_vault_pki
 from bundlecraft.helpers.config_schema import validate_source_config
 from bundlecraft.helpers.exit_codes import ExitCode
 from bundlecraft.helpers.ui import print_banner
@@ -226,6 +232,170 @@ def _fetch_from_config(
                     token_ref=token_ref,
                     namespace=namespace,
                     verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "vault_pki":
+                mount_point = src.get("mount_point") or src.get("mount") or "pki"
+                issuer_ref = src.get("issuer_ref") or src.get("issuer") or "default"
+                addr = src.get("addr")  # fallback to VAULT_ADDR if not provided
+                token_ref = src.get("token_ref")  # fallback to VAULT_TOKEN
+                namespace = src.get("namespace")
+                logger.info("  Fetching from Vault PKI:")
+                logger.info(f"    Address: {addr or 'from VAULT_ADDR env'}")
+                logger.info(f"    Mount: {mount_point}, Issuer: {issuer_ref}")
+                if verbose:
+                    logger.debug(f"    Namespace: {namespace or 'default'}")
+                    logger.debug(f"    Token ref: {token_ref or 'from VAULT_TOKEN env'}")
+                out_path = fetch_vault_pki(
+                    dest_dir,
+                    name=name,
+                    mount_point=mount_point,
+                    issuer_ref=issuer_ref,
+                    addr=addr,
+                    token_ref=token_ref,
+                    namespace=namespace,
+                    verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "s3":
+                bucket = src.get("bucket")
+                key = src.get("key")
+                if not bucket or not key:
+                    raise click.ClickException("S3 fetch source requires 'bucket' and 'key'")
+                region = src.get("region")
+                access_key_id_ref = src.get("access_key_id_ref")
+                secret_access_key_ref = src.get("secret_access_key_ref")
+                session_token_ref = src.get("session_token_ref")
+                endpoint_url = src.get("endpoint_url")
+                logger.info("  Fetching from S3:")
+                logger.info(f"    Bucket: {bucket}, Key: {key}")
+                logger.info(f"    Region: {region or 'from AWS_DEFAULT_REGION or us-east-1'}")
+                if verbose:
+                    logger.debug(f"    Endpoint URL: {endpoint_url or 'default'}")
+                out_path = fetch_s3(
+                    dest_dir,
+                    name=name,
+                    bucket=bucket,
+                    key=key,
+                    region=region,
+                    access_key_id_ref=access_key_id_ref,
+                    secret_access_key_ref=secret_access_key_ref,
+                    session_token_ref=session_token_ref,
+                    endpoint_url=endpoint_url,
+                    verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
+                )
+            elif ftype == "azure_blob":
+                account_name = src.get("account_name")
+                container = src.get("container")
+                blob_name = src.get("blob_name")
+                if not account_name or not container or not blob_name:
+                    raise click.ClickException(
+                        "Azure Blob fetch source requires 'account_name', 'container', and 'blob_name'"
+                    )
+                account_key_ref = src.get("account_key_ref")
+                connection_string_ref = src.get("connection_string_ref")
+                sas_token_ref = src.get("sas_token_ref")
+                endpoint_url = src.get("endpoint_url")
+                logger.info("  Fetching from Azure Blob Storage:")
+                logger.info(f"    Account: {account_name}, Container: {container}")
+                logger.info(f"    Blob: {blob_name}")
+                if verbose:
+                    logger.debug(f"    Endpoint URL: {endpoint_url or 'default'}")
+                out_path = fetch_azure_blob(
+                    dest_dir,
+                    name=name,
+                    account_name=account_name,
+                    container=container,
+                    blob_name=blob_name,
+                    account_key_ref=account_key_ref,
+                    connection_string_ref=connection_string_ref,
+                    sas_token_ref=sas_token_ref,
+                    endpoint_url=endpoint_url,
+                    verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
+                )
+            elif ftype == "gcs":
+                bucket = src.get("bucket")
+                blob_name = src.get("blob_name")
+                if not bucket or not blob_name:
+                    raise click.ClickException("GCS fetch source requires 'bucket' and 'blob_name'")
+                project_id = src.get("project_id")
+                credentials_file_ref = src.get("credentials_file_ref")
+                logger.info("  Fetching from Google Cloud Storage:")
+                logger.info(f"    Bucket: {bucket}, Blob: {blob_name}")
+                if verbose:
+                    logger.debug(f"    Project ID: {project_id or 'from credentials'}")
+                    logger.debug(
+                        f"    Credentials: {credentials_file_ref or 'from GOOGLE_APPLICATION_CREDENTIALS'}"
+                    )
+                out_path = fetch_gcs(
+                    dest_dir,
+                    name=name,
+                    bucket=bucket,
+                    blob_name=blob_name,
+                    project_id=project_id,
+                    credentials_file_ref=credentials_file_ref,
+                    verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
+                )
+            elif ftype == "azure_keyvault":
+                vault_url = src.get("vault_url")
+                certificate_name = src.get("certificate_name")
+                if not vault_url or not certificate_name:
+                    raise click.ClickException(
+                        "Azure Key Vault fetch source requires 'vault_url' and 'certificate_name'"
+                    )
+                version = src.get("version")
+                client_id_ref = src.get("client_id_ref")
+                client_secret_ref = src.get("client_secret_ref")
+                tenant_id_ref = src.get("tenant_id_ref")
+                logger.info("  Fetching from Azure Key Vault:")
+                logger.info(f"    Vault: {vault_url}")
+                logger.info(f"    Certificate: {certificate_name}")
+                if verbose and version:
+                    logger.debug(f"    Version: {version}")
+                out_path = fetch_azure_keyvault(
+                    dest_dir,
+                    name=name,
+                    vault_url=vault_url,
+                    certificate_name=certificate_name,
+                    version=version,
+                    client_id_ref=client_id_ref,
+                    client_secret_ref=client_secret_ref,
+                    tenant_id_ref=tenant_id_ref,
+                    verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
+                )
+            elif ftype == "mozilla":
+                logger.info("  Fetching Mozilla root store:")
+                logger.info(f"    URL: https://curl.se/ca/cacert.pem")
+                if verbose and verify:
+                    logger.debug(f"  Verification config: {json.dumps(verify, indent=2)}")
+                out_path = fetch_mozilla(
+                    dest_dir,
+                    name=name,
+                    verify=verify,
+                    root=root,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
                 )
             else:
                 raise click.ClickException(f"Unsupported fetch type: {ftype}")
@@ -527,6 +697,31 @@ def _fetch_each_to_named_dirs(
                 )
                 path = src.get("path")
                 logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
+            elif ftype == "vault_pki":
+                mount_point = src.get("mount_point") or src.get("mount") or "pki"
+                issuer_ref = src.get("issuer_ref") or src.get("issuer") or "default"
+                logger.info(f"[dry-run]   from Vault PKI: {mount_point}/issuer/{issuer_ref}")
+            elif ftype == "s3":
+                bucket = src.get("bucket")
+                key = src.get("key")
+                logger.info(f"[dry-run]   from S3: s3://{bucket}/{key}")
+            elif ftype == "azure_blob":
+                account_name = src.get("account_name")
+                container = src.get("container")
+                blob_name = src.get("blob_name")
+                logger.info(
+                    f"[dry-run]   from Azure Blob: {account_name}/{container}/{blob_name}"
+                )
+            elif ftype == "gcs":
+                bucket = src.get("bucket")
+                blob_name = src.get("blob_name")
+                logger.info(f"[dry-run]   from GCS: gs://{bucket}/{blob_name}")
+            elif ftype == "azure_keyvault":
+                vault_url = src.get("vault_url")
+                certificate_name = src.get("certificate_name")
+                logger.info(f"[dry-run]   from Azure Key Vault: {vault_url}/certificates/{certificate_name}")
+            elif ftype == "mozilla":
+                logger.info(f"[dry-run]   from Mozilla root store: https://curl.se/ca/cacert.pem")
             logger.info(f"[dry-run]   to directory: {staging_root / 'fetch' / name}")
             continue
 
