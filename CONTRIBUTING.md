@@ -492,9 +492,9 @@ git tag -v v1.2.3
 # Import a maintainer's public key first (if needed)
 curl -sL https://raw.githubusercontent.com/bundlecraft-io/bundlecraft/main/docs/public-gpg-key.asc | gpg --import
 
-# Verify the key fingerprint matches the one published in the repository
+# List the imported keys and verify the fingerprint matches the one published in the repository
 # Expected fingerprint can be found at: https://github.com/bundlecraft-io/bundlecraft/blob/main/docs/public-gpg-key.asc
-gpg --fingerprint YOUR_KEY_ID
+gpg --list-keys --fingerprint
 
 # Then verify the tag
 git tag -v v1.2.3
