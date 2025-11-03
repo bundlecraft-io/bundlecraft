@@ -20,6 +20,19 @@ def _import_gcs():
         ) from e
 
 
+def _import_gcs_service_account():
+    """Import Google service account module for authentication."""
+    try:
+        from google.oauth2 import service_account  # type: ignore
+
+        return service_account
+    except Exception as e:  # pragma: no cover
+        raise click.ClickException(
+            "GCS fetcher requires 'google-auth' package for service account authentication. "
+            "Install with: pip install 'bundlecraft[fetchers]'"
+        ) from e
+
+
 def fetch_gcs(
     dest_dir: Path,
     name: str,
@@ -85,8 +98,7 @@ def fetch_gcs(
     try:
         if credentials_file:
             # Use service account from file
-            from google.oauth2 import service_account
-
+            service_account = _import_gcs_service_account()
             credentials = service_account.Credentials.from_service_account_file(credentials_file)
             client = storage.Client(
                 project=project_id,

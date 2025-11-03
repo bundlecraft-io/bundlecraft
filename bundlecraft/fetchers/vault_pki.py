@@ -86,12 +86,14 @@ def fetch_vault_pki(
             pem_data = pem_data + "\n"
 
         out_path.write_text(pem_data, encoding="utf-8")
-    except hvac.exceptions.InvalidPath as e:
-        raise click.ClickException(
-            f"Vault PKI issuer '{issuer_ref}' not found at mount '{mount_point}'. "
-            f"Verify the mount point and issuer reference."
-        ) from e
     except Exception as e:
+        # Check if it's a 404/not found error
+        error_msg = str(e).lower()
+        if '404' in error_msg or 'not found' in error_msg or 'invalid path' in error_msg:
+            raise click.ClickException(
+                f"Vault PKI issuer '{issuer_ref}' not found at mount '{mount_point}'. "
+                f"Verify the mount point and issuer reference."
+            ) from e
         raise click.ClickException(
             f"Failed to fetch from Vault PKI mount '{mount_point}', issuer '{issuer_ref}': {e}"
         ) from e

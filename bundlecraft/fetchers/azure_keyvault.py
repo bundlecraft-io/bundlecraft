@@ -32,6 +32,19 @@ def _import_azure_identity():
         ) from e
 
 
+def _import_cryptography():
+    """Import cryptography dependencies for certificate conversion."""
+    try:
+        from cryptography import x509  # type: ignore
+        from cryptography.hazmat.primitives import serialization  # type: ignore
+
+        return x509, serialization
+    except Exception as e:  # pragma: no cover
+        raise click.ClickException(
+            "Azure Key Vault fetcher requires 'cryptography' package for DER to PEM conversion."
+        ) from e
+
+
 def fetch_azure_keyvault(
     dest_dir: Path,
     name: str,
@@ -150,9 +163,7 @@ def fetch_azure_keyvault(
         cert_bytes = certificate.cer
 
         # Convert DER to PEM
-        from cryptography import x509
-        from cryptography.hazmat.primitives import serialization
-
+        x509, serialization = _import_cryptography()
         cert_obj = x509.load_der_x509_certificate(cert_bytes)
         pem_data = cert_obj.public_bytes(serialization.Encoding.PEM).decode("utf-8")
 

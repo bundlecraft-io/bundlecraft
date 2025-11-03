@@ -8,11 +8,13 @@ import click
 from bundlecraft.helpers.fetch_utils import get_fetch_config
 
 
-def _import_boto3():
+def _import_boto3_and_config():
+    """Import boto3 and botocore.config together to handle dependencies."""
     try:
         import boto3  # type: ignore
+        from botocore.config import Config  # type: ignore
 
-        return boto3
+        return boto3, Config
     except Exception as e:  # pragma: no cover - tested via behavior
         raise click.ClickException(
             "S3 fetcher requires 'boto3' package. Install with: pip install 'bundlecraft[fetchers]'"
@@ -53,7 +55,11 @@ def fetch_s3(
       - backoff_factor: exponential backoff multiplier
       - retry_on_status: HTTP status codes to retry on
     """
-    boto3 = _import_boto3()
+    boto3, Config = _import_boto3_and_config()
+
+    # Validate required parameters
+    if not bucket or not key:
+        raise click.ClickException("S3 fetch source requires non-empty 'bucket' and 'key'")
 
     # Get fetch configuration with overrides
     fetch_config = get_fetch_config(
@@ -93,8 +99,6 @@ def fetch_s3(
     aws_region = region or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1"
 
     # Build boto3 config for retries
-    from botocore.config import Config
-
     boto_config = Config(
         region_name=aws_region,
         retries={"max_attempts": fetch_config["retries"] + 1, "mode": "standard"},
