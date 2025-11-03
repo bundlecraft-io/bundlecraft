@@ -419,6 +419,22 @@ jobs:
           ## Package Contents
           - `bundlecraft-${{ steps.norm.outputs.PEP440_VERSION }}-py3-none-any.whl` - Wheel distribution
           - `bundlecraft-${{ steps.norm.outputs.PEP440_VERSION }}.tar.gz` - Source distribution
+
+          ## Verifying Release Signatures
+
+          All release artifacts can be verified using the BundleCraft GPG public key:
+
+          ```bash
+          # Import the GPG key
+          curl -sL https://raw.githubusercontent.com/bundlecraft-io/bundlecraft/main/docs/public-gpg-key.asc | gpg --import
+
+          # Verify a signed checksum file
+          gpg --verify dist/checksums.sha256.asc dist/checksums.sha256
+          ```
+
+          **Key Fingerprint:** `E836 154B DAC9 16D3 449A  629A B180 BB07 EBF8 E354`
+
+          For more information, see [SECURITY.md](https://github.com/${{ github.repository }}/blob/main/SECURITY.md#contact).
           EOF
 
           # Append changelog
@@ -541,6 +557,22 @@ jobs:
           # or
           podman pull ghcr.io/${{ github.repository }}-test:${{ steps.version.outputs.VERSION }}
           ```
+
+          ## Verifying Release Signatures
+
+          All release artifacts can be verified using the BundleCraft GPG public key:
+
+          ```bash
+          # Import the GPG key
+          curl -sL https://raw.githubusercontent.com/bundlecraft-io/bundlecraft/main/docs/public-gpg-key.asc | gpg --import
+
+          # Verify a signed checksum file
+          gpg --verify dist/checksums.sha256.asc dist/checksums.sha256
+          ```
+
+          **Key Fingerprint:** `E836 154B DAC9 16D3 449A  629A B180 BB07 EBF8 E354`
+
+          For more information, see [SECURITY.md](https://github.com/${{ github.repository }}/blob/main/SECURITY.md#contact).
           EOF
 
           # Append changelog

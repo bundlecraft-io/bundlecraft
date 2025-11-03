@@ -152,6 +152,8 @@ ______________________________________________________________________
 
 - **Primary Contact:** <security@bundlecraft.io>
 - **PGP Key:** [`docs/public-gpg-key.asc`](docs/public-gpg-key.asc)
+- **Key Fingerprint:** `E836 154B DAC9 16D3 449A  629A B180 BB07 EBF8 E354`
+- **Keyserver:** https://keys.openpgp.org/search?q=security%40bundlecraft.io
 - **Project Website:** [https://github.com/bundlecraft](https://github.com/bundlecraft)
 
 ### Verifying Signed Releases
@@ -164,7 +166,7 @@ curl -sL https://raw.githubusercontent.com/bundlecraft-io/bundlecraft/main/docs/
 gpg --verify dist/checksums.sha256.asc dist/checksums.sha256
 ```
 
-For key fingerprint verification and additional keyserver locations, see [`docs/public-gpg-key.asc`](docs/public-gpg-key.asc).
+You can verify the key fingerprint out-of-band before importing. The fingerprint should match: `E836 154B DAC9 16D3 449A  629A B180 BB07 EBF8 E354`
 
 ## Thanks
 
