@@ -46,10 +46,10 @@ ______________________________________________________________________
 | **PKCS / CMS** | PKCS#7 (degenerate “chain only”) | `.p7b`, `.p7c` | Cert chain; no private keys | ✅ | ✅ | `cryptography` PKCS7 serialization (degenerate SignedData) | **Now** | Widely accepted by Windows/Java tooling for trust chains. |
 | | CMS (RFC 5652) | `.cms` | General CMS container | ✅ | ⚠️ | `cryptography` (CMS/PKCS7 overlap) | **Phase 2** | Broader CMS support beyond p7b; add once PKCS#7 path is fully stable and interop-tested. |
 | | PKCS#12 (also Java storetype=PKCS12) | `.p12`, `.pfx` | Certs + (optionally) private key | ✅ | ✅ | `cryptography` `serialize_key_and_certificates` | **Now** | Common cross-platform keystore. Can serve as a Java TrustStore with `-storetype PKCS12`. Trust-only variant when feasible. |
-| **Java Keystores** | BCFKS (Bouncy Castle FIPS KeyStore) | `.bcfks` | Keystore (certs/keys) | ✅ | ❌ | Java `keytool` + BC(FIPS/non-FIPS) providers | **Phase 2 (Priority)** | Enterprise priority; FIPS-friendly. Implement via conversion utilities in `convert_utils`; record provider versions in manifest. |
-| | JKS | `.jks` | Keystore (legacy) | ✅ | ❌ | Java `keytool` | **Supported (Current)**| Legacy but still prevalent. Already implemented in conversion utilities. |
-| | JCEKS | `.jceks` | Keystore incl. secret keys | ✅ | ❌ | Java `keytool` | **Phase 2** | Niche legacy. Implement in conversion utilities if demanded. |
-| | BKS (non-FIPS BC keystore) | `.bks` | Keystore | ✅ | ❌ | Java `keytool` + BC | **Phase 2** | Older BC format; implement in conversion utilities based on demand. |
+| **Java Keystores** | BCFKS (Bouncy Castle FIPS KeyStore) | `.bcfks` | Keystore (certs/keys) | ✅ | ❌ | Java tooling + BC(FIPS/non-FIPS) providers | **Phase 2 (Priority)** | Enterprise priority; FIPS-friendly. Implement via conversion utilities in `convert_utils`; record provider versions in manifest. |
+| | JKS | `.jks` | Keystore (legacy) | ✅ | ✅ | Python `pyjks` library | **Supported (Current)**| Legacy but still prevalent. Implemented natively in conversion utilities using pyjks. |
+| | JCEKS | `.jceks` | Keystore incl. secret keys | ✅ | ❌ | Java tooling | **Phase 2** | Niche legacy. Implement in conversion utilities if demanded. |
+| | BKS (non-FIPS BC keystore) | `.bks` | Keystore | ✅ | ❌ | Java tooling + BC | **Phase 2** | Older BC format; implement in conversion utilities based on demand. |
 | **Microsoft** | SST (Serialized Store via PKCS#7) | `.sst` | Serialized cert store (Windows) | ✅ | ⚠️ | Represent as `.p7b` (alias) | **Not planned** | Too niche and Windows-dependent for building; users can rename `.p7b` to `.sst` if needed. |
 | | SPC | `.spc` | Authenticode cert container | ✅ | ⚠️ | SignTool/Win APIs | **Not planned** | Code-signing specific; not a general trust store. |
 | | P7R | `.p7r` | “Cert response” file | ✅ | ⚠️ | Windows tooling | **Not planned** | Rare/limited value for trust distribution. |
@@ -86,7 +86,7 @@ ______________________________________________________________________
 
 - **JKS (`.jks`):**
 
-  - Already supported via `bundlecraft.helpers.convert_utils`; uses Java `keytool` with deterministic flags.
+  - Already supported via `bundlecraft.helpers.convert_utils`; uses Python `pyjks` library for native keystore operations.
 
 - **Verification:**
 
@@ -100,15 +100,15 @@ ______________________________________________________________________
 
 - **Extend `bundlecraft.helpers.convert_utils`** for additional Java keystores:
 
-  - First target: **BCFKS** (priority) using `keytool` + BC provider.
+  - First target: **BCFKS** (priority) using Java tooling + BC provider.
   - Then: **JCEKS** and **BKS** if demanded.
   - Enforce deterministic flags (cipher, KDF, iteration counts, keystore type).
   - Record tool versions, provider versions, and command parameters in manifest for auditability.
 
 - **Dependencies:**
 
-  - Java `keytool` (required for Java keystores).
-  - Bouncy Castle provider jars (`bcfips` or `bcprov`) for BCFKS/BKS.
+  - Python `pyjks` library (required for JKS keystores).
+  - Java tooling with Bouncy Castle provider jars (`bcfips` or `bcprov`) for BCFKS/BKS (Phase 2).
   - Validate availability before attempting conversion; emit clear error if missing.
 
 - **Configuration:**
@@ -117,7 +117,7 @@ ______________________________________________________________________
 
 - **Testing:**
 
-  - Golden test vectors (keystores + expected listing via `keytool -list -rfc`), MAC verification, and round-trip import into a scratch JVM.
+  - Golden test vectors for keystores, MAC verification, and round-trip import validation using Python libraries or JVM tools as appropriate.
 
 - **Optional CMS (`.cms`)**:
 
@@ -139,7 +139,7 @@ ______________________________________________________________________
 {
   "outputs": ["pem", "p7b", "p12", "jks", "bcfks"],
   "java_config": {
-    "keytool_path": "keytool",
+    "java_path": "java",
     "providers": {
       "bcfips": "/opt/bc/bc-fips-*.jar",
       "bcprov": "/opt/bc/bcprov-*.jar"
@@ -163,7 +163,7 @@ bundlecraft build --outputs pem,p7b,p12,jks,bcfks
 - Implement in `bundlecraft.helpers.convert_utils` alongside existing JKS conversion logic.
 - Prefer **BC FIPS** provider in regulated contexts; fall back to **BC non-FIPS** if requested.
 - Pin algorithms: AES-GCM, PBKDF2-HMAC-SHA-512 with high iteration counts; record parameters in the manifest for auditability.
-- Dependencies: Java `keytool`, BC provider jars (`bcfips`, `bcprov`). Capture tool/jar versions and hashes in `manifest.json`.
+- Dependencies: Java runtime with BC provider jars (`bcfips`, `bcprov`). Capture tool/jar versions and hashes in `manifest.json`.
 
 ______________________________________________________________________
 
@@ -187,15 +187,15 @@ ______________________________________________________________________
 ## Rollout & Testing
 
 - **Golden vectors:** for each format, store a minimal 2-cert chain and a larger mixed chain; verify parse, counts, and expected DN/SKI/AKI across libraries.
-- **Interop:** CI matrix (Linux/Windows/macOS) opening artifacts with platform tools: `keytool`, `certutil (Windows)`, `openssl`, and Python `cryptography`.
+- **Interop:** CI matrix (Linux/Windows/macOS) opening artifacts with platform tools: Java tools (for JKS/BCFKS), `certutil (Windows)`, `openssl`, and Python `cryptography`.
 - **Property tests:** fuzz order and duplicate certs; ensure dedupe and stable output.
 
 ______________________________________________________________________
 
 ## Alternatives Considered
 
-- **Only keytool-based outputs:** rejected for Phase 1 due to portability and dependency weight.
-- **Exclude JKS/JCEKS entirely:** rejected; too much legacy demand. JKS already supported; JCEKS/BKS deferred to Phase 2.
+- **Only Java tooling-based outputs:** rejected for Phase 1; JKS now uses native Python `pyjks` library. BCFKS/JCEKS will require Java tooling in Phase 2.
+- **Exclude JKS/JCEKS entirely:** rejected; too much legacy demand. JKS now supported via `pyjks`; JCEKS/BKS deferred to Phase 2.
 - **Add hash directories now:** rejected due to "single artifact" constraint; revisit with archive packaging.
 - **Create adapter layer:** rejected in favor of extending existing `convert_utils` module to keep conversion logic centralized.
 

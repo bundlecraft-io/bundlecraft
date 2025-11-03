@@ -8,7 +8,7 @@ IMPORTANT: BundleCraft processes CERTIFICATES and PUBLIC KEYS ONLY.
            If you need private keys in your bundles, add them securely via external tooling.
 
 Notes:
-  • Requires OpenSSL and keytool to be installed and available on PATH.
+  • Requires OpenSSL for P7B and P12 conversions.
   • Environment variables TRUST_JKS_PASSWORD and TRUST_P12_PASSWORD are used if needed.
   • Conversion logic implemented in helpers/convert_utils.py.
   • CI/CD safe: will not prompt for passwords unless --prompt is provided.

@@ -8,17 +8,12 @@ Capabilities:
     • verify_manifest() – Validate manifest.json and checksums.sha256 integrity
     • _check_output_files() – Detect empty/missing output files
     • _compare_output_counts() – Compare certificate counts across formats
-
-Requires:
-    - openssl
-    - keytool (for JKS counting)
 """
 
 import datetime as dt
 import hashlib
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -245,47 +240,55 @@ def _count_certs_in_file(file_path: Path) -> int:
             text = file_path.read_text(encoding="utf-8", errors="ignore")
             return text.count("-----BEGIN CERTIFICATE-----")
         if ext == ".p7b":
-            cmd = [
-                "openssl",
-                "pkcs7",
-                "-print_certs",
-                "-in",
-                str(file_path),
-                "-inform",
-                "DER",
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            out = res.stdout
-            n = out.count("-----BEGIN CERTIFICATE-----") or out.count("subject=")
-            return n
+            # Use cryptography module to load and count PKCS#7 certificates
+            from cryptography.hazmat.primitives.serialization import pkcs7
+
+            data = file_path.read_bytes()
+            try:
+                # Try DER format first (most common for .p7b)
+                certs = pkcs7.load_der_pkcs7_certificates(data)
+            except ValueError:
+                # Fallback to PEM format
+                certs = pkcs7.load_pem_pkcs7_certificates(data)
+            return len(certs)
         if ext == ".p12":
-            cmd = [
-                "openssl",
-                "pkcs12",
-                "-in",
-                str(file_path),
-                "-nokeys",
-                "-passin",
-                "pass:changeit",
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            out = res.stdout
-            n = out.count("-----BEGIN CERTIFICATE-----") or out.count("subject=")
-            return n
+            # Use cryptography module to load and count PKCS#12 certificates
+            from cryptography.hazmat.primitives.serialization import pkcs12
+
+            data = file_path.read_bytes()
+            password = os.environ.get("TRUST_P12_PASSWORD", "changeit")
+            # Try with password, then without
+            try:
+                pkey, cert, addl = pkcs12.load_key_and_certificates(
+                    data, password=password.encode()
+                )
+            except Exception:
+                # Try with empty password
+                try:
+                    pkey, cert, addl = pkcs12.load_key_and_certificates(data, password=None)
+                except Exception:
+                    # Last attempt with different password
+                    pkey, cert, addl = pkcs12.load_key_and_certificates(data, password=b"")
+
+            count = 0
+            if cert:
+                count += 1
+            if addl:
+                count += len(addl)
+            return count
         if ext == ".jks":
+            import jks
+
             storepass = os.environ.get("TRUST_JKS_PASSWORD", "changeit")
-            cmd = [
-                "keytool",
-                "-list",
-                "-rfc",
-                "-keystore",
-                str(file_path),
-                "-storepass",
-                storepass,
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            out = res.stdout
-            return out.count("-----BEGIN CERTIFICATE-----")
+            keystore = jks.KeyStore.load(str(file_path), storepass)
+            count = 0
+            for _alias, entry in keystore.entries.items():
+                if isinstance(entry, jks.TrustedCertEntry):
+                    count += 1
+                elif isinstance(entry, jks.PrivateKeyEntry):
+                    # Count certificates in the certificate chain
+                    count += len(entry.cert_chain)
+            return count
     except Exception as e:
         print(f"[WARN] Could not count certs in {file_path}: {e}")
         return 0

@@ -437,7 +437,7 @@ All outputs use standardized naming: `bundlecraft-ca-trust.[FORMAT]`
 
 **Notes:**
 
-- Requires `openssl` and `keytool` binaries in PATH for some formats.
+- Requires `openssl` binary in PATH for P7B and P12 formats.
 - Uses optional environment variables `TRUST_JKS_PASSWORD` and `TRUST_P12_PASSWORD` for keystore password overrides.
 - Only one output format can be produced per invocation.
 - Any supported input format (PEM, DER, P7B, JKS, P12) can be converted to any supported output format (PEM, P7B, JKS, P12, ZIP).
@@ -603,7 +603,7 @@ ______________________________________________________________________
 
 - Always run from the project root or with the package installed.
 - Use `pip install -e .` for iterative local testing.
-- The project expects Python 3.9+ and system utilities `openssl` + `keytool`.
+- The project expects Python 3.9+ and the `openssl` system utility.
 
 ______________________________________________________________________
 

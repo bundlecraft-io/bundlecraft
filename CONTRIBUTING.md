@@ -1,21 +1,12 @@
 # 🧩 Contributing to BundleCraft
 
-A concise guide to contributing changes to BundleCraft and releasing new package versions.
-
-**Quick Navigation:**
-
-- ⚡ Quickstart — Get started in 60 seconds
-- Part 1: Contributing Code Changes — Merge features/fixes into pre-release
-- Releases — Tag-driven release overview
-- Understanding the Codebase — Architecture and structure
-- Testing Your Changes — How to test locally
-- Release Security — Four-layer release security
+A concise guide to contributing changes to BundleCraft, interacting with the code in this repository, and releasing new package versions.
 
 ______________________________________________________________________
 
 ## ⚡ Quickstart
 
-**Contributing code? Get started in 60 seconds:**
+Contributing code:
 
 ```bash
 # 1. Clone the repo
@@ -33,233 +24,28 @@ pip install -e ".[dev]"
 # 4. Create a feature branch
 git checkout -b feature/my-awesome-feature
 
-# 5. Make changes, test locally
+# 5. (Optional) Generate minimal sample configs for testing
+scripts/prepare_test_configs.sh
+
+# 6. Make changes, test locally
 bundlecraft build --env test-example-envconfig --verbose
+
+# 7. Test a pypi/container build with your changes:
+make test-image-build   # container, requires podman/docker
+make test-pypi-build    # pypi package
+
+# 8. Test and lint code
 pytest -v
 black . && ruff check . --fix
 
-# 6. Commit and open PR to pre-release
+# 9. Commit and open PR to pre-release (address pre-commit findings too if any)
 git add .
 git commit -m "feat: describe your feature"
 git push origin feature/my-awesome-feature
 # Open PR on GitHub targeting pre-release branch
 ```
 
-Optional: prepare example testing configs and certs (no setup needed):
-
-```bash
-# Generate minimal example configs (inline test certs)
-scripts/prepare_test_configs.sh
-
-# Then run a quick build using the generated env name
-bundlecraft build --env test-example-envconfig --verbose
-
-# Clean up generated configs and artifacts when done
-scripts/prepare_test_configs.sh --cleanup
-```
-
-Note: The script writes files to `config/sources/.test-example-sourcecfg.yaml` and
-`config/envs/.test-example-envconfig.yaml`. It uses inline test certificates and is for
-local testing only. Set `BUNDLECRAFT_WORKSPACE=/path/to/repo` to override the target workspace.
-
-**Releasing a version? See the Releases section below for the full process.**
-
-______________________________________________________________________
-
-## Part 1: Contributing Code Changes
-
-This section covers how to develop features or fixes and merge them into the `pre-release` branch for staging.
-
-### Overview
-
-1. Create a feature/bugfix branch
-2. Make and test your changes locally
-3. Open a PR to merge into `pre-release`
-4. PR gets reviewed and merged
-
-**Note:** Changes go to `pre-release` first, not `main`. The `main` branch only receives merges from `pre-release` during official releases.
-
-______________________________________________________________________
-
-### Step 1: Get the code
-
-Fork the repo on GitHub, then clone your fork:
-
-```bash
-git clone https://github.com/YOUR_USERNAME/bundlecraft.git
-cd bundlecraft
-```
-
-Or if you have write access, clone directly:
-
-```bash
-git clone https://github.com/bundlecraft-io/bundlecraft.git
-cd bundlecraft
-```
-
-### Step 2: Set up your environment
-
-Ensure some useful system dependencies:
-
-```bash
-# Required for conversions and verification
-sudo apt-get install openssl openjdk-21-jdk-headless  # (for keytool)
-
-# Optional: jq (required for scripts/json-output-examples.sh)
-sudo apt-get install jq
-```
-
-Create a virtual environment and install everything you need:
-
-```bash
-# Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate   # macOS/Linux
-venv\Scripts\activate      # Windows
-
-# Install with runtime dependencies
-pip install -e .
-
-# If needed, install with remote fetch dependencies
-pip install -e ".[fetchers]"
-
-# Or install with dev/test tools
-pip install -e ".[dev]"
-```
-
-This installs:
-
-- The `bundlecraft` CLI in editable mode (your code changes take effect immediately)
-- Optional fetcher dependencies (i.e. hvac for HashiCorp Vault)
-- Optional development tools (black, ruff, pytest)
-
-> **Tip:** Keep your output directory named `dist/` (not `build/`) to avoid conflicts with Python's build tool.
-
-#### Shell Completion (Optional but Recommended for Development)
-
-BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags during development:
-
-```bash
-# Bash - run in your current shell (or add to ~/.bashrc for persistence)
-eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
-
-# Zsh - run in your current shell (or add to ~/.zshrc for persistence)  
-eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
-```
-
-**Notes:**
-
-- Run this **after** activating your venv
-- Completion works for all subcommands (`build`, `verify`, `convert`, etc.) and their flags
-- For persistence, add the `eval` line to your shell's rc file (`~/.bashrc` or `~/.zshrc`)
-- If completion stops working, re-run the `eval` command
-
-### Step 3: Configure Repository (when testing builds/fetches)
-
-> Tip: To skip manual setup for a quick smoke test, run `scripts/prepare_test_configs.sh`.
-> This creates minimal example configs with inline test certs at:
->
-> - `config/sources/.test-example-sourcecfg.yaml`
-> - `config/envs/.test-example-envconfig.yaml`
->
-> Clean up with `scripts/prepare_test_configs.sh --cleanup`.
-
-#### Prepare Certificate Source Configurations
-
-- Bring your own certs, or use `scripts/generate_test_cas.py` to generate some **TEST** CA certificates.
-- Place PEM files in appropriate folders under `cert_sources/`
-- Update `config/sources/` YAMLs to specify what certificates each source will be comprised of
-- Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault, etc..)
-
-#### Prepare Certificate Environment Configurations
-
-- Update `config/envs/` YAMLs to specify which sources to include into which bundles
-- Define where each environment/bundle is meant to be bundled
-- Optionally add various filters and parameters to the final output of the trust store build.
-
-### Step 4: Make your changes
-
-Create or checkout a branch depending on what you're trying to do:
-
-```bash
-# Add a new feature
-git checkout -b feature/my-awesome-feature
-
-# Fix a bug or problem
-git checkout -b bugfix/my-awesome-fix
-
-# Checkout pre-release branch to tag and trigger a pre-release
-git checkout pre-release
-
-# Checkout main branch to tag and trigger a main
-git checkout main
-```
-
-Now you can:
-
-- Edit code in `bundlecraft/`
-- Update docs in `docs/` or the README
-- Add tests in `tests/`
-
-### Step 5: Test core changes (non release branches)
-
-Run the CLI to see your changes in action:
-
-```bash
-bundlecraft build --env test-example-envconfig --verbose
-```
-
-Run the test suite:
-
-```bash
-pytest -v
-```
-
-Format and lint your code:
-
-```bash
-black .
-ruff check . --fix
-```
-
-### Step 6: Local build/test shortcuts (optional)
-
-For a quick end-to-end smoke test of the built wheel and container, the Makefile provides a few simple helpers:
-
-```bash
-# Build a local container image and smoke-test it
-make build-test-image
-make test-image-version     # runs 'bundlecraft --version' in the container
-make test-image-build       # builds + verifies using inline test configs
-
-# Build a local wheel/sdist and smoke-test it in a temp venv
-make build-test-pypi
-make test-pypi-version      # prints installed version from the wheel
-make test-pypi-build        # builds + verifies using inline test configs
-```
-
-Notes:
-
-- These targets do not publish anything; they're strictly local tests.
-- The inline configs are created/cleaned by `scripts/prepare_test_configs.sh`.
-
-### Step 6: Commit and push
-
-```bash
-git add .
-git commit -m "fix: describe what you fixed"
-git push origin fix-something-awesome
-```
-
-### Step 7: Open a Pull Request
-
-Go to GitHub and open a PR from your branch to `main`. In your PR description:
-
-- Explain what changed and why
-- Link any related issues
-- Note how to test/verify the change
-
-Maintainers will review, provide feedback, and merge when ready. PRs are squash-merged to keep history clean.
+**Releasing a new version?** Once your change has been merged to the pre-release branch, you can tag it as a new alpha/beta version and deploy a new pre-release. See ## TODO ## for more details.
 
 ______________________________________________________________________
 
@@ -333,7 +119,7 @@ bundlecraft/
 
 - `utils.py` – Core utilities (filters, merging, config loading)
 - `config_schema.py` – Pydantic validation schemas for all configs
-- `convert_utils.py` – Format conversion helpers (OpenSSL, keytool wrappers)
+- `convert_utils.py` – Format conversion helpers
 - `verify_utils.py` – Verification utilities
 - `atomic_build.py` – Atomic build context manager
 - `sbom.py` – SBOM generation (CycloneDX format)
@@ -346,6 +132,210 @@ bundlecraft/
 - `config/defaults.yaml` – Global defaults for all envs/sources
 - `config/envs/*.yaml` – Environment definitions (bundles, filters, verify policies)
 - `config/sources/*.yaml` – Bundle definitions (sources, fetch specs)
+
+______________________________________________________________________
+
+## Contributing Code Changes
+
+This section covers how to develop features or fixes and merge them into the `pre-release` branch for staging.
+
+### Overview
+
+1. Create a feature/bugfix branch
+2. Make and test your changes locally
+3. Open a PR to merge into `pre-release`
+4. PR gets reviewed and merged
+
+**Note:** Changes go to `pre-release` first, not `main`. The `main` branch only receives merges from `pre-release` during official releases.
+
+______________________________________________________________________
+
+### Step 1: Get the code
+
+Fork the repo on GitHub, then clone your fork:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/bundlecraft.git
+cd bundlecraft
+```
+
+Or if you have write access, clone directly:
+
+```bash
+git clone https://github.com/bundlecraft-io/bundlecraft.git
+cd bundlecraft
+```
+
+### Step 2: Set up your environment
+
+Ensure some useful system dependencies:
+
+```bash
+# Optional: jq (required for scripts/json-output-examples.sh)
+sudo apt-get install jq
+
+# Optional: misc system dependencies, not needed by bundlecraft
+# But, can be useful for overall cert + keystore + crypto testing
+sudo apt-get install openssl     # general cert/key operations
+sudo apt-get install openjdk-21-jdk-headless     # keytool for java stores
+
+```
+
+Create a virtual environment and install everything you need:
+
+```bash
+# Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate   # macOS/Linux
+venv\Scripts\activate      # Windows
+
+# Install with runtime dependencies
+pip install -e .
+
+# If needed, install with remote fetch dependencies
+pip install -e ".[fetchers]"
+
+# Or install with dev/test tools
+pip install -e ".[dev]"
+```
+
+This installs:
+
+- The `bundlecraft` CLI in editable mode (your code changes take effect immediately)
+- Optional fetcher dependencies (i.e. hvac for HashiCorp Vault)
+- Optional development tools (black, ruff, pytest)
+
+> **Tip:** Keep your output directory named `dist/` (not `build/`) to avoid conflicts with Python's build tool.
+
+#### Shell Completion (Optional)
+
+BundleCraft uses Click's shell completion. To enable tab completion for commands, subcommands, and flags during development:
+
+```bash
+# Bash - run in your current shell (or add to ~/.bashrc for persistence)
+eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
+
+# Zsh - run in your current shell (or add to ~/.zshrc for persistence)  
+eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
+```
+
+**Notes:**
+
+- Run this **after** activating your venv
+- Completion works for all subcommands (`build`, `verify`, `convert`, etc.) and their flags
+- For persistence, add the `eval` line to your shell's rc file (`~/.bashrc` or `~/.zshrc`)
+- If completion stops working, re-run the `eval` command
+
+### Step 3: Configure Repository (when testing builds/fetches)
+
+> Tip: To skip manual setup for a quick smoke test, run `scripts/prepare_test_configs.sh`.
+> This creates minimal example configs with inline test certs at:
+>
+> - `config/sources/.test-example-sourcecfg.yaml`
+> - `config/envs/.test-example-envconfig.yaml`
+>
+> Clean up with `scripts/prepare_test_configs.sh --cleanup`.
+
+#### Prepare Certificate Source Configurations
+
+- Bring your own certs, or use `scripts/generate_test_cas.py` to generate some **TEST** CA certificates.
+- Place PEM files in appropriate folders under `cert_sources/`
+- Update `config/sources/` YAMLs to specify what certificates each source will be comprised of
+- Optionally add a `fetch:` section to stage certificates from trusted remote origins (HTTPS/API/Vault, etc..)
+
+#### Prepare Certificate Environment Configurations
+
+- Update `config/envs/` YAMLs to specify which sources to include into which bundles
+- Define where each environment/bundle is meant to be bundled
+- Optionally add various filters and parameters to the final output of the trust store build.
+
+### Step 4: Make your changes
+
+Create or checkout a branch depending on what you're trying to do:
+
+```bash
+# Add a new feature
+git checkout -b feature/my-awesome-feature
+
+# Fix a bug or problem
+git checkout -b bugfix/my-awesome-fix
+
+# Checkout pre-release branch to tag and trigger a pre-release
+git checkout pre-release
+
+# Checkout main branch to tag and trigger a main
+git checkout main
+```
+
+Now you can:
+
+- Edit code in `bundlecraft/`
+- Update docs in `docs/` or the README
+- Add tests in `tests/`
+
+### Step 5: Test core changes
+
+Run the CLI to see your changes in action:
+
+```bash
+bundlecraft build --env test-example-envconfig --verbose
+```
+
+Run the pytest suite:
+
+```bash
+pytest -v
+```
+
+**PROTIP:** consider adding an accompanying test if any BundleCraft functionality has been added/modified ☺️
+
+Format and lint your code (the pre-commit hook will also do this):
+
+```bash
+black .
+ruff check . --fix
+```
+
+### Step 6: Local build/test shortcuts
+
+For a quick end-to-end smoke test of the built wheel and container, the Makefile provides a few simple helpers:
+
+```bash
+# Build a local container image and smoke-test it
+make build-test-image
+make test-image-version  # runs 'bundlecraft --version' in the container
+make test-image-build    # builds + verifies using inline test configs
+make test-image-run      # run the image with your own args (i.e. BUNDLECRAFT_ARGS='build-all')
+
+# Build a local wheel/sdist and smoke-test it in a temp venv
+make build-test-pypi
+make test-pypi-version   # prints installed version from the wheel
+make test-pypi-build     # builds + verifies using inline test configs
+make test-pypi-run       # run the package with your own args (i.e. BUNDLECRAFT_ARGS='build-all')
+```
+
+Notes:
+
+- These targets do not publish anything; they're strictly local tests.
+- The inline configs are created/cleaned by `scripts/prepare_test_configs.sh`.
+
+### Step 8: Commit and push
+
+```bash
+git add .
+git commit -m "fix: describe what you fixed"
+git push origin fix-something-awesome
+```
+
+### Step 9: Open a Pull Request
+
+Go to GitHub and open a PR from your branch to `pre-release`. In your PR description:
+
+- Explain what changed and why
+- Link any related issues
+- Note how to test/verify the change
+
+Maintainers will review, provide feedback, and merge when ready. PRs are squash-merged to keep history clean.
 
 ______________________________________________________________________
 
@@ -407,273 +397,118 @@ ______________________________________________________________________
 
 ## 🧾 Coding Standards
 
-We keep things simple and consistent:
+Keep things simple and consistent, follow [PEP 8](https://peps.python.org/pep-0008/).
+  
+______________________________________________________________________
 
-- Follow [PEP 8](https://peps.python.org/pep-0008/)
-
-## 🚀 Releases (short and sweet)
+## 🚀 Releases
 
 Releases are driven by tags and handled by GitHub Actions:
 
-- Tag format for production: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.3`)
-- Tag format for pre-release: `vMAJOR.MINOR.PATCH-(alpha|beta).N` (e.g., `v1.2.3-beta.1`)
+- Tag format for production: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.3`) - Tagged from `main` branch
+- Tag format for pre-release: `vMAJOR.MINOR.PATCH-(alpha|beta).N` (e.g., `v1.2.3-beta.1`) - Tagged from `pre-release` branch
+
+**Release Workflow:**
+
+1. **Pre-releases**: Push tags to `pre-release` branch → Publishes to TestPyPI + GHCR
+2. **Production**: Push tags to `main` branch → Publishes to PyPI + GHCR after approval
 
 When you push a valid tag to GitHub, CI builds the package, publishes (after environment approval), builds/pushes the container image, and creates a GitHub Release. See `docs/CI-CD.md` for details.
 
-### Release Security
-
-BundleCraft uses a **four-layer security model** for PyPI releases:
-
-```text
-Developer → Tag Push → Branch Protection → Environment Approval → Trusted Publishing → PyPI
-             (v0.2.0)   (Tests must pass)  (Human review)        (OIDC signature)    (Live)
-```
-
-#### Security Layers Explained
-
-##### Layer 1: Branch Protection
-
-- Prevents direct commits to `main`
-- Requires PR approval before merge
-- Requires tests to pass before merge
-- Ensures code review happens
-
-##### Layer 2: Tag Protection
-
-- Only maintainers can create `v*` tags
-- Prevents unauthorized releases
-- Tags trigger the release workflow
-
-##### Layer 3: Environment Approval
-
-- Human review required before PyPI publish
-- Reviewer checks version, tests, artifacts
-- Can cancel during review
-- 5-minute wait timer (optional grace period)
-
-##### Layer 4: Trusted Publishing (OIDC)
-
-- No API tokens needed
-- GitHub signs workflow identity
-- PyPI verifies signature
-- Can't be used outside specific workflow
-- Can't be stolen or leaked
-
-#### Initial Security Setup
-
-##### 1. Branch Protection (Settings → Branches → Add rule for `main`)
-
-```yaml
-✅ Require pull request before merging
-   └─ Require approvals: 1
-   └─ Dismiss stale approvals when new commits pushed
-
-✅ Require status checks to pass before merging
-   └─ Require branches to be up to date
-   Required checks:
-      - test / Run Tests
-      - test / Run linting
-
-✅ Require conversation resolution before merging
-
-✅ Do not allow bypassing the above settings
-
-✅ Restrict who can push to matching branches
-   └─ Only: Administrators, Maintainers
-```
-
-##### 2. Tag Protection (Settings → Tags → Add rule)
-
-```yaml
-Pattern: v*
-Who can create: Maintainers only
-```
-
-##### 3. Environment Protection (Settings → Environments → Create `release`)
-
-```yaml
-Environment name: release
-
-Protection rules:
-✅ Required reviewers: 1-2 trusted maintainers
-   Example: @maintainer1, @maintainer2
-
-✅ Wait timer: 5 minutes (optional - gives grace period to cancel)
-
-✅ Deployment branches and tags
-   Pattern: refs/tags/v*
-   (Only version tags can deploy)
-```
-
-##### 4. PyPI Trusted Publishing (<https://pypi.org/manage/account/publishing/>)
-
-```yaml
-Add a new publisher:
-  PyPI Project Name: bundlecraft
-  Owner: bundlecraft-io
-  Repository: bundlecraft
-  Workflow: release.yaml
-  Environment: release
-```
-
-After first release, the "pending" publisher becomes active.
-
-#### How Environment Approval Works
+### Deploying a new Release / Pre-Release
 
 ```bash
-# 1. You push a tag
-git tag v0.2.0
-git push origin v0.2.0
+# 1. Clone the repo
+git clone https://github.com/bundlecraft-io/bundlecraft.git
+cd bundlecraft
 
-# 2. GitHub Actions starts:
-#    ✅ Runs tests
-#    ✅ Builds wheel and sdist
-#    ✅ Pauses at publish-pypi job
+# 2. Checkout the proper branch
+git checkout -b pre-release     # For test/staging releases
+git checkout -b main            # For official releases
 
-# 3. GitHub notifies required reviewers
+# 3. Update CHANGELOG with the new upcoming version
+vi CHANGELOG.md
 
-# 4. Reviewer checks:
-#    - Version number correct? (v0.2.0)
-#    - Tests passed?
-#    - Build artifacts look good?
-#    - Changelog updated?
-#    - Ready for users?
+# 4. Create a tag named after that version:
+git tag v1.2.3-beta.1     # For tags in pre-release
+git tag v1.2.3            # For tags in main
 
-# 5. Reviewer clicks "Approve and deploy" in GitHub UI
-
-# 6. Publish proceeds to PyPI
-
-# 7. Verify on PyPI:
-#    https://pypi.org/project/bundlecraft/
+# 5. Push the tag to GitHub, trigger the release job
+git push origin --tags
 ```
 
-#### How Trusted Publishing Works
+Once the release workflow finishes successfully, your new version of BundleCraft is ready to be installed from PyPi/GCR 🎉 A GitHub release with the details of the change will also be published to this repository.
 
-```text
-GitHub Actions Workflow
-         ↓
-Request OIDC token from GitHub
-         ↓
-GitHub signs token with identity:
-  - Repository: bundlecraft-io/bundlecraft
-  - Workflow: release.yaml
-  - Environment: release
-  - Tag: refs/tags/v0.2.0
-         ↓
-Send package + OIDC token to PyPI
-         ↓
-PyPI verifies signature matches trusted publisher
-         ↓
-✅ Publish succeeds (valid signature)
-❌ Publish fails (invalid/unauthorized)
-```
+From here, see the Quickstart section in [README.md](README.md) for general instructions on using the BundleCraft package, or alternatively read on for some specific instructions in regards to using and testing with the pre-release version package.
 
-**Security benefits:**
+### Testing Pre-Release Versions
 
-- No API tokens to leak
-- No token rotation needed
-- Only works from specific workflow
-- Only works from specific repository
-- Only works from environment-protected jobs
-
-#### Workflow Security Features
-
-The `.github/workflows/release.yaml` includes:
-
-**Minimal Permissions:**
-
-```yaml
-permissions:
-  contents: write  # Only for GitHub releases
-  id-token: write  # Only for PyPI OIDC
-```
-
-**Tag Validation:**
-
-```yaml
-# Ensures only semantic versions are released
-if [[ ! "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-  exit 1
-fi
-```
-
-**Test Requirements:**
-
-```yaml
-publish-pypi:
-  needs: [test, build]  # Can't publish without passing tests
-```
-
-**Artifact Verification:**
-
-```yaml
-- name: Verify package
-  run: twine check dist/*
-```
-
-#### Emergency Procedures
-
-**To cancel a release:**
-
-1. **Before approval:** Don't approve the deployment (it will timeout)
-2. **During wait timer:** Click "Cancel deployment" in Actions UI
-3. **After PyPI publish:** ⚠️ Can't unpublish! Release patch version with fix
-
-**If malicious tag is pushed:**
+#### Installing Pre-Release Packages from TestPyPI
 
 ```bash
-# 1. Delete the tag immediately
-git tag -d v0.2.0              # Local
-git push origin :refs/tags/v0.2.0  # Remote
+# Install the latest pre-release version from TestPyPI
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ bundlecraft
 
-# 2. Workflow will fail (no approval)
+# Install a specific pre-release version
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ bundlecraft==1.2.3-beta.1
 
-# 3. Check audit logs
-# Settings → Security → Audit log
-# Filter: action:tag.create
+# Upgrade to latest pre-release (if you have an older version)
+pip install --upgrade --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ bundlecraft
 
-# 4. Review tag protection settings
-# Ensure only maintainers can create v* tags
+# Verify version
+bundlecraft --version
 ```
 
-#### Security Checklist
+> **Why TestPyPI?** Pre-releases use TestPyPI to avoid cluttering the main PyPI with beta versions, while `--extra-index-url https://pypi.org/simple/` ensures all dependencies (like `click`, `pydantic`, etc.) are still available from the main PyPI.
 
-**Before first release:**
+#### Running Pre-Release Container Images
 
-- [ ] Branch protection enabled on `main`
-- [ ] Tag protection enabled for `v*`
-- [ ] Environment `release` created
-- [ ] Required reviewers configured (1-2 maintainers)
-- [ ] Deployment branches set to `refs/tags/v*`
-- [ ] PyPI Trusted Publisher configured
-- [ ] Workflow references `environment: release`
-- [ ] Test with a test tag to verify setup
+Pre-release container images are published to GitHub Container Registry (Docker instructions used for simplicity):
 
-**After each release:**
+```bash
+# Run the latest pre-release image
+docker run --rm ghcr.io/bundlecraft-io/bundlecraft:pre-release --version
 
-- [ ] Package appears on PyPI
-- [ ] Installation works: `pip install bundlecraft==X.Y.Z`
-- [ ] GitHub Release created
-- [ ] Audit logs show no unexpected activity
+# Run a specific pre-release version
+docker run --rm ghcr.io/bundlecraft-io/bundlecraft:1.2.3-beta.1 --version
 
-#### Security Best Practices
+# Mount configs and run a build with pre-release image
+docker run --rm \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/cert_sources:/app/cert_sources \
+  -v $(pwd)/dist:/app/dist \
+  ghcr.io/bundlecraft-io/bundlecraft:pre-release \
+  build --env your-env-config --verbose
 
-**DO:**
+# Get shell access for debugging
+docker run --rm -it \
+  -v $(pwd):/workspace \
+  --entrypoint /bin/bash \
+  ghcr.io/bundlecraft-io/bundlecraft:pre-release
+```
 
-- ✅ Always release from `main` branch
-- ✅ Use semantic versioning (v1.0.0, v1.2.3)
-- ✅ Review diff before approving deployment
-- ✅ Test on Test PyPI for major releases
-- ✅ Document breaking changes
-- ✅ Keep reviewer list current
+#### Available Pre-Release Tags
 
-**DON'T:**
+- `pre-release` - Always points to the latest pre-release version
+- `1.2.3-beta.1` - Specific pre-release version tags
+- `1.2.3-alpha.1` - Alpha versions for early testing
 
-- ❌ Share API tokens (not needed!)
-- ❌ Bypass branch protection
-- ❌ Create release tags from feature branches
-- ❌ Approve without reviewing
-- ❌ Use non-semantic versions
+#### When to Use Pre-Release Versions
+
+**Use pre-releases for:**
+
+- Testing new features before production
+- Verifying bug fixes work in your environment  
+- Contributing feedback on upcoming changes
+- CI/CD pipeline testing with latest features
+
+**Don't use pre-releases for:**
+
+- Production environments
+- Critical infrastructure
+- When stability is more important than features
+
+> **Note:** Pre-release versions are only published when tags are pushed to the `pre-release` branch. They become available on TestPyPI and GHCR within a few minutes of the tag push.
 
 ______________________________________________________________________
 
@@ -697,6 +532,8 @@ Handy commands for common tasks:
 | Action | Command |
 | -------------------- | ------------------------------------------------------------- |
 | Install for dev | `pip install -e ".[dev]"` |
+| Install pre-release | `pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ bundlecraft` |
+| Test pre-release container | `docker run --rm ghcr.io/bundlecraft-io/bundlecraft:pre-release --version` |
 | Format code | `black .` |
 | Lint code | `ruff check . --fix` |
 | Run tests | `pytest -v` |
@@ -710,19 +547,11 @@ ______________________________________________________________________
 
 ## 🤝 Pull Request Guidelines
 
-We keep it simple for small projects:
+It's a small project, so it's all quite simple:
 
-1. **Fork or branch** from `main`
+1. **Fork or branch** from `pre-release` (always has the latest, somewhat stable changes)
 1. **Test your changes** – Run `pytest`, `black`, and `ruff` locally
-1. **Update docs** – If behavior changes, update relevant docs
-1. **Write a clear description**:
-   - What changed and why
-   - How to test/verify
-   - Link related issues or ADRs
-1. **Expect feedback** – Reviews happen quickly; we're here to help
-1. **Squash-merge** – Maintainers will squash commits to keep history clean
-
-**Commit signing is encouraged but not required.**
+1. **Update docs** – If behavior changes, update relevant docs, especially [CHANGELOG.md](CHANGELOG.md)
 
 ______________________________________________________________________
 

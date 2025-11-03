@@ -16,14 +16,9 @@ Strategy:
   1) Normalize any input into a canonical PEM bundle (certificates only).
   2) Reuse existing writers to emit bundle formats from that PEM bundle.
   3) Private keys are ignored and excluded from all operations.
-
-Requires:
-  - openssl (for p7b / p12)
-  - keytool (for jks)
 """
 
 import os
-import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
@@ -288,8 +283,11 @@ def create_p7b(pem_path: Path, build_root: Path, output_basename: str, force: bo
     """
     Convert PEM → PKCS#7 (.p7b, DER) including ALL certs.
 
-    Use -certfile (not -in) so OpenSSL ingests the entire bundle.
+    Uses Python cryptography module to create PKCS#7 bundle.
     """
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+
     out_path = build_root / f"{output_basename}.p7b"
     if out_path.exists() and not force:
         raise FileExistsError(f"Output file exists: {out_path}. Use --force to overwrite.")
@@ -305,29 +303,25 @@ def create_p7b(pem_path: Path, build_root: Path, output_basename: str, force: bo
         print(f"[WARN] No certificates found in {pem_path}; skipping P7B.")
         return
 
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".pem", text=True)
-    try:
-        # Write PEM blocks to temp file
-        with os.fdopen(tmp_fd, "w") as tmp:
-            tmp.write("".join(blocks))
+    # Load all certificates from PEM blocks
+    certs = []
+    for blk in blocks:
+        try:
+            cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
+            certs.append(cert)
+        except Exception as e:
+            print(f"[WARN] Failed to load certificate: {e}")
+            continue
 
-        # Now run openssl with the closed temp file
-        cmd = [
-            "openssl",
-            "crl2pkcs7",
-            "-nocrl",
-            "-certfile",
-            tmp_path,
-            "-out",
-            str(out_path),
-            "-outform",
-            "DER",
-        ]
-        subprocess.run(cmd, check=True)
-    finally:
-        # Clean up temp file
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+    if not certs:
+        print(f"[WARN] No valid certificates found in {pem_path}; skipping P7B.")
+        return
+
+    # Create PKCS#7 bundle using cryptography
+    from cryptography.hazmat.primitives.serialization import Encoding
+
+    p7b_data = pkcs7.serialize_certificates(certs, Encoding.DER)
+    out_path.write_bytes(p7b_data)
 
     print(f"[INFO] Created P7B: {out_path}")
 
@@ -336,9 +330,10 @@ def create_jks(
     pem_path: Path, build_root: Path, output_basename: str, overrides: dict, force: bool = False
 ):
     """
-    Create a Java KeyStore (JKS) from a PEM bundle.
+    Create a Java KeyStore (JKS) from a PEM bundle using pyjks.
     Imports each certificate individually with alias naming controlled by alias_format.
     """
+    import jks
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
 
@@ -361,48 +356,40 @@ def create_jks(
     text = pem_path.read_text(encoding="utf-8", errors="ignore")
     blocks = _split_pem_blocks(text)
 
-    with tempfile.TemporaryDirectory() as td:
-        td = Path(td)
-        for idx, blk in enumerate(blocks, 1):
-            try:
-                cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
-                cn = _get_cn(cert)
-                serial = f"{cert.serial_number:X}"
-                from cryptography.hazmat.primitives import hashes
+    # Create a new JKS keystore
+    keystore = jks.KeyStore.new("jks", [])
 
-                fp_sha256 = cert.fingerprint(hashes.SHA256()).hex()
-                fp_sha1 = cert.fingerprint(hashes.SHA1()).hex()
-                alias = _format_alias(
-                    alias_format,
-                    cn,
-                    serial,
-                    fingerprint_sha1=fp_sha1,
-                    fingerprint_sha256=fp_sha256,
-                )
-                alias = _sanitize_alias(alias)
+    for idx, blk in enumerate(blocks, 1):
+        try:
+            cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
+            cn = _get_cn(cert)
+            serial = f"{cert.serial_number:X}"
+            from cryptography.hazmat.primitives import hashes
 
-                tmp_pem = td / f"cert{idx}.pem"
-                tmp_pem.write_text(blk, encoding="utf-8")
+            fp_sha256 = cert.fingerprint(hashes.SHA256()).hex()
+            fp_sha1 = cert.fingerprint(hashes.SHA1()).hex()
+            alias = _format_alias(
+                alias_format,
+                cn,
+                serial,
+                fingerprint_sha1=fp_sha1,
+                fingerprint_sha256=fp_sha256,
+            )
+            alias = _sanitize_alias(alias)
 
-                cmd = [
-                    "keytool",
-                    "-importcert",
-                    "-noprompt",
-                    "-alias",
-                    alias,
-                    "-file",
-                    str(tmp_pem),
-                    "-keystore",
-                    str(out_path),
-                    "-storepass",
-                    storepass,
-                ]
-                # Capture keytool output to suppress its generic message
-                subprocess.run(cmd, check=True, capture_output=True, text=True)
-                # Print our own formatted message with the cert alias
-                print(f"  [JKS] ✓ Imported: {alias}")
-            except Exception as e:
-                print(f"  [JKS] ✗ Failed to import cert {idx}: {e}")
+            # Convert PEM to DER for pyjks
+            cert_der = cert.public_bytes(Encoding.DER)
+
+            # Create a trusted certificate entry
+            cert_entry = jks.TrustedCertEntry.new(alias, cert_der)
+            keystore.entries[alias] = cert_entry
+
+            print(f"  [JKS] ✓ Imported: {alias}")
+        except Exception as e:
+            print(f"  [JKS] ✗ Failed to import cert {idx}: {e}")
+
+    # Save the keystore
+    keystore.save(str(out_path), storepass)
 
     print(f"[INFO] Created JKS: {out_path}")
 
@@ -414,10 +401,14 @@ def create_pkcs12(
     Create a single PKCS#12 (.p12) containing ALL certificates from the PEM bundle.
 
     IMPORTANT: Private keys are NOT supported. Only certificates are included.
-    Use: -in (first cert) + -certfile (rest) to include entire set.
+    Uses Python cryptography module to create PKCS#12 file.
     """
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives.serialization import (
+        BestAvailableEncryption,
+        NoEncryption,
+    )
 
     alias_format = overrides.get("alias_format", "{subject.CN}-{fingerprint}")
     password = (
@@ -441,57 +432,50 @@ def create_pkcs12(
         print(f"[WARN] No certificates found in {pem_path}; skipping PKCS#12.")
         return
 
-    # First + rest strategy
-    first_pem = blocks[0]
-    rest_pems = blocks[1:]
+    # Load all certificates
+    certs = []
+    for blk in blocks:
+        try:
+            cert = x509.load_pem_x509_certificate(blk.encode(), default_backend())
+            certs.append(cert)
+        except Exception as e:
+            print(f"[WARN] Failed to load certificate: {e}")
+            continue
 
-    with tempfile.TemporaryDirectory() as td:
-        td = Path(td)
-        first_file = td / "first.pem"
-        first_file.write_text(first_pem, encoding="utf-8")
+    if not certs:
+        print(f"[WARN] No valid certificates found in {pem_path}; skipping PKCS#12.")
+        return
 
-        rest_file = None
-        if rest_pems:
-            rest_file = td / "rest.pem"
-            rest_file.write_text("".join(rest_pems), encoding="utf-8")
+    # Get alias from the first cert for naming
+    first_cert = certs[0]
+    cn = _get_cn(first_cert)
+    serial = f"{first_cert.serial_number:X}"
+    from cryptography.hazmat.primitives import hashes
 
-        # Alias from the first cert
-        first_cert = x509.load_pem_x509_certificate(first_pem.encode(), default_backend())
-        cn = _get_cn(first_cert)
-        serial = f"{first_cert.serial_number:X}"
-        from cryptography.hazmat.primitives import hashes
+    fp_sha256 = first_cert.fingerprint(hashes.SHA256()).hex()
+    fp_sha1 = first_cert.fingerprint(hashes.SHA1()).hex()
+    alias = _format_alias(
+        alias_format,
+        cn,
+        serial,
+        fingerprint_sha1=fp_sha1,
+        fingerprint_sha256=fp_sha256,
+    )
+    alias = _sanitize_alias(alias)
 
-        fp_sha256 = first_cert.fingerprint(hashes.SHA256()).hex()
-        fp_sha1 = first_cert.fingerprint(hashes.SHA1()).hex()
-        alias = _format_alias(
-            alias_format,
-            cn,
-            serial,
-            fingerprint_sha1=fp_sha1,
-            fingerprint_sha256=fp_sha256,
-        )
-        alias = _sanitize_alias(alias)
+    # Create PKCS#12 with no private key (certificates only)
+    # When there's no private key, all certs go into the cas parameter
+    encryption = BestAvailableEncryption(password.encode()) if password else NoEncryption()
 
-        cmd = [
-            "openssl",
-            "pkcs12",
-            "-export",
-            "-nokeys",  # ALWAYS exclude private keys
-            "-in",
-            str(first_file),
-            "-out",
-            str(out_path),
-            "-passout",
-            f"pass:{password}",
-            "-name",
-            alias,
-        ]
-        if rest_file:
-            # Insert before '-out'
-            cmd[6:6] = ["-certfile", str(rest_file)]
+    p12_data = pkcs12.serialize_key_and_certificates(
+        name=alias.encode(),
+        key=None,  # No private key
+        cert=None,  # No primary cert (would require private key)
+        cas=certs,  # All certificates as additional certs
+        encryption_algorithm=encryption,
+    )
 
-        subprocess.run(cmd, check=True)
-
+    out_path.write_bytes(p12_data)
     print(f"[INFO] Created PKCS#12: {out_path}")
 
 
@@ -591,39 +575,50 @@ def normalize_to_pem(
         return output_pem_path, has_keys
 
     if fmt == "jks":
+        import jks
+        from cryptography import x509
+        from cryptography.hazmat.backends import default_backend
+
         pw = password or os.environ.get("TRUST_JKS_PASSWORD")
         if pw is None:
             raise ValueError(
                 "Password required for JKS input; set TRUST_JKS_PASSWORD or provide --password"
             )
-        # Use keytool to get RFC PEM output
-        result = subprocess.run(
-            [
-                "keytool",
-                "-list",
-                "-rfc",
-                "-keystore",
-                str(input_path),
-                "-storepass",
-                pw,
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            check=False,
-            timeout=20,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"keytool failed to read JKS: {result.stdout.strip()[:400]}")
-        pem_text = result.stdout
-        certs = _split_pem_blocks(pem_text)
-        keys = _split_pem_key_blocks(pem_text)
-        if keys:
-            has_keys = True
-        if not certs:
+
+        # Load JKS using pyjks
+        try:
+            keystore = jks.KeyStore.load(str(input_path), pw)
+        except Exception as e:
+            raise RuntimeError(f"Failed to read JKS: {e}") from e
+
+        # Extract certificates
+        pem_blocks = []
+        for alias, entry in keystore.entries.items():
+            if isinstance(entry, jks.TrustedCertEntry):
+                # Convert DER to PEM
+                try:
+                    cert = x509.load_der_x509_certificate(entry.cert, default_backend())
+                    pem_block = cert.public_bytes(Encoding.PEM).decode("utf-8")
+                    pem_blocks.append(pem_block)
+                except Exception as e:
+                    print(f"[WARN] Failed to load certificate '{alias}': {e}")
+            elif isinstance(entry, jks.PrivateKeyEntry):
+                # Private key entry detected - we skip the key but may extract cert chain
+                has_keys = True
+                # Try to extract certificate chain if available
+                for cert_der in entry.cert_chain:
+                    try:
+                        cert = x509.load_der_x509_certificate(cert_der[1], default_backend())
+                        pem_block = cert.public_bytes(Encoding.PEM).decode("utf-8")
+                        pem_blocks.append(pem_block)
+                    except Exception as e:
+                        print(f"[WARN] Failed to load certificate from chain in '{alias}': {e}")
+
+        if not pem_blocks:
             raise ValueError("No certificates found in JKS input")
+
         # Write certificates ONLY
-        output_pem_path.write_text("".join(certs), encoding="utf-8")
+        output_pem_path.write_text("".join(pem_blocks), encoding="utf-8")
         return output_pem_path, has_keys
 
     raise ValueError(f"Unsupported input format: {fmt}")

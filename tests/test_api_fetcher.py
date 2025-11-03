@@ -13,10 +13,10 @@ Tests for:
 
 import urllib.error
 import urllib.request
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-import pytest
 import click
+import pytest
 
 from bundlecraft.fetchers.api import _tls_leaf_fingerprint_sha256, fetch_api
 
@@ -44,7 +44,9 @@ class TestAPIFetcherHTTPS:
 
     def test_accepts_https_endpoint(self, tmp_path):
         """Test that HTTPS endpoints are accepted."""
-        mock_response = create_mock_response(b"-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----")
+        mock_response = create_mock_response(
+            b"-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----"
+        )
 
         with patch("urllib.request.urlopen", return_value=mock_response):
             result = fetch_api(
@@ -94,7 +96,9 @@ class TestAPIFetcherAuthentication:
         # Ensure the env var is not set
         monkeypatch.delenv("MISSING_TOKEN", raising=False)
 
-        with pytest.raises((click.ClickException, KeyError, ValueError), match="Missing API token|not set"):
+        with pytest.raises(
+            (click.ClickException, KeyError, ValueError), match="Missing API token|not set"
+        ):
             fetch_api(
                 endpoint="https://api.example.com/certs",
                 dest_dir=tmp_path,
@@ -235,7 +239,9 @@ class TestAPIFetcherTLSVerification:
             "bundlecraft.fetchers.api._tls_leaf_fingerprint_sha256",
             return_value=actual_fingerprint,
         ):
-            with pytest.raises((click.ClickException, ValueError), match="fingerprint|mismatch|TLS"):
+            with pytest.raises(
+                (click.ClickException, ValueError), match="fingerprint|mismatch|TLS"
+            ):
                 fetch_api(
                     endpoint="https://api.example.com/certs",
                     dest_dir=tmp_path,

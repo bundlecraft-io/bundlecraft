@@ -791,15 +791,17 @@ def main(
     if build_path_cfg:
         # Normalize and validate the build_path (should already be validated by schema)
         build_path_clean = str(build_path_cfg).strip("/")
-        
+
         # Final structure: dist/<env>/<build_path>/<bundle>
         # Note: safe_env is the environment name, build_path_clean is the custom subdirectory
         build_output_base = (ROOT / "dist" / safe_env / build_path_clean).resolve()
-        
+
         # Double-check that resolved path is under dist/<env> (defense in depth)
         expected_root = (ROOT / "dist" / safe_env).resolve()
         if not str(build_output_base).startswith(str(expected_root)):
-            error_msg = f"build_path must remain under dist/{safe_env}/ directory (got: {build_path_cfg})"
+            error_msg = (
+                f"build_path must remain under dist/{safe_env}/ directory (got: {build_path_cfg})"
+            )
             if json_output:
                 json_errors.append(error_msg)
                 from bundlecraft.helpers.json_output import create_build_response, emit_json
@@ -812,7 +814,7 @@ def main(
             else:
                 click.secho(f"[ERROR] {error_msg}", fg="red", err=True)
             sys.exit(ExitCode.CONFIG_ERROR)
-        
+
         # Manifest shows the full path relative to project root
         manifest_build_path = f"dist/{safe_env}/{build_path_clean}"
     else:

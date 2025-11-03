@@ -329,13 +329,7 @@ curl -s https://example.com/certs.pem | sha256sum
 
 **Problem:** Server certificate has been rotated
 
-**Solution:** Update the fingerprint after verifying the certificate change is legitimate:
-```bash
-# Get current server certificate fingerprint
-openssl s_client -connect example.com:443 -servername example.com < /dev/null 2>/dev/null | \
-  openssl x509 -fingerprint -sha256 -noout | \
-  cut -d'=' -f2 | tr -d ':'
-```
+**Solution:** Update the fingerprint after verifying the certificate change is legitimate. You can use Python's cryptography module or other tools to extract the certificate fingerprint.
 
 #### "Token authentication failed" Error
 

@@ -398,7 +398,9 @@ class EnvConfig(BaseModel):
     format_overrides: FormatOverridesModel = Field(default_factory=FormatOverridesModel)
     distribution_metadata: DistributionMetadata | None = None
     metadata: MetadataModel = Field(default_factory=MetadataModel)
-    build_path: str | None = Field(None, description="Custom build output path (relative subdirectory within dist/<env>)")
+    build_path: str | None = Field(
+        None, description="Custom build output path (relative subdirectory within dist/<env>)"
+    )
     output_metadata: OutputMetadata | None = Field(
         None, description="Output metadata for GitOps (annotations/labels with templating)"
     )
@@ -409,27 +411,29 @@ class EnvConfig(BaseModel):
         """Validate build_path to ensure it's a safe relative path."""
         if v is None:
             return v
-        
+
         # Convert to string and normalize
         path_str = str(v).strip()
         if not path_str:
             return None
-        
+
         # No absolute paths (check before stripping slashes)
         if path_str.startswith("/") or (len(path_str) > 1 and path_str[1] == ":"):
             raise ValueError("build_path must be a relative path")
-            
+
         # Remove leading/trailing slashes for further processing
         path_str = path_str.strip("/")
-        
+
         # Security checks: no parent directory traversal
         if ".." in path_str:
             raise ValueError("build_path cannot contain '..' (parent directory references)")
-            
+
         # Don't allow paths that try to escape dist/
         if path_str.startswith("dist/"):
-            raise ValueError("build_path should not include 'dist/' prefix - it will be automatically prefixed")
-            
+            raise ValueError(
+                "build_path should not include 'dist/' prefix - it will be automatically prefixed"
+            )
+
         # Path components validation (no empty components, no special chars)
         components = path_str.split("/")
         for component in components:
@@ -437,8 +441,10 @@ class EnvConfig(BaseModel):
                 raise ValueError("build_path cannot contain empty path components")
             # Allow alphanumeric, hyphens, underscores, dots
             if not all(c.isalnum() or c in "-_." for c in component):
-                raise ValueError("build_path components can only contain alphanumeric characters, hyphens, underscores, and dots")
-        
+                raise ValueError(
+                    "build_path components can only contain alphanumeric characters, hyphens, underscores, and dots"
+                )
+
         return path_str
 
     @field_validator("output_formats")

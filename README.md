@@ -25,7 +25,7 @@ ______________________________________________________________________
 
 Get started with BundleCraft in under 5 minutes using either the container image or Python package.
 
-### Option 1: Using Container (Recommended)
+### Option 1: Using a Container
 
 ```bash
 # Pull the latest container
@@ -169,12 +169,6 @@ tls:
   truststore_password: changeit
 ```
 
-### Next Steps
-
-- 🧱 **For production use**: Start with the [BundleCraft Starter Template](https://github.com/bundlecraft-io/bundlecraft-starter)
-- 📚 **Learn more**: See the [Template Repository](#-template-repository---get-started-quickly) section below
-- 🔧 **Advanced config**: Explore the [Configuration Deep Dive](#-configuration-deep-dive) section
-
 ______________________________________________________________________
 
 ## 🎯 Problems Solved
@@ -210,7 +204,7 @@ Managing certificate trust stores at scale is notoriously difficult. BundleCraft
 
 - **Problem:** "It works on my machine" but fails in CI. Different Python versions, missing tools, inconsistent outputs.
 - **Solution:** Configuration-as-code with deterministic builds. Same inputs = same outputs, every time. Perfect for GitOps workflows.
-- 
+
 ______________________________________________________________________
 
 ## ✨ Features
@@ -221,7 +215,7 @@ ______________________________________________________________________
 - **Multi-format export:** PEM, P7B, JKS, P12, ZIP
 - **Cross-format verification:** expiry, empties, count consistency
 - **Extensible config model:** defaults → environment → bundle
-- **Portable tooling:** Containerized or Python + OpenSSL + Java keytool
+- **Portable tooling:** Pure Python, no system dependencies like OpenSSL or JDK needed
 - **Manifest and checksum generation:** for auditing and release integrity
 - **SBOM generation:** CycloneDX SBOM for supply chain transparency (enabled by default; can be disabled)
 - **GPG signing integration:** Sign release artifacts with detached signatures (`--sign`)
@@ -445,46 +439,6 @@ These can be overridden by environment or source configs.
 
 ______________________________________________________________________
 
-## 🎯 Template Repository - Get Started Quickly
-
-New to BundleCraft and looking to get up and running using it? Use the official template repository for a quick setup within your own BundleCraft config repository:
-
-### 🧱 [BundleCraft Starter Template](https://github.com/bundlecraft-io/bundlecraft-starter)
-
-The template provides:
-
-- ✅ **Complete GitHub Actions workflow** with containerized builds
-- 🔄 **Dynamic build matrix** for parallel environment processing
-- 🔐 **Optional GPG signing** for artifact integrity
-- 📊 **Automatic certificate diff reports** between releases
-- ⚙️ **Highly configurable** for different organizational needs
-
-### Quick Setup
-
-```bash
-# Create a new repository from the template
-gh repo create my-org/my-certificate-bundles --template bundlecraft-io/bundlecraft-starter
-
-# Clone and customize
-git clone https://github.com/my-org/my-certificate-bundles.git
-cd my-certificate-bundles
-
-# Add your certificates
-mkdir -p cert_sources/internal
-cp /path/to/your/rootCA.pem cert_sources/internal/
-
-# Configure your bundles
-# Edit config/sources/*.yaml and config/envs/*.yaml
-
-# Commit and trigger your first build
-git add . && git commit -m "Initial certificate configuration"
-git push origin main
-```
-
-The template is perfect for anyone wanting to adopt BundleCraft with minimal setup!
-
-______________________________________________________________________
-
 ## ⚙️ Environment Variables
 
 BundleCraft supports the following environment variables for configuration:
@@ -521,6 +475,8 @@ ______________________________________________________________________
 - **GPG signing:** Sign all release artifacts with detached GPG signatures (.asc files)
 - **SBOM generation:** Automatic Software Bill of Materials in CycloneDX format
 - **Signature verification:** Built-in verification for signed releases with keyring support
+
+For more, see: [`SECURITY.md`](./SECURITY.md)
 
 ### ✍🏽 Signing Release Artifacts (optional)
 
@@ -564,6 +520,18 @@ For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/R
 
 ______________________________________________________________________
 
+## 💽 Related Repositories
+
+### 🧱 BundleCraft Starter Template Repository
+
+New to BundleCraft and looking to quickly get up and running using it? Use the official template repository for a quick setup within your own BundleCraft config repository: [`BundleCraft Starter Template`](https://github.com/bundlecraft-io/bundlecraft-starter)
+
+### 🧑🏽‍💻 BundleCraft Demo Repository
+
+Want to see a (made up) case study on how BundleCraft solved an organization's PKI problems? Or, want to see some config samples? Check out the BundleCraft demo repo: [`BundleCraft Demo`](https://github.com/bundlecraft-io/bundlecraft-demo)
+
+______________________________________________________________________
+
 ## 📝 Documentation
 
 **See: [`docs/README.md`](docs/README.md)**
@@ -586,8 +554,8 @@ podman run --rm \
   build --env prod
 ```
 
-**Container permission issues?**
-If output files have wrong ownership, the container runs as user ID 1000. Match your user:
+- **Verifier says JKS=0?**
+  Ensure password is correct. The default password is `"changeit"`. Set `TRUST_JKS_PASSWORD` env var if using a different password.
 
 ```bash
 podman run --user $(id -u):$(id -g) --rm \
@@ -601,16 +569,13 @@ podman run --user $(id -u):$(id -g) --rm \
 ### 🔐 Format & Conversion Issues
 
 **Empty P7B files?**
-Ensure OpenSSL is installed and available on PATH. BundleCraft uses `openssl crl2pkcs7 -certfile` for conversion. When using containers, this is handled automatically.
+Ensure your PEM input files contain valid certificates. BundleCraft uses the Python `cryptography` module for all format conversions.
 
 **P12 only contains one certificate?**
-This has been fixed in the current version - the exporter now uses `-in first` + `-certfile rest` for complete bundle inclusion.
+This has been fixed in the current version - all certificates from the bundle are included in the PKCS#12 output.
 
 **Duplicate JKS aliases?**
 The build process removes existing keystores before import to prevent conflicts. Ensure you're using the latest version.
-
-**Verifier reports JKS certificate count as 0?**
-Ensure `keytool` is installed and on PATH. The verifier parses `Alias name:` entries and certificate blocks. When using containers, this is handled automatically.
 
 ### 🔑 Authentication & Secrets
 
@@ -855,8 +820,8 @@ ______________________________________________________________________
 ## 🤝 Contributing
 
 - Issues and PRs are welcome!
-- Please ensure all changes are reflected in relevant docs in [`docs/`](docs/).
-- For more info, see: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
+- Check out [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) before getting started for come community guidelines.
+- See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details on how to interact with the codebase and release process.
 
 ______________________________________________________________________
 
@@ -868,7 +833,7 @@ ______________________________________________________________________
 
 ## 🏷️ Tags & Metadata
 
-- **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, openssl, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, keytool, certificates, pki-tools
+- **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, certificates, pki-tools
 
 ______________________________________________________________________
 
@@ -876,16 +841,15 @@ ______________________________________________________________________
 
 **BundleCraft Ecosystem:**
 
-- [🧱 BundleCraft Starter](https://github.com/bundlecraft-io/bundlecraft-starter) —  Template repository with GitHub Actions workflow for orchestrating your own BundleCraft builds.
+- [🧱 BundleCraft Starter](https://github.com/bundlecraft-io/bundlecraft-starter) -  Template repository with GitHub Actions workflow for orchestrating your own BundleCraft builds.
+- [🧑🏽‍💻 BundleCraft Demo](https://github.com/bundlecraft-io/bundlecraft-demo) -  Mock environment for showcasing BundleCraft's usages and potential applications in the format of sample scenario.
 
 **Standards & Documentation:**
 
-- [RFC 5280 — Internet X.509 PKI Certificate and CRL Profile](https://datatracker.ietf.org/doc/html/rfc5280)
-- [RFC 5652 — Cryptographic Message Syntax (CMS / PKCS#7)](https://datatracker.ietf.org/doc/html/rfc5652)
-- [RFC 7292 — PKCS #12 v1.1 (Personal Information Exchange)](https://datatracker.ietf.org/doc/html/rfc7292)
-- OpenSSL documentation: [pkcs12](https://www.openssl.org/docs/manmaster/man1/openssl-pkcs12.html), [x509](https://www.openssl.org/docs/manmaster/man1/openssl-x509.html), [crl2pkcs7](https://www.openssl.org/docs/manmaster/man1/openssl-crl2pkcs7.html)
-- Java keytool documentation: [keytool](https://docs.oracle.com/javase/8/docs/technotes/tools/unix/keytool.html)
-- OpenSSL Cookbook (practical guide): <https://www.feistyduck.com/library/openssl-cookbook/online/>
+- [RFC 5280 - Internet X.509 PKI Certificate and CRL Profile](https://datatracker.ietf.org/doc/html/rfc5280)
+- [RFC 5652 - Cryptographic Message Syntax (CMS / PKCS#7)](https://datatracker.ietf.org/doc/html/rfc5652)
+- [RFC 7292 - PKCS #12 v1.1 (Personal Information Exchange)](https://datatracker.ietf.org/doc/html/rfc7292)
+- [Python cryptography library documentation](https://cryptography.io/)
 
 ______________________________________________________________________
 

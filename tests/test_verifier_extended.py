@@ -75,7 +75,10 @@ class TestVerifierDirectoryMode:
 
         # Write invalid PEM
         pem_file = build_dir / "corrupt.pem"
-        pem_file.write_text("-----BEGIN CERTIFICATE-----\nINVALID DATA\n-----END CERTIFICATE-----\n", encoding="utf-8")
+        pem_file.write_text(
+            "-----BEGIN CERTIFICATE-----\nINVALID DATA\n-----END CERTIFICATE-----\n",
+            encoding="utf-8",
+        )
 
         result = cli_runner.invoke(verify_main, ["--target", str(build_dir)])
 
@@ -102,9 +105,7 @@ class TestVerifierManifest:
         manifest_file = build_dir / "manifest.json"
         manifest_file.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-        result = cli_runner.invoke(
-            verify_main, ["--target", str(build_dir), "--verify-manifest"]
-        )
+        result = cli_runner.invoke(verify_main, ["--target", str(build_dir), "--verify-manifest"])
 
         # May fail if checksums.sha256 is missing (exit code 30 = VALIDATION_ERROR)
         # The manifest display should happen even if verification fails
@@ -116,9 +117,7 @@ class TestVerifierManifest:
 
         build_dir = temp_workspace / "build"
 
-        result = cli_runner.invoke(
-            verify_main, ["--target", str(build_dir), "--verify-manifest"]
-        )
+        result = cli_runner.invoke(verify_main, ["--target", str(build_dir), "--verify-manifest"])
 
         assert result.exit_code != 0 or "not found" in result.output.lower()
 
@@ -131,9 +130,7 @@ class TestVerifierManifest:
         manifest_file = build_dir / "manifest.json"
         manifest_file.write_text("{ invalid json }", encoding="utf-8")
 
-        result = cli_runner.invoke(
-            verify_main, ["--target", str(build_dir), "--verify-manifest"]
-        )
+        result = cli_runner.invoke(verify_main, ["--target", str(build_dir), "--verify-manifest"])
 
         assert result.exit_code != 0
 
@@ -272,9 +269,7 @@ class TestVerifierErrorHandling:
         """Test graceful error when target directory doesn't exist."""
         cli_runner = CliRunner()
 
-        result = cli_runner.invoke(
-            verify_main, ["--target", str(temp_workspace / "nonexistent")]
-        )
+        result = cli_runner.invoke(verify_main, ["--target", str(temp_workspace / "nonexistent")])
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower() or "error" in result.output.lower()
@@ -305,9 +300,7 @@ class TestVerifierErrorHandling:
         pem_file = temp_workspace / "bundle.pem"
         pem_file.write_text(sample_cert_pem, encoding="utf-8")
 
-        result = cli_runner.invoke(
-            verify_main, ["--target", str(pem_file), "--dry-run"]
-        )
+        result = cli_runner.invoke(verify_main, ["--target", str(pem_file), "--dry-run"])
 
         # dry-run might not be implemented for verify, check gracefully
         assert result.exit_code == 0 or "dry" in result.output.lower()
