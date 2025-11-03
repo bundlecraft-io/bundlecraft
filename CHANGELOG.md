@@ -177,9 +177,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3-beta.32] - 2025-11-03
+
+### Changed
+
+- Minor refactor of `build-all` script location
+- Actual stage of bundlecraft v0.2.0
+
+---
+
 ## Stable Releases
 
-## [0.2.0] - 2025-10-26
+## [0.2.0] - 2025-11-03
 <!-- markdownlint-disable MD024 -->
 
 ### Added
