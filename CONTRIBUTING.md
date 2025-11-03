@@ -393,6 +393,22 @@ ruff check .
 ruff check . --fix  # Auto-fix what's possible
 ```
 
+### Dependency Vulnerability Scanning
+
+Scan for known vulnerabilities in Python dependencies using pip-audit:
+
+```bash
+pip-audit --desc
+```
+
+Scan against pyproject.toml requirements:
+
+```bash
+pip-audit --desc --require pyproject.toml
+```
+
+The CI pipeline automatically runs pip-audit on every push and pull request to detect vulnerabilities in dependencies. The build will fail if high or critical vulnerabilities are found, ensuring supply chain security.
+
 ______________________________________________________________________
 
 ## 🧾 Coding Standards

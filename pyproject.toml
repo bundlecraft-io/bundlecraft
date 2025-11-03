@@ -48,6 +48,7 @@ dev = [
   "yamlfix>=1.17.0",
   "Flask>=3.0.0",
   "flasgger>=0.9.7",
+  "pip-audit>=2.0.0",
 ]
 fetchers = [
   "hvac>=2.0.0",
