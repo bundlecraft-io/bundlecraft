@@ -1,0 +1,182 @@
+# Example source configuration demonstrating all cloud fetcher types
+# This file shows how to configure BundleCraft to fetch certificates from
+# various cloud providers and services.
+#
+# For production use:
+# 1. Replace placeholder values with your actual configuration
+# 2. Set required environment variables (see docs/fetchers.md)
+# 3. Add SHA256 verification for static content
+# 4. Consider TLS certificate pinning for security
+
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
+source_name: cloud-certificates
+description: Example certificates from cloud storage and key management services
+
+fetch:
+  # Mozilla Root Store - Convenience wrapper
+  # Fetches the Mozilla root certificate bundle from curl.se
+  - name: mozilla-roots
+    type: mozilla
+    verify:
+      # Get current SHA256 from: curl -s https://curl.se/ca/cacert.pem | sha256sum
+      sha256: "your-expected-sha256-here"
+    timeout: 60
+    retries: 3
+
+  # AWS S3 - Using IAM role (no credentials needed)
+  # Works on EC2, ECS, Lambda with attached IAM role
+  - name: s3-prod-bundle
+    type: s3
+    bucket: company-certificates
+    key: prod/ca-bundle.pem
+    region: us-east-1
+    verify:
+      sha256: "expected-bundle-sha256"
+    timeout: 60
+    retries: 3
+
+  # AWS S3 - Using explicit credentials
+  # Requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables
+  - name: s3-partner-certs
+    type: s3
+    bucket: partner-pki-exports
+    key: trusted-roots/2024/roots.pem
+    region: eu-west-1
+    access_key_id_ref: PARTNER_AWS_ACCESS_KEY
+    secret_access_key_ref: PARTNER_AWS_SECRET_KEY
+    # session_token_ref: PARTNER_AWS_SESSION_TOKEN  # Optional, for temporary credentials
+    timeout: 90
+    retries: 5
+
+  # AWS S3 - S3-compatible storage (e.g., MinIO, Ceph)
+  - name: minio-internal-ca
+    type: s3
+    bucket: pki-certificates
+    key: internal/ca.pem
+    region: us-east-1
+    endpoint_url: https://minio.company.local:9000
+    access_key_id_ref: MINIO_ACCESS_KEY
+    secret_access_key_ref: MINIO_SECRET_KEY
+    verify:
+      ca_file: config/certs/company-ca.pem  # Custom CA for internal MinIO
+
+  # Azure Blob Storage - Using connection string
+  # Requires AZURE_STORAGE_CONNECTION_STRING environment variable
+  - name: azure-blob-prod
+    type: azure_blob
+    account_name: companystorage
+    container: certificates
+    blob_name: prod/ca-bundle.pem
+    connection_string_ref: AZURE_STORAGE_CONNECTION_STRING
+    timeout: 60
+    retries: 3
+
+  # Azure Blob Storage - Using account key
+  # Requires AZURE_STORAGE_KEY environment variable
+  - name: azure-blob-staging
+    type: azure_blob
+    account_name: stagingstorage
+    container: pki-certs
+    blob_name: staging/roots.pem
+    account_key_ref: AZURE_STAGING_STORAGE_KEY
+    timeout: 60
+    retries: 3
+
+  # Azure Blob Storage - Using managed identity
+  # Works on Azure VMs, App Services, Functions with managed identity
+  - name: azure-blob-managed-identity
+    type: azure_blob
+    account_name: securestorage
+    container: trusted-certificates
+    blob_name: current/ca-bundle.pem
+    # No credentials needed - uses managed identity
+
+  # Google Cloud Storage - Using service account
+  # Requires GOOGLE_APPLICATION_CREDENTIALS pointing to service account JSON
+  - name: gcs-prod-bundle
+    type: gcs
+    bucket: company-pki-certificates
+    blob_name: prod/ca-bundle.pem
+    project_id: my-gcp-project
+    credentials_file_ref: GOOGLE_APPLICATION_CREDENTIALS
+    timeout: 60
+    retries: 3
+
+  # Google Cloud Storage - Using Application Default Credentials
+  # Works on GCE, GKE, Cloud Run with default service account
+  - name: gcs-internal-ca
+    type: gcs
+    bucket: internal-pki
+    blob_name: roots/ca-2024.pem
+    # No credentials needed - uses ADC
+
+  # Azure Key Vault - Using managed identity
+  # Works on Azure VMs, App Services with managed identity
+  - name: akv-root-ca
+    type: azure_keyvault
+    vault_url: https://company-keyvault.vault.azure.net
+    certificate_name: root-ca-2024
+    # No credentials needed - uses managed identity
+
+  # Azure Key Vault - Using service principal
+  # Requires AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID
+  - name: akv-issuing-ca
+    type: azure_keyvault
+    vault_url: https://partner-keyvault.vault.azure.net
+    certificate_name: issuing-ca-prod
+    version: abc123def456789  # Optional - specific version
+    client_id_ref: PARTNER_AZURE_CLIENT_ID
+    client_secret_ref: PARTNER_AZURE_CLIENT_SECRET
+    tenant_id_ref: PARTNER_AZURE_TENANT_ID
+    timeout: 30
+
+  # HashiCorp Vault PKI - Fetch issuer certificate from PKI engine
+  # Requires VAULT_TOKEN and VAULT_ADDR environment variables
+  - name: vault-pki-root
+    type: vault_pki
+    mount_point: pki_root
+    issuer_ref: root-2024
+    addr: https://vault.company.com:8200
+    token_ref: VAULT_TOKEN
+    verify:
+      ca_file: config/certs/vault-ca.pem
+
+  # HashiCorp Vault PKI - Using default issuer
+  - name: vault-pki-intermediate
+    type: vault_pki
+    mount_point: pki_int
+    issuer_ref: default  # Uses default issuer
+    addr: https://vault.company.com:8200
+    token_ref: VAULT_TOKEN
+
+  # HashiCorp Vault PKI - With Vault Enterprise namespace
+  - name: vault-pki-enterprise
+    type: vault_pki
+    mount_point: pki
+    issuer_ref: prod-issuer
+    addr: https://vault-enterprise.company.com:8200
+    token_ref: VAULT_ENTERPRISE_TOKEN
+    namespace: admin/security/pki
+    verify:
+      ca_file: config/certs/vault-enterprise-ca.pem
+
+  # HashiCorp Vault KV - For comparison with PKI fetcher
+  # Fetches from KV store instead of PKI engine
+  - name: vault-kv-legacy
+    type: vault
+    mount_point: secret
+    path: pki/legacy-roots
+    pem_field: certificate_pem
+    addr: https://vault.company.com:8200
+    token_ref: VAULT_TOKEN
+
+# Metadata for tracking and documentation
+metadata:
+  owner: security-team@company.com
+  purpose: Cloud-sourced CA certificates for production trust bundles
+  tags: [cloud, production, external]
+  labels:
+    environment: production
+    managed_by: bundlecraft
+    last_reviewed: "2024-01-15"

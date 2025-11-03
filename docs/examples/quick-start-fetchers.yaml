@@ -1,0 +1,55 @@
+# Quick Start: Common Fetcher Examples
+# Simple configurations for getting started with BundleCraft fetchers
+
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
+source_name: quick-start
+description: Quick start examples for common fetcher scenarios
+
+fetch:
+  # 1. Mozilla Root Store - Simplest option for trusted public roots
+  - name: mozilla-roots
+    type: mozilla
+    # Recommended: Add SHA256 verification (get from curl.se)
+    # verify:
+    #   sha256: "current-bundle-hash"
+
+  # 2. AWS S3 with IAM Role - No credentials needed if running on AWS
+  - name: s3-bundle
+    type: s3
+    bucket: my-cert-bucket
+    key: ca-bundle.pem
+    region: us-east-1
+
+  # 3. Azure Blob with Managed Identity - No credentials needed on Azure
+  - name: azure-bundle
+    type: azure_blob
+    account_name: mystorageaccount
+    container: certificates
+    blob_name: ca-bundle.pem
+
+  # 4. Google Cloud Storage with ADC - No credentials needed on GCP
+  - name: gcs-bundle
+    type: gcs
+    bucket: my-cert-bucket
+    blob_name: ca-bundle.pem
+
+  # 5. HashiCorp Vault PKI - Fetch from PKI engine
+  - name: vault-pki-ca
+    type: vault_pki
+    mount_point: pki
+    issuer_ref: default
+    # Set VAULT_TOKEN and VAULT_ADDR environment variables
+
+  # 6. Azure Key Vault - Fetch certificate
+  - name: keyvault-cert
+    type: azure_keyvault
+    vault_url: https://myvault.vault.azure.net
+    certificate_name: my-root-ca
+    # Uses managed identity by default on Azure
+
+# To use this configuration:
+# 1. Save to config/sources/quick-start.yaml
+# 2. Set required environment variables for authentication
+# 3. Run: bundlecraft fetch --source-config-file config/sources/quick-start.yaml
+# 4. Or integrate into a full build: bundlecraft build --env prod --bundle quick-start
