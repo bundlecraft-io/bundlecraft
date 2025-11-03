@@ -415,6 +415,98 @@ Releases are driven by tags and handled by GitHub Actions:
 
 When you push a valid tag to GitHub, CI builds the package, publishes (after environment approval), builds/pushes the container image, and creates a GitHub Release. See `docs/CI-CD.md` for details.
 
+### GPG Tag Signing
+
+GPG-signed tags are **strongly recommended** for all releases to ensure code integrity and authenticity. This aligns with the security controls documented in [SECURITY.md](SECURITY.md).
+
+#### Setting Up GPG Keys
+
+If you don't already have a GPG key, you'll need to generate one:
+
+```bash
+# Generate a new GPG key (use your real name and email)
+gpg --full-generate-key
+
+# Follow the prompts:
+# - Select RSA and RSA (default)
+# - Key size: 4096 bits (recommended)
+# - Expiration: 2 years (or your preference)
+# - Enter your name and email (use the email associated with your GitHub account)
+
+# List your GPG keys to find the key ID
+gpg --list-secret-keys --keyid-format=long
+
+# The output will look like:
+# sec   rsa4096/YOUR_KEY_ID 2025-01-01 [SC]
+#       ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234
+# uid   [ultimate] Your Name <your.email@example.com>
+
+# Export your public key to add to GitHub
+gpg --armor --export YOUR_KEY_ID
+
+# Copy the output (including the BEGIN and END lines) and add it to:
+# GitHub Settings → SSH and GPG keys → New GPG key
+```
+
+Configure Git to use your GPG key:
+
+```bash
+# Tell Git to use your GPG key for signing
+git config --global user.signingkey YOUR_KEY_ID
+
+# Optional: Automatically sign all commits
+git config --global commit.gpgsign true
+
+# Optional: Automatically sign all tags
+git config --global tag.gpgSign true
+```
+
+For more details, see the [Git documentation on signing your work](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work).
+
+#### Creating Signed Tags
+
+When creating release tags, use the `-s` flag to sign them with your GPG key:
+
+```bash
+# Create a signed tag for a production release
+git tag -s v1.2.3 -m "Release v1.2.3"
+
+# Create a signed tag for a pre-release
+git tag -s v1.2.3-beta.1 -m "Release v1.2.3-beta.1"
+
+# Verify the tag signature locally before pushing
+git tag -v v1.2.3
+
+# Push the signed tag to GitHub
+git push origin v1.2.3
+```
+
+#### Verifying Signed Tags
+
+Anyone can verify that a tag was signed by a trusted maintainer:
+
+```bash
+# Verify a specific tag
+git tag -v v1.2.3
+
+# Import a maintainer's public key first (if needed)
+curl -sL https://raw.githubusercontent.com/bundlecraft-io/bundlecraft/main/docs/public-gpg-key.asc | gpg --import
+
+# Then verify the tag
+git tag -v v1.2.3
+```
+
+#### GitHub Branch Protection (Optional)
+
+To enforce signed commits and tags at the repository level, maintainers with admin access can enable branch protection:
+
+1. Go to **Repository Settings** → **Branches** → **Branch protection rules**
+2. Add or edit a rule for `main` and `pre-release` branches
+3. Enable **Require signed commits**
+4. This ensures all commits (and by extension, tags) must be signed with a verified GPG key
+
+**Note:** This is optional and should be discussed with the maintainer team before enabling, as it requires all contributors to set up GPG signing.
+
 ### Deploying a new Release / Pre-Release
 
 ```bash
@@ -429,13 +521,18 @@ git checkout -b main            # For official releases
 # 3. Update CHANGELOG with the new upcoming version
 vi CHANGELOG.md
 
-# 4. Create a tag named after that version:
-git tag v1.2.3-beta.1     # For tags in pre-release
-git tag v1.2.3            # For tags in main
+# 4. Create a signed tag named after that version (strongly recommended):
+git tag -s v1.2.3-beta.1 -m "Release v1.2.3-beta.1"  # For tags in pre-release
+git tag -s v1.2.3 -m "Release v1.2.3"                # For tags in main
 
-# 5. Push the tag to GitHub, trigger the release job
-git push origin --tags
+# 5. Verify the tag signature before pushing
+git tag -v v1.2.3  # or v1.2.3-beta.1
+
+# 6. Push the tag to GitHub, trigger the release job
+git push origin v1.2.3  # or v1.2.3-beta.1
 ```
+
+**Note:** Using signed tags (`-s` flag) is strongly recommended for security. See the [GPG Tag Signing](#gpg-tag-signing) section above for setup instructions.
 
 Once the release workflow finishes successfully, your new version of BundleCraft is ready to be installed from PyPi/GCR 🎉 A GitHub release with the details of the change will also be published to this repository.
 
