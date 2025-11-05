@@ -139,7 +139,7 @@ fetch:
     verify:
       # Content integrity verification
       sha256: "expected-sha256-hash-of-content"
-      
+
       # TLS validation options
       ca_file: config/certs/trusted-ca.pem          # optional custom CA
       tls_fingerprint_sha256: "leaf-cert-fp"        # optional leaf cert pinning
@@ -185,7 +185,7 @@ fetch:
     region: us-west-2           # optional, uses default AWS region if not specified
     verify:
       sha256: "expected-content-hash"  # optional content verification
-  
+
   # Using explicit bucket and key parameters
   - name: s3_explicit
     type: s3
@@ -194,7 +194,7 @@ fetch:
     region: us-east-1
     verify:
       sha256: "expected-content-hash"
-  
+
   # S3-compatible storage (MinIO, Ceph, etc.)
   - name: minio_bundle
     type: s3
@@ -600,7 +600,7 @@ bundlecraft fetch --env prod --bundle example --verbose
    ```bash
    # ✅ Use environment variables
    export VAULT_TOKEN="hvs.token"
-   
+
    # ❌ Never in YAML files
    # token: "hvs.token"  # DON'T DO THIS
    ```

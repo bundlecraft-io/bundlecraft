@@ -215,7 +215,7 @@ BundleCraft uses Click's shell completion. To enable tab completion for commands
 # Bash - run in your current shell (or add to ~/.bashrc for persistence)
 eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
 
-# Zsh - run in your current shell (or add to ~/.zshrc for persistence)  
+# Zsh - run in your current shell (or add to ~/.zshrc for persistence)
 eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 ```
 
@@ -398,7 +398,7 @@ ______________________________________________________________________
 ## 🧾 Coding Standards
 
 Keep things simple and consistent, follow [PEP 8](https://peps.python.org/pep-0008/).
-  
+
 ______________________________________________________________________
 
 ## 🚀 Releases
@@ -498,7 +498,7 @@ docker run --rm -it \
 **Use pre-releases for:**
 
 - Testing new features before production
-- Verifying bug fixes work in your environment  
+- Verifying bug fixes work in your environment
 - Contributing feedback on upcoming changes
 - CI/CD pipeline testing with latest features
 

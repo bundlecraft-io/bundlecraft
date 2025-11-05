@@ -13,7 +13,7 @@ Tests for:
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import click
 import pytest
@@ -107,14 +107,14 @@ class TestS3FetcherBasicFunctionality:
         # Mock S3 client
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         # Create a mock file to "download"
         test_file = tmp_path / "test.pem"
         test_file.write_text("MOCK CERT DATA\n")
-        
+
         def mock_download_file(bucket, key, local_path):
             Path(local_path).write_text("MOCK CERT DATA\n")
-        
+
         mock_client.download_file.side_effect = mock_download_file
 
         result = fetch_s3(
@@ -126,7 +126,7 @@ class TestS3FetcherBasicFunctionality:
         assert result.exists()
         assert result.name == "root-ca.pem"
         assert result.read_text() == "MOCK CERT DATA\n"
-        
+
         # Verify boto3 was called correctly
         mock_client.download_file.assert_called_once()
         call_args = mock_client.download_file.call_args
@@ -138,10 +138,10 @@ class TestS3FetcherBasicFunctionality:
         """Test fetching using explicit bucket and key parameters."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         def mock_download_file(bucket, key, local_path):
             Path(local_path).write_text("CERT CONTENT\n")
-        
+
         mock_client.download_file.side_effect = mock_download_file
 
         result = fetch_s3(
@@ -153,7 +153,7 @@ class TestS3FetcherBasicFunctionality:
 
         assert result.exists()
         assert result.name == "cert.pem"
-        
+
         mock_client.download_file.assert_called_once()
         call_args = mock_client.download_file.call_args
         assert call_args[0][0] == "my-bucket"
@@ -164,10 +164,10 @@ class TestS3FetcherBasicFunctionality:
         """Test that custom name is used for output file."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         def mock_download_file(bucket, key, local_path):
             Path(local_path).write_text("CERT\n")
-        
+
         mock_client.download_file.side_effect = mock_download_file
 
         result = fetch_s3(
@@ -185,10 +185,10 @@ class TestS3FetcherBasicFunctionality:
         """Test that region parameter is passed to boto3 client."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         def mock_download_file(bucket, key, local_path):
             Path(local_path).write_text("CERT\n")
-        
+
         mock_client.download_file.side_effect = mock_download_file
 
         fetch_s3(
@@ -210,10 +210,10 @@ class TestS3FetcherBasicFunctionality:
         """Test fetching from S3-compatible service with custom endpoint."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         def mock_download_file(bucket, key, local_path):
             Path(local_path).write_text("CERT\n")
-        
+
         mock_client.download_file.side_effect = mock_download_file
 
         fetch_s3(
@@ -253,7 +253,7 @@ class TestS3FetcherErrorHandling:
         """Test helpful error message when AWS credentials are missing."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         # Simulate NoCredentialsError
         mock_client.download_file.side_effect = NoCredentialsError()
 
@@ -270,9 +270,11 @@ class TestS3FetcherErrorHandling:
         """Test helpful error message when S3 bucket doesn't exist."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         # Simulate NoSuchBucket error
-        error_response = {"Error": {"Code": "NoSuchBucket", "Message": "The specified bucket does not exist"}}
+        error_response = {
+            "Error": {"Code": "NoSuchBucket", "Message": "The specified bucket does not exist"}
+        }
         mock_client.download_file.side_effect = ClientError(error_response, "GetObject")
 
         with pytest.raises(click.ClickException, match="S3 bucket not found.*my-bucket"):
@@ -288,10 +290,13 @@ class TestS3FetcherErrorHandling:
         """Test helpful error message when S3 object doesn't exist."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         # Simulate NoSuchKey error
         from botocore.exceptions import ClientError
-        error_response = {"Error": {"Code": "NoSuchKey", "Message": "The specified key does not exist"}}
+
+        error_response = {
+            "Error": {"Code": "NoSuchKey", "Message": "The specified key does not exist"}
+        }
         mock_client.download_file.side_effect = ClientError(error_response, "GetObject")
 
         with pytest.raises(click.ClickException, match="S3 object not found.*cert.pem"):
@@ -307,9 +312,10 @@ class TestS3FetcherErrorHandling:
         """Test helpful error message when access is denied."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         # Simulate AccessDenied error
         from botocore.exceptions import ClientError
+
         error_response = {"Error": {"Code": "AccessDenied", "Message": "Access Denied"}}
         mock_client.download_file.side_effect = ClientError(error_response, "GetObject")
 
@@ -326,10 +332,13 @@ class TestS3FetcherErrorHandling:
         """Test helpful error message for endpoint connection failures."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         # Simulate EndpointConnectionError
         from botocore.exceptions import EndpointConnectionError
-        mock_client.download_file.side_effect = EndpointConnectionError(endpoint_url="https://s3.amazonaws.com")
+
+        mock_client.download_file.side_effect = EndpointConnectionError(
+            endpoint_url="https://s3.amazonaws.com"
+        )
 
         with pytest.raises(click.ClickException, match="Cannot connect to S3 endpoint"):
             fetch_s3(
@@ -344,7 +353,7 @@ class TestS3FetcherErrorHandling:
         """Test generic error handling for unexpected boto3 errors."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         # Simulate generic exception
         mock_client.download_file.side_effect = Exception("Unexpected error")
 
@@ -365,10 +374,10 @@ class TestS3FetcherRetryConfiguration:
         """Test that timeout is configured in boto3 client."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         def mock_download_file(bucket, key, local_path):
             Path(local_path).write_text("CERT\n")
-        
+
         mock_client.download_file.side_effect = mock_download_file
 
         fetch_s3(
@@ -390,10 +399,10 @@ class TestS3FetcherRetryConfiguration:
         """Test that retry count is configured in boto3 client."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         def mock_download_file(bucket, key, local_path):
             Path(local_path).write_text("CERT\n")
-        
+
         mock_client.download_file.side_effect = mock_download_file
 
         fetch_s3(
@@ -417,10 +426,10 @@ class TestS3FetcherRetryConfiguration:
         """Test that default fetch configuration is applied."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         def mock_download_file(bucket, key, local_path):
             Path(local_path).write_text("CERT\n")
-        
+
         mock_client.download_file.side_effect = mock_download_file
 
         # Provide defaults
@@ -454,10 +463,10 @@ class TestS3FetcherVerification:
         """Test that custom CA file is used for verification."""
         mock_client = Mock()
         mock_boto3.client.return_value = mock_client
-        
+
         def mock_download_file(bucket, key, local_path):
             Path(local_path).write_text("CERT\n")
-        
+
         mock_client.download_file.side_effect = mock_download_file
 
         # Create a mock CA file
@@ -485,7 +494,7 @@ class TestS3FetcherModuleImport:
         """Test that missing boto3 raises helpful error."""
         with patch("bundlecraft.fetchers.s3._import_boto3") as mock_import:
             mock_import.side_effect = click.ClickException("boto3 not installed")
-            
+
             with pytest.raises(click.ClickException, match="boto3"):
                 fetch_s3(
                     dest_dir=tmp_path,

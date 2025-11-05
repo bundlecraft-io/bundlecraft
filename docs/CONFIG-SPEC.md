@@ -473,7 +473,7 @@ build_path: team/custom/dir
 **Validation:**
 
 - Must be a relative path (no leading `/`)
-- Cannot contain `..` (parent directory references)  
+- Cannot contain `..` (parent directory references)
 - Cannot start with `dist/` (automatically prefixed)
 - Path components can only contain alphanumeric characters, hyphens, underscores, and dots
 

@@ -125,7 +125,7 @@ def fetch_s3(
     Example:
         >>> # Using s3:// URL
         >>> fetch_s3(Path("/tmp"), url="s3://my-bucket/certs/root-ca.pem")
-        
+
         >>> # Using explicit bucket/key
         >>> fetch_s3(
         ...     Path("/tmp"),
@@ -172,25 +172,25 @@ def fetch_s3(
     client_config = {
         "service_name": "s3",
     }
-    
+
     # Apply region if specified
     if region:
         client_config["region_name"] = region
-    
+
     # Apply custom endpoint if specified (for S3-compatible services)
     if endpoint_url:
         client_config["endpoint_url"] = endpoint_url
-    
+
     # Handle custom CA for S3-compatible endpoints with self-signed certs
     verify_ssl: str | bool = True
     if verify and isinstance(verify, dict):
         ca_file = verify.get("ca_file")
         if ca_file:
             verify_ssl = str(ca_file)
-    
+
     # Configure boto3 client with retry logic
     from botocore.config import Config
-    
+
     boto_config = Config(
         retries={
             "max_attempts": fetch_config["retries"] + 1,  # boto3 counts initial attempt
@@ -199,7 +199,7 @@ def fetch_s3(
         connect_timeout=fetch_config["timeout"],
         read_timeout=fetch_config["timeout"],
     )
-    
+
     client_config["config"] = boto_config
     client_config["verify"] = verify_ssl
 
@@ -207,8 +207,8 @@ def fetch_s3(
     try:
         from botocore.exceptions import (
             ClientError,
-            NoCredentialsError,
             EndpointConnectionError,
+            NoCredentialsError,
         )
     except ImportError:  # pragma: no cover
         # Fallback if botocore is not available (should not happen if boto3 is installed)
@@ -227,10 +227,10 @@ def fetch_s3(
         try:
             # Create S3 client
             s3_client = boto3.client(**client_config)
-            
+
             # Download object
             s3_client.download_file(bucket, key, str(out_path))
-            
+
             return out_path
         except NoCredentialsError as e:
             raise click.ClickException(
@@ -240,7 +240,7 @@ def fetch_s3(
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "")
             error_msg = e.response.get("Error", {}).get("Message", str(e))
-            
+
             if error_code == "NoSuchBucket":
                 raise click.ClickException(
                     f"S3 bucket not found: {bucket}. "

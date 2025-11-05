@@ -235,7 +235,7 @@ def _fetch_from_config(
                 key_param = src.get("key")
                 region = src.get("region")
                 endpoint_url = src.get("endpoint_url")
-                
+
                 if url_param:
                     logger.info(f"  Fetching from S3: {url_param}")
                 elif bucket and key_param:
@@ -246,12 +246,12 @@ def _fetch_from_config(
                     raise click.ClickException(
                         "S3 fetch requires either 'url' (s3://bucket/key) or both 'bucket' and 'key'"
                     )
-                
+
                 if verbose:
                     if endpoint_url:
                         logger.debug(f"    Custom endpoint: {endpoint_url}")
                     logger.debug("    Using AWS credential chain for authentication")
-                
+
                 out_path = fetch_s3(
                     dest_dir,
                     name=name,
