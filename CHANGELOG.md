@@ -63,6 +63,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Pre-Releases
 
+## [0.2.2-beta.2] - 2025-11-05
+
+### Fixed
+
+- Added s3 fetch type to schema validation
+
+---
+
 ## [0.2.2-beta.1] - 2025-11-04
 
 ### Added
