@@ -31,10 +31,12 @@ RELEASE_IMAGE_REF ?= localhost/$(IMAGE_NAME):$(GIT_TAG)
 	build-image build-test-image build-pypi build-test-pypi \
 	test-image-version test-image-build test-image-run \
 	test-pypi-version test-pypi-build test-pypi-run \
-	ci-install-dev ci-test ci-lint \
+	setup-dev ci-install-dev ci-test ci-lint \
 	help
 
 help:
+	@echo "Development setup:"
+	@echo "  setup-dev               Complete development environment setup (dependencies + git hooks)"
 	@echo "Container targets:"
 	@echo "  build-image             Build image using latest git tag (HATCH_BUILD_VERSION from tag)"
 	@echo "  build-test-image        Build image tagged 'local' with HATCH_BUILD_VERSION=0.0.0+local"
@@ -159,6 +161,66 @@ test-pypi-run: build-test-pypi
 	TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
 	  bundlecraft $(BUNDLECRAFT_ARGS); \
 	deactivate
+
+# ---- Development setup ----
+setup-dev:
+	@echo "Setting up development environment..."
+	@echo ""
+	@# Check if we're in a virtual environment
+	@if [ -z "$$VIRTUAL_ENV" ] && [ -z "$$CONDA_DEFAULT_ENV" ]; then \
+		echo "🔍 No virtual environment detected."; \
+		if [ ! -d "venv" ]; then \
+			echo "📦 Creating virtual environment..."; \
+			python3 -m venv venv; \
+		else \
+			echo "📦 Found existing virtual environment."; \
+		fi; \
+		echo ""; \
+		echo "⚠️  Please activate the virtual environment and run setup again:"; \
+		echo "   source venv/bin/activate  # Linux/Mac"; \
+		echo "   venv\\Scripts\\activate.bat  # Windows"; \
+		echo "   make setup-dev"; \
+		echo ""; \
+		exit 1; \
+	else \
+		echo "✅ Virtual environment active: $$VIRTUAL_ENV$$CONDA_DEFAULT_ENV"; \
+	fi
+	@echo ""
+	python -m pip install --upgrade pip
+	pip install -e ".[dev]"
+	@echo ""
+	@echo "🪝 Setting up git hooks..."
+	@if git config --get core.hooksPath >/dev/null 2>&1; then \
+		echo "   • Custom hooks already configured, installing pre-commit alongside..."; \
+		pre-commit install --allow-missing-config || echo "   • Pre-commit installation skipped (custom hooks take precedence)"; \
+	elif [ -f .git/hooks/pre-commit ] && grep -q "pre-commit" .git/hooks/pre-commit 2>/dev/null; then \
+		echo "   • Pre-commit hooks already installed, adding custom hooks..."; \
+		git config core.hooksPath .githooks; \
+	else \
+		echo "   • Installing both pre-commit and custom hooks..."; \
+		git config --unset-all core.hooksPath || true; \
+		pre-commit install; \
+		git config core.hooksPath .githooks; \
+	fi
+	@echo ""
+	@echo "✅ Development environment ready!"
+	@echo ""
+	@echo "Git hooks status:"
+	@if git config --get core.hooksPath >/dev/null 2>&1; then \
+		echo "  � Custom hooks: ACTIVE (changelog validation on push)"; \
+	else \
+		echo "  📋 Custom hooks: disabled"; \
+	fi
+	@if [ -f .git/hooks/pre-commit ]; then \
+		echo "  🔍 Pre-commit: ACTIVE (code formatting & linting on commit)"; \
+	else \
+		echo "  🔍 Pre-commit: disabled"; \
+	fi
+	@echo ""
+	@echo "To change hook configuration:"
+	@echo "  - Pre-commit only: git config --unset-all core.hooksPath && pre-commit install"
+	@echo "  - Custom hooks only: pre-commit uninstall && git config core.hooksPath .githooks"
+	@echo "  - Both (recommended): git config core.hooksPath .githooks && pre-commit install --allow-missing-config"
 
 # ---- CI helpers ----
 ci-install-dev:
