@@ -17,18 +17,21 @@ import click
 
 from bundlecraft.helpers.fetch_utils import get_fetch_config, retry_with_backoff
 
+# Import boto3 at module level for testability
+try:
+    import boto3  # type: ignore
+except ImportError:
+    boto3 = None  # type: ignore
+
 
 def _import_boto3():
     """Import boto3 with helpful error message if not installed."""
-    try:
-        import boto3  # type: ignore
-
-        return boto3
-    except ImportError as e:  # pragma: no cover
+    if boto3 is None:  # pragma: no cover
         raise click.ClickException(
             "S3 fetcher requires 'boto3' package. "
             "Install with: pip install 'bundlecraft[fetchers]'"
-        ) from e
+        )
+    return boto3
 
 
 def _safe_filename_from_key(key: str, name: str | None = None) -> str:
