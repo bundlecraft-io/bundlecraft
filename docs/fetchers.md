@@ -92,7 +92,7 @@ Integrates with HashiCorp Vault for certificate retrieval from KV stores or PKI 
 
 ### 4. S3 Fetcher (`type: s3`)
 
-Retrieves certificates from AWS S3 buckets or S3-compatible object storage services.
+Retrieves certificates from AWS S3 storage buckets or S3-compatible object storage services.
 
 **Use cases:**
 
