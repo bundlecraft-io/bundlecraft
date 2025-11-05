@@ -103,7 +103,7 @@ Retrieves certificates from AWS S3 storage buckets or S3-compatible object stora
 
 **Security features:**
 
-- AWS credential chain (environment variables, IAM roles, profiles)
+- AWS credential chain (env variables, IAM roles, profiles)
 - Support for IAM policies and bucket policies
 - Custom CA validation for S3-compatible endpoints
 - Regional deployment support
