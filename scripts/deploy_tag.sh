@@ -2,7 +2,7 @@
 # Lil helper script for quickly git tags (which triggers releases on GitHub)
 #
 # Takes in either "pre-release" or "main-release" as an arg, then reads the latest
-# changelog entry from the relevant section of CHANGELOG.md to create a git tag, 
+# changelog entry from the relevant section of CHANGELOG.md to create a git tag,
 # which it will then push to origin.
 #
 # WARNING:
@@ -49,7 +49,7 @@ if git ls-remote --tags origin | grep -q "refs/tags/$GIT_TAG"; then
         echo "Tag $GIT_TAG already exists on remote, but going to delete (force = true)"
         git push --delete origin $GIT_TAG
         echo "Tag $GIT_TAG deleted from remote."
-    fi    
+    fi
 
 fi
 
@@ -61,4 +61,4 @@ elif [ "$FORCE_PUSH" = true ]; then
     echo "Tag $GIT_TAG re-created and re-pushed to remote."
 fi
 echo "You can monitor the release process here:"
-echo "https://github.com/bundlecraft-io/bundlecraft/actions/workflows/release.yaml?query=branch%3A${GIT_TAG}"
+echo "🌍 https://github.com/bundlecraft-io/bundlecraft/actions/workflows/release.yaml?query=branch%3A${GIT_TAG}"
