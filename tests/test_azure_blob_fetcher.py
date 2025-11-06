@@ -21,6 +21,7 @@ from bundlecraft.fetchers.azure_blob import fetch_azure_blob
 # Mock Azure exception class used across multiple tests
 class MockAzureError(Exception):
     """Mock Azure exception for testing error handling."""
+
     pass
 
 
@@ -68,7 +69,7 @@ class TestAzureBlobFetcherRequiredParams:
                 name="test",
                 container="certificates",
                 blob_name="root.pem",
-                account_key_ref="AZURE_ACCOUNT_KEY",
+                account_key_ref="AZURE_ACCOUNT_KEY",  # pragma: allowlist secret
                 connection_string_ref="AZURE_CONNECTION_STRING",
             )
 
@@ -115,13 +116,9 @@ class TestAzureBlobFetcherAuthenticationConnectionString:
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock(return_value=mock_service_client)
-            mock_blob_service_class.from_connection_string = Mock(
-                return_value=mock_service_client
-            )
+            mock_blob_service_class.from_connection_string = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
                 Mock(),  # DefaultAzureCredential
@@ -163,16 +160,12 @@ class TestAzureBlobFetcherAuthenticationAccountKey:
         monkeypatch.setenv("AZURE_ACCOUNT_KEY", "test_account_key_value")
 
         mock_blob_client = Mock()
-        mock_blob_client.download_blob.return_value = MockBlobDownloadStream(
-            b"CERTIFICATE DATA"
-        )
+        mock_blob_client.download_blob.return_value = MockBlobDownloadStream(b"CERTIFICATE DATA")
 
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
@@ -186,7 +179,7 @@ class TestAzureBlobFetcherAuthenticationAccountKey:
                 container="certificates",
                 blob_name="intermediate.pem",
                 account_name="mystorageaccount",
-                account_key_ref="AZURE_ACCOUNT_KEY",
+                account_key_ref="AZURE_ACCOUNT_KEY",  # pragma: allowlist secret
                 timeout=5,
             )
 
@@ -207,7 +200,7 @@ class TestAzureBlobFetcherAuthenticationAccountKey:
                 container="certificates",
                 blob_name="root.pem",
                 account_name="mystorageaccount",
-                account_key_ref="AZURE_ACCOUNT_KEY",
+                account_key_ref="AZURE_ACCOUNT_KEY",  # pragma: allowlist secret
             )
 
 
@@ -219,16 +212,12 @@ class TestAzureBlobFetcherAuthenticationSASToken:
         monkeypatch.setenv("AZURE_SAS_TOKEN", "sv=2021-06-08&ss=b&srt=o&sp=r")
 
         mock_blob_client = Mock()
-        mock_blob_client.download_blob.return_value = MockBlobDownloadStream(
-            b"SAS TOKEN CERT"
-        )
+        mock_blob_client.download_blob.return_value = MockBlobDownloadStream(b"SAS TOKEN CERT")
 
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
@@ -261,9 +250,7 @@ class TestAzureBlobFetcherAuthenticationSASToken:
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
@@ -313,9 +300,7 @@ class TestAzureBlobFetcherAuthenticationManagedIdentity:
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock(return_value=mock_service_client)
             mock_credential = Mock()
             mock_import.return_value = (
@@ -339,16 +324,12 @@ class TestAzureBlobFetcherAuthenticationManagedIdentity:
     def test_default_credential_fallback(self, tmp_path):
         """Test fallback to default credential when no auth method specified."""
         mock_blob_client = Mock()
-        mock_blob_client.download_blob.return_value = MockBlobDownloadStream(
-            b"DEFAULT CRED CERT"
-        )
+        mock_blob_client.download_blob.return_value = MockBlobDownloadStream(b"DEFAULT CRED CERT")
 
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock(return_value=mock_service_client)
             mock_credential = Mock()
             mock_import.return_value = (
@@ -376,20 +357,18 @@ class TestAzureBlobFetcherDownload:
         """Test that blob content is correctly downloaded and saved."""
         monkeypatch.setenv("AZURE_CONNECTION_STRING", "test_connection_string")
 
-        test_cert = b"-----BEGIN CERTIFICATE-----\nMIIBkTCB+6ADAgECAgEBMA0\n-----END CERTIFICATE-----\n"
+        test_cert = (
+            b"-----BEGIN CERTIFICATE-----\nMIIBkTCB+6ADAgECAgEBMA0\n-----END CERTIFICATE-----\n"
+        )
         mock_blob_client = Mock()
         mock_blob_client.download_blob.return_value = MockBlobDownloadStream(test_cert)
 
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock()
-            mock_blob_service_class.from_connection_string = Mock(
-                return_value=mock_service_client
-            )
+            mock_blob_service_class.from_connection_string = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
                 Mock(),
@@ -418,13 +397,9 @@ class TestAzureBlobFetcherDownload:
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock()
-            mock_blob_service_class.from_connection_string = Mock(
-                return_value=mock_service_client
-            )
+            mock_blob_service_class.from_connection_string = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
                 Mock(),
@@ -452,13 +427,9 @@ class TestAzureBlobFetcherDownload:
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock()
-            mock_blob_service_class.from_connection_string = Mock(
-                return_value=mock_service_client
-            )
+            mock_blob_service_class.from_connection_string = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
                 Mock(),
@@ -486,29 +457,23 @@ class TestAzureBlobFetcherErrors:
         monkeypatch.setenv("AZURE_CONNECTION_STRING", "test_connection_string")
 
         mock_blob_client = Mock()
-        
+
         blob_error = MockAzureError("BlobNotFound: The specified blob does not exist.")
         mock_blob_client.download_blob.side_effect = blob_error
 
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock()
-            mock_blob_service_class.from_connection_string = Mock(
-                return_value=mock_service_client
-            )
+            mock_blob_service_class.from_connection_string = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
                 Mock(),
                 MockAzureError,
             )
 
-            with pytest.raises(
-                click.ClickException, match="Azure Blob not found"
-            ):
+            with pytest.raises(click.ClickException, match="Azure Blob not found"):
                 fetch_azure_blob(
                     dest_dir=tmp_path,
                     name="test",
@@ -522,29 +487,23 @@ class TestAzureBlobFetcherErrors:
         monkeypatch.setenv("AZURE_CONNECTION_STRING", "invalid_connection_string")
 
         mock_blob_client = Mock()
-        
+
         auth_error = MockAzureError("AuthenticationFailed: Server failed to authenticate")
         mock_blob_client.download_blob.side_effect = auth_error
 
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock()
-            mock_blob_service_class.from_connection_string = Mock(
-                return_value=mock_service_client
-            )
+            mock_blob_service_class.from_connection_string = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
                 Mock(),
                 MockAzureError,
             )
 
-            with pytest.raises(
-                click.ClickException, match="Azure authentication failed"
-            ):
+            with pytest.raises(click.ClickException, match="Azure authentication failed"):
                 fetch_azure_blob(
                     dest_dir=tmp_path,
                     name="test",
@@ -558,29 +517,23 @@ class TestAzureBlobFetcherErrors:
         monkeypatch.setenv("AZURE_CONNECTION_STRING", "test_connection_string")
 
         mock_blob_client = Mock()
-        
+
         generic_error = MockAzureError("Something went wrong")
         mock_blob_client.download_blob.side_effect = generic_error
 
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock()
-            mock_blob_service_class.from_connection_string = Mock(
-                return_value=mock_service_client
-            )
+            mock_blob_service_class.from_connection_string = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
                 Mock(),
                 MockAzureError,
             )
 
-            with pytest.raises(
-                click.ClickException, match="Azure Blob fetch failed"
-            ):
+            with pytest.raises(click.ClickException, match="Azure Blob fetch failed"):
                 fetch_azure_blob(
                     dest_dir=tmp_path,
                     name="test",
@@ -603,13 +556,9 @@ class TestAzureBlobFetcherConfiguration:
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock()
-            mock_blob_service_class.from_connection_string = Mock(
-                return_value=mock_service_client
-            )
+            mock_blob_service_class.from_connection_string = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
                 Mock(),
@@ -640,13 +589,9 @@ class TestAzureBlobFetcherConfiguration:
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock()
-            mock_blob_service_class.from_connection_string = Mock(
-                return_value=mock_service_client
-            )
+            mock_blob_service_class.from_connection_string = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
                 Mock(),
@@ -684,13 +629,9 @@ class TestAzureBlobFetcherConfiguration:
         mock_service_client = Mock()
         mock_service_client.get_blob_client.return_value = mock_blob_client
 
-        with patch(
-            "bundlecraft.fetchers.azure_blob._import_azure"
-        ) as mock_import:
+        with patch("bundlecraft.fetchers.azure_blob._import_azure") as mock_import:
             mock_blob_service_class = Mock()
-            mock_blob_service_class.from_connection_string = Mock(
-                return_value=mock_service_client
-            )
+            mock_blob_service_class.from_connection_string = Mock(return_value=mock_service_client)
             mock_import.return_value = (
                 mock_blob_service_class,
                 Mock(),
@@ -723,9 +664,7 @@ class TestAzureBlobFetcherImportError:
             "bundlecraft.fetchers.azure_blob._import_azure",
             side_effect=click.ClickException("azure-storage-blob package required"),
         ):
-            with pytest.raises(
-                click.ClickException, match="azure-storage-blob"
-            ):
+            with pytest.raises(click.ClickException, match="azure-storage-blob"):
                 fetch_azure_blob(
                     dest_dir=tmp_path,
                     name="test",

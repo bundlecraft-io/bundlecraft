@@ -11,9 +11,8 @@ Tests for:
 - Required GCS permissions
 """
 
-import os
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import click
 import pytest
@@ -100,7 +99,9 @@ class TestGCSFetcherBasic:
             with patch("bundlecraft.fetchers.gcs._import_service_account") as mock_sa_import:
                 mock_service_account = MagicMock()
                 mock_credentials = MagicMock()
-                mock_service_account.Credentials.from_service_account_file.return_value = mock_credentials
+                mock_service_account.Credentials.from_service_account_file.return_value = (
+                    mock_credentials
+                )
                 mock_sa_import.return_value = mock_service_account
                 result = fetch_gcs(
                     dest_dir=tmp_path,

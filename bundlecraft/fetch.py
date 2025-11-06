@@ -22,8 +22,8 @@ from typing import Any
 import click
 
 from bundlecraft.fetchers.api import fetch_api
-from bundlecraft.fetchers.gcs import fetch_gcs
 from bundlecraft.fetchers.azure_blob import fetch_azure_blob
+from bundlecraft.fetchers.gcs import fetch_gcs
 from bundlecraft.fetchers.http import fetch_url
 from bundlecraft.fetchers.s3 import fetch_s3
 from bundlecraft.fetchers.vault import fetch_vault
@@ -236,7 +236,9 @@ def _fetch_from_config(
                     raise click.ClickException("GCS fetch source requires 'bucket'")
                 object_path = src.get("object_path") or src.get("object") or src.get("path")
                 if not object_path:
-                    raise click.ClickException("GCS fetch source requires 'object_path' (or 'object')")
+                    raise click.ClickException(
+                        "GCS fetch source requires 'object_path' (or 'object')"
+                    )
                 credentials_file = src.get("credentials_file")
                 project = src.get("project")
                 logger.info("  Fetching from Google Cloud Storage:")
@@ -279,11 +281,23 @@ def _fetch_from_config(
                 if account_name:
                     logger.info(f"    Account: {account_name}")
                 if verbose:
-                    auth_method = "connection_string" if connection_string_ref else \
-                                  "account_key" if account_key_ref else \
-                                  "sas_token" if sas_token_ref else \
-                                  "managed_identity" if use_managed_identity else \
-                                  "default_credential"
+                    auth_method = (
+                        "connection_string"
+                        if connection_string_ref
+                        else (
+                            "account_key"
+                            if account_key_ref
+                            else (
+                                "sas_token"
+                                if sas_token_ref
+                                else (
+                                    "managed_identity"
+                                    if use_managed_identity
+                                    else "default_credential"
+                                )
+                            )
+                        )
+                    )
                     logger.debug(f"    Auth method: {auth_method}")
                 out_path = fetch_azure_blob(
                     dest_dir,

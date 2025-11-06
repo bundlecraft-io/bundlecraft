@@ -55,7 +55,6 @@ class FetchType(str, Enum):
     MOZILLA = "mozilla"
 
 
-
 class DistributionTargetType(str, Enum):
     """Valid distribution target types."""
 

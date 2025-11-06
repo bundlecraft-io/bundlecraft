@@ -591,8 +591,8 @@ The build process removes existing keystores before import to prevent conflicts.
 Default passwords are `"changeit"` for both JKS and P12 formats. Override with environment variables:
 
 ```bash
-export TRUST_JKS_PASSWORD="your-jks-password"
-export TRUST_P12_PASSWORD="your-p12-password"
+export TRUST_JKS_PASSWORD="your-jks-password"  #pragma: allowlist secret
+export TRUST_P12_PASSWORD="your-p12-password"  #pragma: allowlist secret
 bundlecraft build --env prod
 ```
 

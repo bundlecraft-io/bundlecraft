@@ -174,7 +174,7 @@ def fetch_gcs(
         except Exception as e:
             # Check for specific errors that should not be retried
             error_msg = str(e)
-            
+
             # Non-retryable errors - convert to ClickException
             if "403" in error_msg or "Forbidden" in error_msg:
                 raise click.ClickException(
@@ -190,8 +190,8 @@ def fetch_gcs(
                     "Authentication failed for GCS. "
                     "Verify your credentials are valid and not expired."
                 ) from e
-            
-            # For other exceptions (including OSError, network errors), 
+
+            # For other exceptions (including OSError, network errors),
             # let them bubble up to trigger retry logic
             raise
 

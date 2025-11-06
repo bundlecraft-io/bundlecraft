@@ -639,13 +639,13 @@ gcloud auth application-default login
 export AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=mykey;EndpointSuffix=core.windows.net"
 
 # Option 2: Account Key (requires account_name in config)
-export AZURE_ACCOUNT_KEY="your-storage-account-key"
+export AZURE_ACCOUNT_KEY="your-storage-account-key"  #pragma: allowlist secret
 
 # Option 3: SAS Token (requires account_name in config)
 export AZURE_SAS_TOKEN="sv=2021-06-08&ss=bfqt&srt=sco&sp=rwdlacupitfx&se=2024-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=..."
 # For S3 fetchers (if not using IAM roles)
 export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
-export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  #pragma: allowlist secret
 export AWS_REGION="us-west-2"  # optional, can be specified in config
 
 # For S3 with AWS credential profiles
@@ -740,7 +740,7 @@ az storage blob list --container-name certificates --account-name mystorageaccou
 
 **Problem:** Invalid credentials or insufficient permissions
 
-**Solution:** 
+**Solution:**
 1. Verify credentials are correct and not expired
 2. Check that the storage account exists and is accessible
 3. Ensure proper RBAC roles are assigned (e.g., "Storage Blob Data Reader")
@@ -770,7 +770,7 @@ Note: When using containers, GCS support is included by default.
 
 **Problem:** Insufficient permissions to access GCS bucket or object
 
-**Solution:** 
+**Solution:**
 
 1. Verify service account has required IAM permissions:
    ```bash
@@ -841,7 +841,7 @@ Note: When using containers, Azure Blob support is included by default.
 ```bash
 # Option 1: Environment variables
 export AWS_ACCESS_KEY_ID="your-access-key"
-export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"  #pragma: allowlist secret
 export AWS_REGION="us-west-2"
 
 # Option 2: AWS credential file

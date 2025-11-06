@@ -19,7 +19,7 @@ source venv/bin/activate  # or: venv\Scripts\activate on Windows
 make setup-dev  # Installs dependencies + configures git hooks + pre-commit
 
 # Alternative manual setup:
-# pip install -e ".[dev]" 
+# pip install -e ".[dev]"
 # git config core.hooksPath .githooks
 # pre-commit install
 

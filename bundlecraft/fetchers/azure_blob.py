@@ -74,7 +74,7 @@ def fetch_azure_blob(
         raise click.ClickException("container parameter is required")
     if not blob_name:
         raise click.ClickException("blob_name parameter is required")
-    
+
     # Validate authentication parameter requirements
     if account_key_ref and not account_name:
         raise click.ClickException(
@@ -187,10 +187,8 @@ def fetch_azure_blob(
     )
     def _do_fetch():
         try:
-            blob_client = blob_service_client.get_blob_client(
-                container=container, blob=blob_name
-            )
-            
+            blob_client = blob_service_client.get_blob_client(container=container, blob=blob_name)
+
             # Download blob content
             stream = blob_client.download_blob(timeout=fetch_config["timeout"])
             return stream.readall()

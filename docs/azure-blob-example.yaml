@@ -1,12 +1,10 @@
 ---
 # Example BundleCraft Source Configuration with Azure Blob Fetcher
 # This demonstrates various ways to fetch certificates from Azure Blob Storage
-
 apiVersion: bundlecraft.io/v1alpha1
 kind: SourceConfig
 source_name: azure-certificates
 description: Certificate sources from Azure Blob Storage
-
 # Fetch certificates from Azure Blob Storage
 fetch:
   # Example 1: Using Connection String (simplest for development/testing)
@@ -16,7 +14,7 @@ fetch:
     blob_name: ca-bundle.pem
     connection_string_ref: AZURE_STORAGE_CONNECTION_STRING
     verify:
-      sha256: "expected-sha256-hash-of-dev-bundle"
+      sha256: expected-sha256-hash-of-dev-bundle
     timeout: 30
     retries: 3
 
@@ -26,9 +24,9 @@ fetch:
     container: staging-certificates
     blob_name: trusted-roots/ca-bundle.pem
     account_name: stagingstorageaccount
-    account_key_ref: AZURE_STAGING_ACCOUNT_KEY
+    account_key_ref: AZURE_STAGING_ACCOUNT_KEY  # pragma: allowlist secret
     verify:
-      sha256: "expected-sha256-hash-of-staging-bundle"
+      sha256: expected-sha256-hash-of-staging-bundle  # pragma: allowlist secret
 
   # Example 3: Using SAS Token (time-limited, read-only access)
   - name: prod_roots
@@ -38,7 +36,7 @@ fetch:
     account_name: prodstorageaccount
     sas_token_ref: AZURE_PROD_SAS_TOKEN
     verify:
-      sha256: "expected-sha256-hash-of-prod-bundle"
+      sha256: expected-sha256-hash-of-prod-bundle
     timeout: 60
     retries: 5
     backoff_factor: 2.0
@@ -67,8 +65,7 @@ fetch:
     account_name: partnerstorage
     # No explicit auth specified - uses DefaultAzureCredential
     verify:
-      sha256: "expected-sha256-hash-of-partner-bundle"
-
+      sha256: expected-sha256-hash-of-partner-bundle
 metadata:
   owner: security@example.com
   purpose: Fetch trusted certificates from Azure Blob Storage
@@ -77,25 +74,3 @@ metadata:
     environment: production
     team: security
     compliance: required
-
----
-# Environment Variables Required:
-#
-# For Connection String auth (Example 1):
-# export AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=devaccount;AccountKey=...;EndpointSuffix=core.windows.net"
-#
-# For Account Key auth (Example 2):
-# export AZURE_STAGING_ACCOUNT_KEY="your-account-key-here"
-#
-# For SAS Token auth (Example 3):
-# export AZURE_PROD_SAS_TOKEN="sv=2021-06-08&ss=bfqt&srt=sco&sp=r&se=2024-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=..."
-#
-# For Managed Identity (Example 4):
-# No environment variables needed - VM/AKS must have managed identity enabled
-# and assigned "Storage Blob Data Reader" role on the storage account
-#
-# For Default Credential (Example 5):
-# Can use any of the above, or:
-# - Azure CLI: az login
-# - Service Principal: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET
-# - User-assigned Managed Identity: AZURE_CLIENT_ID
