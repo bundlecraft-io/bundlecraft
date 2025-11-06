@@ -254,7 +254,19 @@ jobs:
           fi
 
           # Generate S3 test config
-          cat > ci-test-s3.yaml <<YAML
+          if [ -n "${S3_REGION:-}" ]; then
+            cat > ci-test-s3.yaml <<YAML
+          source_name: ci-s3-test
+          description: CI test bundle for S3 fetcher validation
+          fetch:
+            - name: from_s3
+              type: s3
+              bucket: ${S3_BUCKET}
+              key: ${S3_OBJECT_KEY}
+              region: ${S3_REGION}
+          YAML
+          else
+            cat > ci-test-s3.yaml <<YAML
           source_name: ci-s3-test
           description: CI test bundle for S3 fetcher validation
           fetch:
@@ -263,10 +275,6 @@ jobs:
               bucket: ${S3_BUCKET}
               key: ${S3_OBJECT_KEY}
           YAML
-
-          # Add region if provided
-          if [ -n "${S3_REGION:-}" ]; then
-            echo "              region: ${S3_REGION}" >> ci-test-s3.yaml
           fi
           echo "Generated ci-test-s3.yaml:" && cat ci-test-s3.yaml
       - name: Run S3 fetch
