@@ -156,6 +156,12 @@ def fetch_gcs(
                 timeout=fetch_config["timeout"],
             )
             return out_path
+        except click.ClickException:
+            # Re-raise ClickExceptions without modification
+            raise
+        except (OSError, TimeoutError) as e:
+            # Let retryable network errors propagate to retry decorator
+            raise
         except Exception as e:
             # Improve error messages for common issues
             error_msg = str(e)
