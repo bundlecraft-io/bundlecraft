@@ -69,6 +69,26 @@ def fetch_azure_blob(
     Returns:
         Path to the downloaded file
     """
+    # Validate required parameters first
+    if not container:
+        raise click.ClickException("container parameter is required")
+    if not blob_name:
+        raise click.ClickException("blob_name parameter is required")
+    
+    # Validate authentication parameter requirements
+    if account_key_ref and not account_name:
+        raise click.ClickException(
+            "account_name is required when using account_key_ref authentication"
+        )
+    if sas_token_ref and not account_name:
+        raise click.ClickException(
+            "account_name is required when using sas_token_ref authentication"
+        )
+    if use_managed_identity and not account_name:
+        raise click.ClickException(
+            "account_name is required when using managed identity or default credential authentication"
+        )
+
     BlobServiceClient, DefaultAzureCredential, AzureError = _import_azure()
 
     # Get fetch configuration with overrides

@@ -33,6 +33,8 @@ dependencies = [
   "cyclonedx-bom>=4.0.0,<8.0",
   "pyjks>=20.0.0",
   "boto3>=1.26.0",
+  "azure-storage-blob>=12.0.0",
+  "azure-identity>=1.12.0",
 ]
 
 [project.optional-dependencies]
@@ -52,8 +54,6 @@ dev = [
 ]
 fetchers = [
   "hvac>=2.0.0",
-  "azure-storage-blob>=12.0.0",
-  "azure-identity>=1.12.0",
 ]
 
 [project.urls]

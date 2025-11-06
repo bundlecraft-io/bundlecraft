@@ -45,6 +45,7 @@ class TestAzureBlobFetcherRequiredParams:
                 name="test",
                 container=None,
                 blob_name="certs/root.pem",
+                connection_string_ref="AZURE_CONNECTION_STRING",
             )
 
     def test_requires_blob_name(self, tmp_path):
@@ -55,6 +56,7 @@ class TestAzureBlobFetcherRequiredParams:
                 name="test",
                 container="certificates",
                 blob_name=None,
+                connection_string_ref="AZURE_CONNECTION_STRING",
             )
 
     def test_requires_account_name_for_account_key(self, tmp_path, monkeypatch):
@@ -67,6 +69,7 @@ class TestAzureBlobFetcherRequiredParams:
                 container="certificates",
                 blob_name="root.pem",
                 account_key_ref="AZURE_ACCOUNT_KEY",
+                connection_string_ref="AZURE_CONNECTION_STRING",
             )
 
     def test_requires_account_name_for_sas_token(self, tmp_path, monkeypatch):
@@ -90,6 +93,7 @@ class TestAzureBlobFetcherRequiredParams:
                 container="certificates",
                 blob_name="root.pem",
                 use_managed_identity=True,
+                connection_string_ref="AZURE_CONNECTION_STRING",
             )
 
 

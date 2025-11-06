@@ -263,6 +263,13 @@ def _fetch_from_config(
                     account_key_ref=account_key_ref,
                     sas_token_ref=sas_token_ref,
                     use_managed_identity=use_managed_identity,
+                    verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
+                )
             elif ftype == "s3":
                 # S3 fetcher supports both s3:// URLs and explicit bucket/key parameters
                 url_param = src.get("url")
