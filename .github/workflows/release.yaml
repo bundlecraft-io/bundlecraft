@@ -85,6 +85,36 @@ jobs:
         run: make ci-test
       - name: Run linting (Makefile)
         run: make ci-lint
+  fetch-tests:
+    name: Run Fetch Integration Tests
+    needs: determine-channel
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Trigger fetch test suite
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const result = await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'test-bundlecraft-fetch.yaml',
+              ref: context.ref
+            });
+            core.info('Fetch test suite triggered');
+
+            // Note: This triggers the workflow but doesn't wait for results
+            // Failures will be visible in the separate workflow run
+            core.warning('Cloud fetch tests triggered as separate workflow. Check workflow runs for results.');
+      - name: Add summary
+        run: |
+          echo "## ⚠️ Fetch Integration Tests" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Fetch integration tests have been triggered as a separate workflow." >> "$GITHUB_STEP_SUMMARY"
+          echo "These tests validate cloud fetchers (S3, GCS, Azure Blob) which depend on external resources." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Note:** Failures in cloud-dependent tests are treated as warnings and won't block the release." >> "$GITHUB_STEP_SUMMARY"
+          echo "Check the 'BundleCraft Fetch Test Suite' workflow run for detailed results." >> "$GITHUB_STEP_SUMMARY"
   build:
     name: Build Package
     needs: test
