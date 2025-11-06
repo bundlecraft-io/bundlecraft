@@ -221,6 +221,8 @@ jobs:
   s3-fetch:
     name: 'Test: S3 Fetcher (AWS S3)'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: >-
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 's3') }}
     steps:
@@ -300,6 +302,8 @@ jobs:
   gcs-fetch:
     name: 'Test: GCS Fetcher (Google Cloud Storage)'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: >-
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 'gcs') }}
     steps:
@@ -391,6 +395,8 @@ jobs:
   azure-blob-fetch:
     name: 'Test: Azure Blob Fetcher'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: >-
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 'azure_blob') }}
     steps:
