@@ -36,6 +36,19 @@ def _import_gcs():
         ) from e
 
 
+def _import_service_account():
+    """Import Google OAuth2 service account module with helpful error message."""
+    try:
+        from google.oauth2 import service_account  # type: ignore
+
+        return service_account
+    except ImportError as e:  # pragma: no cover - tested via behavior
+        raise click.ClickException(
+            "GCS fetcher requires 'google-auth' package. "
+            "Install with: pip install 'bundlecraft[fetchers]'"
+        ) from e
+
+
 def fetch_gcs(
     dest_dir: Path,
     name: str,
@@ -117,8 +130,7 @@ def fetch_gcs(
     try:
         if creds_path:
             # Use explicit service account credentials
-            from google.oauth2 import service_account
-
+            service_account = _import_service_account()
             credentials = service_account.Credentials.from_service_account_file(creds_path)
             client = storage.Client(credentials=credentials, project=project)
         else:
@@ -157,14 +169,13 @@ def fetch_gcs(
             )
             return out_path
         except click.ClickException:
-            # Re-raise ClickExceptions without modification
-            raise
-        except (OSError, TimeoutError) as e:
-            # Let retryable network errors propagate to retry decorator
+            # Re-raise ClickExceptions as-is (non-retryable)
             raise
         except Exception as e:
-            # Improve error messages for common issues
+            # Check for specific errors that should not be retried
             error_msg = str(e)
+            
+            # Non-retryable errors - convert to ClickException
             if "403" in error_msg or "Forbidden" in error_msg:
                 raise click.ClickException(
                     f"Access denied to gs://{bucket}/{object_path}. "
@@ -176,13 +187,19 @@ def fetch_gcs(
                 ) from e
             elif "401" in error_msg or "Unauthorized" in error_msg:
                 raise click.ClickException(
-                    f"Authentication failed for GCS. "
+                    "Authentication failed for GCS. "
                     "Verify your credentials are valid and not expired."
                 ) from e
-            else:
-                raise click.ClickException(f"GCS fetch failed: {error_msg}") from e
+            
+            # For other exceptions (including OSError, network errors), 
+            # let them bubble up to trigger retry logic
+            raise
 
     # Perform the fetch
-    result_path = _do_fetch()
+    try:
+        result_path = _do_fetch()
+    except (OSError, TimeoutError) as e:
+        # Convert retryable errors to ClickException if retries are exhausted
+        raise click.ClickException(f"GCS fetch failed: {e}") from e
 
     return result_path
