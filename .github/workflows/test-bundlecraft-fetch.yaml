@@ -9,6 +9,14 @@ on:
           Leave blank to run all.
         required: false
         default: ''
+  workflow_call:
+    inputs:
+      test_types:
+        description: Comma-separated list of test types to run (vault,http,api,s3,gcs,azure_blob).
+          Leave blank to run all.
+        required: false
+        type: string
+        default: ''
 jobs:
   vault-fetch:
     name: 'Test: Vault Fetcher (K/V v2 or v1)'
