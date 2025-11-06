@@ -17,10 +17,10 @@ FORCE_PUSH=${2:-false}
 # Determine the git tag based on the changelog
 if [ "$RELEASE_CHANNEL" == "pre-release" ]; then
     # Top pre-release (has dash, e.g. 1.0.0-beta.1)
-    GIT_TAG=$(grep -m1 -oP '^\#\# \[\K[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9.]+(?=\])' CHANGELOG.md)
+    GIT_TAG="v$(grep -m1 -oP '^\#\# \[\K[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9.]+(?=\])' CHANGELOG.md)"
 elif [ "$RELEASE_CHANNEL" == "main-release" ]; then
     # Top stable release (no dash, e.g. 1.0.0)
-    GIT_TAG=$(grep -m1 -oP '^\#\# \[\K[0-9]+\.[0-9]+\.[0-9]+(?=\])' CHANGELOG.md)
+    GIT_TAG="v$(grep -m1 -oP '^\#\# \[\K[0-9]+\.[0-9]+\.[0-9]+(?=\])' CHANGELOG.md)"
 else
     echo "Invalid release channel specified. Use 'pre-release' or 'main-release'."
     exit 1
