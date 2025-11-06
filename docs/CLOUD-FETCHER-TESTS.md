@@ -16,17 +16,34 @@ Before running cloud fetcher tests, you need to:
 
 1. Set up cloud storage accounts and containers/buckets
 2. Upload test certificate files to these storage locations
-3. Configure GitHub secrets with connection details and credentials
+3. Configure GitHub variables for non-sensitive configuration data
+4. Configure GitHub secrets for sensitive authentication credentials
+
+## GitHub Variables vs Secrets
+
+The workflow uses GitHub's distinction between variables and secrets for better security practices:
+
+- **Variables** (`${{ vars.NAME }}`): Used for non-sensitive configuration data like bucket names, container names, and object paths. These are visible in the repository settings and can be viewed by anyone with read access to the repository.
+
+- **Secrets** (`${{ secrets.NAME }}`): Used for sensitive authentication data like access keys, connection strings, and service account credentials. These are encrypted and only visible to repository administrators.
+
+This separation provides:
+- **Better security**: Credentials are encrypted while configuration is transparent
+- **Easier management**: Non-sensitive config can be changed without managing encrypted secrets
+- **Clear separation**: Makes it obvious which data is sensitive vs configuration
 
 ## Test Configuration by Provider
 
 ### AWS S3 Fetcher
 
-**Required GitHub Secrets:**
+**Required GitHub Variables:**
 
 - `S3_TEST_BUCKET`: Name of the S3 bucket containing test certificates
 - `S3_TEST_OBJECT_KEY`: Path/key to the certificate file in the bucket (e.g., `certs/test-ca.pem`)
 - `S3_TEST_REGION`: (Optional) AWS region for the bucket (e.g., `us-east-1`)
+
+**Required GitHub Secrets:**
+
 - `AWS_ACCESS_KEY_ID`: AWS access key ID with read permissions to the bucket
 - `AWS_SECRET_ACCESS_KEY`: AWS secret access key
 
@@ -60,16 +77,21 @@ aws s3 mb s3://your-org-bundlecraft-test-certs --region us-east-1
 aws s3 cp test-ca.pem s3://your-org-bundlecraft-test-certs/certs/test-ca.pem
 
 # 3. Create IAM user with read-only access (or use existing credentials)
-# 4. Add secrets to GitHub repository settings
+# 4. Add variables and secrets to GitHub repository settings
+# Variables: S3_TEST_BUCKET, S3_TEST_OBJECT_KEY, S3_TEST_REGION
+# Secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 ```
 
 ### Google Cloud Storage (GCS) Fetcher
 
-**Required GitHub Secrets:**
+**Required GitHub Variables:**
 
 - `GCS_TEST_BUCKET`: Name of the GCS bucket containing test certificates
 - `GCS_TEST_OBJECT_PATH`: Path to the certificate file in the bucket (e.g., `certs/test-ca.pem`)
 - `GCS_TEST_PROJECT`: (Optional) GCP project ID
+
+**Required GitHub Secrets:**
+
 - `GCS_CREDENTIALS_JSON`: Service account JSON key file contents
 
 **Required Permissions:**
@@ -99,23 +121,25 @@ gcloud storage buckets add-iam-policy-binding gs://your-org-bundlecraft-test-cer
 gcloud iam service-accounts keys create key.json \
   --iam-account=bundlecraft-ci-test@PROJECT_ID.iam.gserviceaccount.com
 
-# 6. Copy the contents of key.json to GCS_CREDENTIALS_JSON secret in GitHub
+# 6. Add variables and secrets to GitHub repository settings
+# Variables: GCS_TEST_BUCKET, GCS_TEST_OBJECT_PATH, GCS_TEST_PROJECT
+# Secrets: Copy the contents of key.json to GCS_CREDENTIALS_JSON secret
 ```
 
 ### Azure Blob Storage Fetcher
 
-**Required GitHub Secrets:**
+**Required GitHub Variables:**
 
 - `AZURE_TEST_STORAGE_ACCOUNT`: Name of the Azure Storage account
 - `AZURE_TEST_CONTAINER`: Name of the blob container
 - `AZURE_TEST_BLOB_NAME`: Path/name of the certificate blob (e.g., `certs/test-ca.pem`)
+
+**Required GitHub Secrets:**
+
 - `AZURE_STORAGE_CONNECTION_STRING`: Connection string for the storage account
 
 **Alternative Authentication (Managed Identity):**
-If using managed identity instead of connection string, only configure:
-- `AZURE_TEST_STORAGE_ACCOUNT`
-- `AZURE_TEST_CONTAINER`
-- `AZURE_TEST_BLOB_NAME`
+If using managed identity instead of connection string, only the variables above are needed (no secrets required).
 
 **Setup Steps:**
 ```bash
@@ -145,7 +169,9 @@ az storage account show-connection-string \
   --resource-group bundlecraft-ci \
   --output tsv
 
-# 5. Add the connection string to AZURE_STORAGE_CONNECTION_STRING secret in GitHub
+# 5. Add variables and secrets to GitHub repository settings
+# Variables: AZURE_TEST_STORAGE_ACCOUNT, AZURE_TEST_CONTAINER, AZURE_TEST_BLOB_NAME
+# Secrets: Add the connection string to AZURE_STORAGE_CONNECTION_STRING secret
 ```
 
 ## Running the Tests
@@ -186,7 +212,7 @@ The fetch test suite is automatically triggered during releases via the `release
 - Check that credentials have not expired
 
 **Error: "S3 bucket not found"**
-- Verify `S3_TEST_BUCKET` name is correct
+- Verify `S3_TEST_BUCKET` variable is correct
 - Ensure bucket exists in the specified region
 - Check IAM permissions allow `s3:ListBucket`
 
@@ -207,7 +233,7 @@ The fetch test suite is automatically triggered during releases via the `release
 - Check that storage account key has not been rotated
 
 **Error: "Blob not found"**
-- Verify `AZURE_TEST_CONTAINER` and `AZURE_TEST_BLOB_NAME` are correct
+- Verify `AZURE_TEST_CONTAINER` and `AZURE_TEST_BLOB_NAME` variables are correct
 - Ensure blob exists in the container
 
 ## Best Practices
