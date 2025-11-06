@@ -50,6 +50,7 @@ class FetchType(str, Enum):
     VAULT = "vault"
     API = "api"
     S3 = "s3"
+    AZURE_BLOB = "azure_blob"
 
 
 class DistributionTargetType(str, Enum):
