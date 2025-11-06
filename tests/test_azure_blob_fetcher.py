@@ -10,7 +10,7 @@ Tests for:
 - Provenance recording
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import click
 import pytest
