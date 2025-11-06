@@ -3,9 +3,10 @@ name: 🧪 BundleCraft PyTest Suite
 run-name: 'BundleCraft PyTest Suite - Run #${{ github.run_number }}'
 on:
   push:
-    branches: [main, develop]
+    branches: [main, pre-release]
   pull_request:
-    branches: [main, develop]
+    branches: [main, pre-release]
+  workflow_dispatch:
 jobs:
   test:
     name: 🧪 PyTest Suite

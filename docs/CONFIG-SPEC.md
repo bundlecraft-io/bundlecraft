@@ -193,6 +193,22 @@ fetch:
     timeout: 45
     retries: 4
 ```
+  - name: s3_bundle
+    type: s3
+    # Option 1: Use s3:// URL
+    url: s3://my-bucket/certificates/bundle.pem
+    region: us-west-2
+    # Option 2: Use explicit bucket/key (alternative to url)
+    # bucket: my-bucket
+    # key: certificates/bundle.pem
+    # region: us-west-2
+    # For S3-compatible services (MinIO, Ceph, etc.)
+    # endpoint_url: https://minio.example.com:9000
+    verify:
+      sha256: <expected_sha256>
+      # For custom S3-compatible endpoints with self-signed certs
+      # ca_file: config/certs/custom-ca.pem
+```yaml
 
 **Fetch Retry and Timeout Configuration:**
 
@@ -473,7 +489,7 @@ build_path: team/custom/dir
 **Validation:**
 
 - Must be a relative path (no leading `/`)
-- Cannot contain `..` (parent directory references)  
+- Cannot contain `..` (parent directory references)
 - Cannot start with `dist/` (automatically prefixed)
 - Path components can only contain alphanumeric characters, hyphens, underscores, and dots
 
@@ -797,6 +813,7 @@ For step-by-step guidance on interpreting and fixing validation errors (plus pyt
 
 - `fetch[].type: url` → requires `url` field
 - `fetch[].type: vault` → requires both `mount` and `path` fields
+- `fetch[].type: s3` → requires either `url` (s3://bucket/key format) OR both `bucket` and `key` fields
 - `fetch[].type: api` → requires `endpoint` field
 
 **Bundle Requirements:**

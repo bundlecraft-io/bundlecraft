@@ -49,6 +49,7 @@ class FetchType(str, Enum):
     FILE = "file"
     VAULT = "vault"
     API = "api"
+    S3 = "s3"
 
 
 class DistributionTargetType(str, Enum):

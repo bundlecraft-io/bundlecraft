@@ -7,186 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
----
-
-## Pre-Releases
-
-## [0.1.3-beta.13] - 2025-10-26
-
 ### Added
 
-- Initial pre-release version
-
-### Changed
-
-- Release workflow improvements
-
-### Fixed
-
-- Container immutable release handling
-
----
-
-## [0.1.3-beta.14] - 2025-10-26
-
-### Changed
-
-- No changes, refining CI/CD workflow
-
----
-
-## [0.1.3-beta.15] - 2025-10-26
-
-### Changed
-
-- No changes, refining CI/CD workflow
-
----
-
-## [0.1.3-beta.16] - 2025-10-26
-
-### Changed
-
-- No changes, refining CI/CD workflow
-
----
-
-## [0.1.3-beta.17] - 2025-10-26
-
-### Changed
-
-- No changes, refining CI/CD workflow (hoping this message shows up!)
-
----
-
-## [0.1.3-beta.18] - 2025-10-26
-
-### Changed
-
-- No changes, refining CI/CD workflow (hoping this message shows up!)
-
----
-
-## [0.1.3-beta.19] - 2025-10-26
-
-### Changed
-
-- No changes, refining CI/CD workflow (hoping this message shows up, cmon pypi)
-
----
-
-## [0.1.3-beta.20] - 2025-10-26
-
-### Changed
-
-- No changes, refining CI/CD workflow (hoping this message shows up, cmon pypi, pass verification)
-
----
-
-## [0.1.3-beta.21] - 2025-10-26
-
-### Changed
-
-- No changes, refining CI/CD workflow (hoping this message shows up, cmon pypi, pass verification)
-
----
-
-## [0.1.3-beta.22] - 2025-10-26
-
-### Changed
-
-- `bundlecraft build-all` !
-
----
-
-## [0.1.3-beta.23] - 2025-10-26
-
-### Changed
-
-- New option: `bundlecraft build-all --recursive`
-- Small fixes
-
----
-
-## [0.1.3-beta.24] - 2025-10-27
-
-### Changed
-
-- N/A, more release tests
-
----
-
-## [0.1.3-beta.25] - 2025-10-28
-
-### Changed
-
-- `bundlecraft build-all --print-plan` now prints `build_path`
-
----
-
-## [0.1.3-beta.26] - 2025-10-28
-
-### Changed
-
-- feat: add build_path field to manifest
-
----
-
-## [0.1.3-beta.27] - 2025-10-28
-
-### Changed
-
-- feat: enforce build_path to be a subdirectory within dist/env for security
-
----
-
-## [0.1.3-beta.28] - 2025-10-30
-
-### Changed
-
-- OpenJDK has been replaced by PyJKS
-  - Makes BundleCraft less reliant on a system dependency and reduces image file size
-  - All keytool operations are now python native
-  - All behavior with respect to JKS bundle creation remains the same as before
-
----
-
-## [0.1.3-beta.29] - 2025-10-30
-
-### Changed
-
-- N/A, more release tests
-
----
-
-## [0.1.3-beta.30] - 2025-10-30
-
-### Changed
-
-- N/A, more release tests
-
----
-
-## [0.1.3-beta.31] - 2025-10-30
-
-### Changed
-
-- Openssl dependencies removed
-  - BundleCraft is now 100% python native - no more system dependencies!
-  - Operations that relied on openssl (like p7b conversions) now use python deps
-
----
-
-## [0.1.3-beta.32] - 2025-11-03
-
-### Changed
-
-- Minor refactor of `build-all` script location
-- Actual stage of bundlecraft v0.2.0
+- New fetcher support: AWS S3
+  - Retrieve certs from S3 buckets and S3-like storage
 
 ---
 
 ## Stable Releases
+
+## [0.2.1] - 2025-11-04
+<!-- markdownlint-disable MD024 -->
+
+### Added
+
+- Nothing! This release is identical to v0.2.0, but had to be made due to deployment issues.
+
+---
 
 ## [0.2.0] - 2025-11-03
 <!-- markdownlint-disable MD024 -->
@@ -221,6 +58,200 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Minor polish and miscellaneous fixes across scripts and docs
 - Build path for certs now rooted at `dist/`
+
+---
+
+## Pre-Releases
+
+## [0.2.2-beta.2] - 2025-11-05
+
+### Fixed
+
+- Added s3 fetch type to schema validation
+
+---
+
+## [0.2.2-beta.1] - 2025-11-04
+
+### Added
+
+- New fetcher support: AWS S3
+  - Retrieve certs from S3 buckets and S3-like storage
+
+---
+
+## [0.1.3-beta.32] - 2025-11-03
+
+### Changed
+
+- Minor refactor of `build-all` script location
+- Actual stage of bundlecraft v0.2.0
+
+---
+
+## [0.1.3-beta.31] - 2025-10-30
+
+### Changed
+
+- Openssl dependencies removed
+  - BundleCraft is now 100% python native - no more system dependencies!
+  - Operations that relied on openssl (like p7b conversions) now use python deps
+
+---
+
+## [0.1.3-beta.30] - 2025-10-30
+
+### Changed
+
+- N/A, more release tests
+
+---
+
+## [0.1.3-beta.29] - 2025-10-30
+
+### Changed
+
+- N/A, more release tests
+
+---
+
+## [0.1.3-beta.28] - 2025-10-30
+
+### Changed
+
+- OpenJDK has been replaced by PyJKS
+  - Makes BundleCraft less reliant on a system dependency and reduces image file size
+  - All keytool operations are now python native
+  - All behavior with respect to JKS bundle creation remains the same as before
+
+---
+
+## [0.1.3-beta.27] - 2025-10-28
+
+### Changed
+
+- feat: enforce build_path to be a subdirectory within dist/env for security
+
+---
+
+## [0.1.3-beta.26] - 2025-10-28
+
+### Changed
+
+- feat: add build_path field to manifest
+
+---
+
+## [0.1.3-beta.25] - 2025-10-28
+
+### Changed
+
+- `bundlecraft build-all --print-plan` now prints `build_path`
+
+---
+
+## [0.1.3-beta.24] - 2025-10-27
+
+### Changed
+
+- N/A, more release tests
+
+---
+
+## [0.1.3-beta.23] - 2025-10-26
+
+### Changed
+
+- New option: `bundlecraft build-all --recursive`
+- Small fixes
+
+---
+
+## [0.1.3-beta.22] - 2025-10-26
+
+### Changed
+
+- `bundlecraft build-all` !
+
+---
+
+## [0.1.3-beta.21] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow (hoping this message shows up, cmon pypi, pass verification)
+
+---
+
+## [0.1.3-beta.20] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow (hoping this message shows up, cmon pypi, pass verification)
+
+---
+
+## [0.1.3-beta.19] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow (hoping this message shows up, cmon pypi)
+
+---
+
+## [0.1.3-beta.18] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow (hoping this message shows up!)
+
+---
+
+## [0.1.3-beta.17] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow (hoping this message shows up!)
+
+---
+
+## [0.1.3-beta.16] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow
+
+---
+
+## [0.1.3-beta.15] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow
+
+---
+
+## [0.1.3-beta.14] - 2025-10-26
+
+### Changed
+
+- No changes, refining CI/CD workflow
+
+---
+
+## [0.1.3-beta.13] - 2025-10-26
+
+### Added
+
+- Initial pre-release version
+
+### Changed
+
+- Release workflow improvements
+
+### Fixed
+
+- Container immutable release handling
 
 ---
 <!-- markdownlint-enable MD024 -->

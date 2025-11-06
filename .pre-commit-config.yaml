@@ -22,6 +22,9 @@ repos:
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff
+        name: ruff-check
+        args: [--no-fix]
 
   # Python code formatter (opinionated). Configure in pyproject.toml [tool.black]
   - repo: https://github.com/psf/black

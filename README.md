@@ -17,13 +17,15 @@ ______________________________________________________________________
 
 Essentially, you configure the CA certificates you'd like to populate in your custom trust stores, and BundleCraft will take care of reliably converting them into consistent, multi-formatted trust bundle files you can then distribute to your servers, applications, and general infrastructure.
 
-> In short: BundleCraft lets YOU define how your PKI trust is built and configured.
+In short: BundleCraft lets ***you*** define how your PKI trust is built and configured.
 
 ______________________________________________________________________
 
 ## 🚀 Quick Start
 
-Get started with BundleCraft in under 5 minutes using either the container image or Python package.
+Get started with BundleCraft in under 5 minutes using either the container image or Python package!
+
+> ❗ Before making full use of BundleCraft, you'll need a project & configuration structure for it to use. You can use [bundlecraft-starter](https://github.com/bundlecraft-io/bundlecraft-starter) to get going right away with a configuration structure and an out-of-the-box Github Actions workflow for building releases. Check out [bundlecraft-demo](https://github.com/bundlecraft-io/bundlecraft-demo) for a quick configuration example reference.
 
 ### Option 1: Using a Container
 
@@ -105,7 +107,7 @@ Every build produces a complete trust bundle in `dist/<environment>/<bundle>/`:
 ```text
 bundlecraft-ca-trust.pem     # Canonical PEM bundle
 bundlecraft-ca-trust.jks     # Java KeyStore
-bundlecraft-ca-trust.p12     # PKCS#12 bundle  
+bundlecraft-ca-trust.p12     # PKCS#12 bundle
 bundlecraft-ca-trust.p7b     # PKCS#7 bundle
 manifest.json                # Build metadata & provenance
 checksums.sha256             # Integrity verification
@@ -235,10 +237,12 @@ ______________________________________________________________________
 - Deterministic **manifest.json** and **checksums.sha256** (traceability)
 - **SBOM (Software Bill of Materials)** in CycloneDX format (optional, on by default)
 - **GPG signatures (.asc)** for all artifacts (optional, when `--sign`)
-  
+
 ______________________________________________________________________
 
 ## 🏗️ How It Works
+
+### Overview
 
 BundleCraft uses a **layered configuration model** and a three-stage pipeline when performing a `bundlecraft build`, its core operation:
 
@@ -272,9 +276,7 @@ BundleCraft provides the building blocks for trust bundle creation, while your C
 - Verify all outputs and cross-format consistency
 - Optionally sign and publish release artifacts
 
-______________________________________________________________________
-
-### 🔗 Fetch Layer & External Integrations
+### Fetch Layer & External Integrations
 
 BundleCraft's optional **Fetch layer** enables secure retrieval of certificates from external systems, allowing you to build trust bundles from remote sources while maintaining full security and auditability.
 
@@ -295,215 +297,11 @@ All fetchers support token-based authentication via environment variables and in
 
 ______________________________________________________________________
 
-### ⚙️ Bundle Composition in Environment Config Files
+## ⚡ Quick CLI Reference
 
-Environments can define composed bundles that merge one or more base sources.
+For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/README.md).
 
-In `config/envs/dev.yaml`:
-
-```yaml
-bundles:
-  internal-dev:
-    include_sources: [internal, mozilla]
-  mozilla:
-    include_sources: [mozilla]
-```
-
-Commands:
-
-```bash
-# Build all configured bundles (composed from sources)
-# --env references the config file stem (config/envs/dev.yaml)
-bundlecraft build --env dev
-
-# Build one bundle
-bundlecraft build --env dev --bundle mozilla
-
-# Build all environments (discovery baked in)
-# Scans config/envs/*.yaml by default; use --envs-path to scope to a subdirectory or glob
-bundlecraft build-all
-bundlecraft build-all --envs-path my_group
-bundlecraft build-all --envs-path "my_group/*.yaml"
-
-# Recursively discover envs in subdirectories (e.g., config/envs/**/*)
-bundlecraft build-all --recursive
-
-# Preview what would be built (no changes)
-bundlecraft build-all --print-plan
-bundlecraft build-all --envs-path my_group --print-plan --json
-bundlecraft build-all --recursive --print-plan
-```
-
-Outputs:
-
-- `dist/dev/internal-dev/` contains both internal and mozilla certs (bundle name)
-- `dist/dev/mozilla/` contains only mozilla certs
-
-______________________________________________________________________
-
-## 📦 Configuration Deep Dive
-
-### Source Config (`config/cert_sources/*.yaml`)
-
-These configuration files are your **trusted certificate sources.**
-
-It defines where BundleCraft where retrieve CA certificates from and stage them for a build. These certificates can either come from:
-
-- `repo`: a locally committed source, useful for simplicity or if you'd like explicit control of which exact certificates are built from within the repository, along with the rest of `bundlecraft` build configuration.
-- `fetch`: a trusted remote source, such as HashiCorp Vault, Keyfactor Command, or the Mozilla CA Bundle from [curl.se](https://curl.se/docs/caextract.html). Useful when managing trusted certificates in separate systems, while still being able to use `bundlecraft` configuration to perform further filtering.
-
-These bundles are then referenced by environment configuration files, which will go on to define which bundles these sourced certificates will appear in.
-
-```yaml
-# Optional, recommended identifiers for future controller/CRD-style tooling
-apiVersion: bundlecraft.io/v1alpha1
-kind: SourceConfig
-
-bundle_name: internal
-description: Trust bundle for internal PKI services
-repo:
-  - name: internal
-    include:
-      # Path entries (string or {path: ...})
-      - cert_sources/internal/rootCA.pem
-      - { path: cert_sources/internal/issuingCA1.pem }
-      # Inline PEM entry (optional name; if omitted, a name is generated)
-      - name: special-inline.pem
-        inline: |
-          -----BEGIN CERTIFICATE-----
-          ...
-          -----END CERTIFICATE-----
-
-# Optional remote sources (fetched at build time, staged with provenance)
-fetch:
-  - name: mozilla_roots
-    type: url
-    url: https://curl.se/ca/cacert.pem
-metadata:
-  # Free-form documentation and selectors
-  owner: example@bundlecraft.io
-  tags: [internal]
-  labels: { team: security, tier: core }
-```
-
-### Environment Config (`config/envs/*.yaml`)
-
-Defines **how** bundles are built in a specific context, including secrets, output path, global filters, and format behavior.
-
-These configuration files are your **customized certificate trust bundles.**
-
-It defines how BundleCraft (based on the certificate source configurations from `config/cert_sources/`) will build, merge, package, and prepare your trust bundle files for distribution. These are essentially your environment specific configuration files.
-
-Additional build filters, verification guardrails, packaging settings, and formatting options can be specified here.
-
-```yaml
-# Optional, recommended identifiers
-apiVersion: bundlecraft.io/v1alpha1
-kind: EnvConfig
-name: Example Environment
-build_path: dist/example/
-package: false
-verify:
-  fail_on_expired: true
-  warn_days_before_expiry: 30
-output_formats:
-  - pem
-  - p7b
-  - jks
-  - p12
-format_overrides:
-  jks:
-    storepass_env: TRUST_JKS_PASSWORD
-    alias_format: "{subject.CN}-{serial}"
-  pkcs12:
-    password_env: TRUST_P12_PASSWORD
-filters:
-  unique_by_fingerprint: true
-  not_expired_only: true
-  ca_certs_only: true
-metadata:
-  contact: security@bundlecraft.io
-  policy_version: 1.0
-```
-
-#### Notes on config headers and metadata
-
-- `apiVersion` and `kind` are optional but validated when present. They future‑proof configs for strict environments (e.g., Kubernetes-style controllers) without changing behavior.
-- `metadata.labels` is supported on source and environment configs to attach machine-readable key/value tags for internal automation. It’s not used for selection today (envs reference sources by name only) but provides a clean place for future selectors and CI policies.
-- Separation of concerns is enforced: environment configs compose sources by name and control build/distribution; source configs own repo/fetch definitions. Envs do not reference nested repo/fetch entries.
-
-### Defaults (`config/defaults.yaml`)
-
-Baseline settings for verification, filters, output formats, and metadata.
-These can be overridden by environment or source configs.
-
-______________________________________________________________________
-
-## ⚙️ Environment Variables
-
-BundleCraft supports the following environment variables for configuration:
-
-| Variable | Purpose | Default Value | Used By |
-|------------------------|-----------------------------------------------|----------------|------------------|
-| `TRUST_JKS_PASSWORD` | Password for Java KeyStore operations | `"changeit"` | Convert, Verify |
-| `TRUST_P12_PASSWORD` | Password for PKCS#12 operations | `"changeit"` | Convert, Verify |
-| `BUNDLECRAFT_WORKSPACE` | Override workspace directory for builds | Current directory | Builder |
-| `VAULT_TOKEN` | HashiCorp Vault authentication token | - | Vault Fetcher |
-| `VAULT_ADDR` | HashiCorp Vault server address | - | Vault Fetcher |
-| `KEYFACTOR_TOKEN` | Keyfactor API authentication token | - | API Fetcher |
-| `GPG_KEY_ID` | GPG key identifier for signing operations | - | Signing |
-| `GPG_PASSPHRASE` | GPG key passphrase for signing | `""` (empty) | Signing |
-
-**Note:**
-
-- Password variables are used as fallback values and can be overridden via CLI options or config files
-- Authentication tokens (`*_TOKEN`) are required when using their respective fetchers
-- Signing variables are only needed when using `--sign` option
-- Workspace variable is primarily used for development and testing environments
-
-______________________________________________________________________
-
-## 🔐 Security & Verification
-
-- **Strict Expiry Handling:** Build fails if any cert is expired (unless configured otherwise)
-- **Deduplication:** SHA256 fingerprint used for unique certs
-- **Subject Annotation:** PEM includes `# Subject:` comments for traceability
-- **Manifest & Checksums:** Every build records outputs with SHA256 in both JSON and text formats
-- **Cross-format Verification:** Cert counts and file integrity checked for PEM, P7B, JKS, P12
-- **Fetch provenance:** `provenance.fetch.json` recorded in staging and embedded into `manifest.json` under `fetched`
-- **Network trust controls:** HTTPS only (for APIs and URLs), optional custom CA, optional TLS leaf fingerprint pinning, and optional content `sha256` pinning
-- **GPG signing:** Sign all release artifacts with detached GPG signatures (.asc files)
-- **SBOM generation:** Automatic Software Bill of Materials in CycloneDX format
-- **Signature verification:** Built-in verification for signed releases with keyring support
-
-For more, see: [`SECURITY.md`](./SECURITY.md)
-
-### ✍🏽 Signing Release Artifacts (optional)
-
-Sign all release artifacts with GPG:
-
-```bash
-# Generate or use existing GPG key
-gpg --full-generate-key
-
-# Build and sign artifacts
-export GPG_KEY_ID=ABCD1234EFGH5678
-bundlecraft build --env prod --bundle mozilla --sign
-
-# Verify signatures
-bundlecraft verify --target dist/Production/mozilla --verify-signatures
-```
-
-See [SIGNING-AND-SBOM.md](docs/SIGNING-AND-SBOM.md) for the complete guide on:
-
-- GPG key generation and management
-- CI/CD integration with GitHub Actions
-- SBOM usage and validation
-- Key management best practices
-
-______________________________________________________________________
-
-## 🧰 Core CLI Reference
+### Core CLI
 
 All commands work with both the Python package (`bundlecraft`) and container (`podman run ghcr.io/bundlecraft-io/bundlecraft:latest`):
 
@@ -515,232 +313,6 @@ All commands work with both the Python package (`bundlecraft`) and container (`p
 | `bundlecraft verify` | Verify PEMs or built bundle directories (expiry + integrity) | `bundlecraft verify dist/prod/internal --verify-all` |
 | `bundlecraft diff` | Compare two bundles and identify certificate changes | `bundlecraft diff --from dist/prod/v1/internal --to dist/prod/v2/internal` |
 | `bundlecraft convert` | Convert any supported input to any supported output (PEM, P7B, JKS, P12, ZIP) | `bundlecraft convert --input bundlecraft-ca-trust.pem --output-dir ./ --output-format jks` |
-
-For more detailed usage and options, see [`bundlecraft/README.md`](bundlecraft/README.md).
-
-______________________________________________________________________
-
-## 💽 Related Repositories
-
-### 🧱 BundleCraft Starter Template Repository
-
-New to BundleCraft and looking to quickly get up and running using it? Use the official template repository for a quick setup within your own BundleCraft config repository: [`BundleCraft Starter Template`](https://github.com/bundlecraft-io/bundlecraft-starter)
-
-### 🧑🏽‍💻 BundleCraft Demo Repository
-
-Want to see a (made up) case study on how BundleCraft solved an organization's PKI problems? Or, want to see some config samples? Check out the BundleCraft demo repo: [`BundleCraft Demo`](https://github.com/bundlecraft-io/bundlecraft-demo)
-
-______________________________________________________________________
-
-## 📝 Documentation
-
-**See: [`docs/README.md`](docs/README.md)**
-
-______________________________________________________________________
-
-## 🧭 Troubleshooting & FAQ
-
-### 🐳 Container Issues
-
-**Container volume mount issues?**
-Ensure volumes are mounted correctly:
-
-```bash
-podman run --rm \
-  -v $(pwd)/config:/config \
-  -v $(pwd)/cert_sources:/cert_sources \
-  -v $(pwd)/dist:/dist \
-  ghcr.io/bundlecraft-io/bundlecraft:latest \
-  build --env prod
-```
-
-- **Verifier says JKS=0?**
-  Ensure password is correct. The default password is `"changeit"`. Set `TRUST_JKS_PASSWORD` env var if using a different password.
-
-```bash
-podman run --user $(id -u):$(id -g) --rm \
-  -v $(pwd)/config:/config \
-  -v $(pwd)/cert_sources:/cert_sources \
-  -v $(pwd)/dist:/dist \
-  ghcr.io/bundlecraft-io/bundlecraft:latest \
-  build --env prod
-```
-
-### 🔐 Format & Conversion Issues
-
-**Empty P7B files?**
-Ensure your PEM input files contain valid certificates. BundleCraft uses the Python `cryptography` module for all format conversions.
-
-**P12 only contains one certificate?**
-This has been fixed in the current version - all certificates from the bundle are included in the PKCS#12 output.
-
-**Duplicate JKS aliases?**
-The build process removes existing keystores before import to prevent conflicts. Ensure you're using the latest version.
-
-### 🔑 Authentication & Secrets
-
-**Password issues with keystores?**
-Default passwords are `"changeit"` for both JKS and P12 formats. Override with environment variables:
-
-```bash
-export TRUST_JKS_PASSWORD="your-jks-password"
-export TRUST_P12_PASSWORD="your-p12-password"
-bundlecraft build --env prod
-```
-
-**Vault authentication failing?**
-Ensure both `VAULT_TOKEN` and `VAULT_ADDR` are set:
-
-```bash
-export VAULT_TOKEN="hvs.your-vault-token"
-export VAULT_ADDR="https://vault.example.com:8200"
-```
-
-**Keyfactor API authentication issues?**
-Set the `KEYFACTOR_TOKEN` environment variable:
-
-```bash
-export KEYFACTOR_TOKEN="your-keyfactor-api-token"
-```
-
-### 🌐 Network & Fetch Issues
-
-**"Insecure HTTP rejected" errors?**
-BundleCraft only supports HTTPS for security. Use `https://` URLs or `file://` for local files. For APIs, configure proper CA verification:
-
-```yaml
-fetch:
-  - name: secure_source
-    type: api
-    endpoint: https://api.example.com/certificates
-    verify:
-      ca_file: config/certs/api-ca.pem
-      tls_fingerprint_sha256: "abc123..." # optional
-```
-
-**SHA256 content mismatch errors?**
-Update the expected `verify.sha256` value to match the current content, or investigate if the source has changed unexpectedly:
-
-```yaml
-verify:
-  sha256: "new-expected-sha256-hash"
-```
-
-**TLS fingerprint mismatch errors?**
-Re-check the server certificate fingerprint (leaf certificate). If it rotated legitimately, update the configuration:
-
-```yaml
-verify:
-  tls_fingerprint_sha256: "new-leaf-certificate-fingerprint"
-```
-
-**"hvac not installed" errors with Vault?**
-Install the optional fetcher dependencies:
-
-```bash
-pip install bundlecraft[fetchers]
-```
-
-When using containers, Vault support is included by default.
-
-### 🔧 Build & Configuration Issues
-
-**Offline builds needed?**
-Use `bundlecraft build --skip-fetch` to avoid network access. If your config includes `fetch:` sections, pre-stage certificates:
-
-```bash
-# In connected environment
-bundlecraft fetch --env prod
-
-# Commit or package staged inputs
-# Then in offline environment
-bundlecraft build --env prod --skip-fetch
-```
-
-**Configuration validation errors?**
-Check YAML syntax and ensure all required fields are present. Use the `--verbose` flag for detailed error information:
-
-```bash
-bundlecraft build --env prod --verbose
-```
-
-**Certificate expiry warnings or failures?**
-Configure expiry handling in your environment config:
-
-```yaml
-verify:
-  fail_on_expired: false        # Don't fail builds on expired certs
-  warn_days_before_expiry: 30   # Warn 30 days before expiry
-```
-
-### 📋 Common Commands for Debugging
-
-```bash
-# Verbose output for detailed error information
-bundlecraft build --env prod --verbose
-
-# JSON output for structured error parsing
-bundlecraft build --env prod --json
-
-# Verify a specific bundle with detailed output
-bundlecraft verify --target dist/prod/internal --verify-all --verbose
-
-# Test fetch configuration without building
-bundlecraft fetch --env prod --bundle internal --verbose
-```
-
-### 📚 Additional Resources
-
-For more detailed troubleshooting information, see:
-
-- 📖 [Complete Troubleshooting Guide](docs/troubleshooting.md)
-- 🔧 [Configuration Specification](docs/CONFIG-SPEC.md)
-- 🚫 [Anti-Patterns Guide](docs/ANTI-PATTERNS.md)
-- 💬 [GitHub Discussions](https://github.com/bundlecraft-io/bundlecraft/discussions) for community support
-
-______________________________________________________________________
-
-## 🔮 Philosophy & Best Practices
-
-### Philosophy: BundleCraft as a comprehensive trust management system
-
-BundleCraft treats certificate trust management as a holistic engineering problem requiring reproducibility, auditability, and security at every layer. Rather than just being another certificate conversion tool, BundleCraft provides a complete configuration-as-code approach to trust store management.
-
-**Core Design Principles:**
-
-- **Declarative configuration:** Define what you want, not how to get it - BundleCraft handles the complexity
-- **Reproducible builds:** Same inputs always produce identical outputs across environments and time
-- **Defense in depth:** Multiple verification layers from source validation to output integrity checking  
-- **Full provenance:** Every operation is tracked and auditable for compliance and debugging
-- **Environment awareness:** Support different trust requirements across dev, staging, and production
-- **Format agnostic:** Universal trust bundle that works across all platforms and technologies
-
-### Best Practices
-
-**Security:**
-
-- Always use HTTPS; never `http://`
-- Pin content (`verify.sha256`) for static/public bundles when possible (e.g., Mozilla)
-- For APIs/services, prefer TLS CA pinning and optionally leaf fingerprint pinning
-- Keep tokens in env vars (`*_TOKEN`) and never commit secrets in YAML
-
-**Configuration Management:**
-
-- Commit sample configs but not secrets; use CI secret stores for tokens
-- Treat `cert_sources/staged/` as ephemeral; do not rely on it as a cache
-- Use layered configs: defaults → environment → bundle for clean separation
-- Test configurations in non-production environments first
-
-**Operational:**
-
-- Use `--json` output for CI/CD automation and monitoring
-- Implement certificate expiry monitoring with configurable thresholds
-- Regularly verify bundle integrity across all environments
-- Document your certificate sources and approval processes
-
-______________________________________________________________________
-
-## ⚡ Quick Reference
 
 ### Common Commands
 
@@ -787,7 +359,7 @@ podman run --rm \
   convert --input /dist/bundlecraft-ca-trust.pem --output-dir /dist --output-format jks
 ```
 
-### 🤖 Machine-Readable Output (JSON)
+### Machine-Readable Output (JSON)
 
 All BundleCraft commands support `--json` flag for CI/CD automation and scripting:
 
@@ -805,15 +377,382 @@ fi
 bundlecraft verify --target dist/prod/mozilla --json | jq -r '.verified_files'
 ```
 
-**Benefits:**
+- 📖 **Full documentation:** [docs/JSON-OUTPUT.md](docs/JSON-OUTPUT.md)
+- 🔍 **Examples:** [scripts/json-output-examples.sh](scripts/json-output-examples.sh)
 
-- **Stable schemas** - Documented, versioned JSON schemas for reliable parsing
-- **Error handling** - Structured error messages in JSON even on failures
-- **CI/CD friendly** - No ANSI colors, emojis, or unparseable output
-- **Consistent** - All commands follow the same base schema pattern
+______________________________________________________________________
 
-📖 **Full documentation:** [docs/JSON-OUTPUT.md](docs/JSON-OUTPUT.md)
-🔍 **Examples:** [scripts/json-output-examples.sh](scripts/json-output-examples.sh)
+## ⚙️ Configuration
+
+### Config Files
+
+#### Source Config (`config/cert_sources/*.yaml`)
+
+These configuration files are your **trusted certificate sources.**
+
+It defines where BundleCraft where retrieve CA certificates from and stage them for a build. These certificates can either come from:
+
+- `repo`: a locally committed source, useful for simplicity or if you'd like explicit control of which exact certificates are built from within the repository, along with the rest of `bundlecraft` build configuration.
+- `fetch`: a trusted remote source, such as HashiCorp Vault, Keyfactor Command, or the Mozilla CA Bundle from [curl.se](https://curl.se/docs/caextract.html). Useful when managing trusted certificates in separate systems, while still being able to use `bundlecraft` configuration to perform further filtering.
+
+These bundles are then referenced by environment configuration files, which will go on to define which bundles these sourced certificates will appear in.
+
+```yaml
+# Optional, recommended identifiers for future controller/CRD-style tooling
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
+
+bundle_name: internal
+description: Trust bundle for internal PKI services
+repo:
+  - name: internal
+    include:
+      # Path entries (string or {path: ...})
+      - cert_sources/internal/rootCA.pem
+      - { path: cert_sources/internal/issuingCA1.pem }
+      # Inline PEM entry (optional name; if omitted, a name is generated)
+      - name: special-inline.pem
+        inline: |
+          -----BEGIN CERTIFICATE-----
+          ...
+          -----END CERTIFICATE-----
+
+# Optional remote sources (fetched at build time, staged with provenance)
+fetch:
+  - name: mozilla_roots
+    type: url
+    url: https://curl.se/ca/cacert.pem
+metadata:
+  # Free-form documentation and selectors
+  owner: example@bundlecraft.io
+  tags: [internal]
+  labels: { team: security, tier: core }
+```
+
+#### Environment Config (`config/envs/*.yaml`)
+
+Defines **how** bundles are built in a specific context, including secrets, output path, global filters, and format behavior.
+
+These configuration files are your **customized certificate trust bundles.**
+
+It defines how BundleCraft (based on the certificate source configurations from `config/cert_sources/`) will build, merge, package, and prepare your trust bundle files for distribution. These are essentially your environment specific configuration files.
+
+Additional build filters, verification guardrails, packaging settings, and formatting options can be specified here.
+
+```yaml
+# Optional, recommended identifiers
+apiVersion: bundlecraft.io/v1alpha1
+kind: EnvConfig
+name: Example Environment
+build_path: dist/example/
+package: false
+verify:
+  fail_on_expired: true
+  warn_days_before_expiry: 30
+output_formats:
+  - pem
+  - p7b
+  - jks
+  - p12
+format_overrides:
+  jks:
+    storepass_env: TRUST_JKS_PASSWORD
+    alias_format: "{subject.CN}-{serial}"
+  pkcs12:
+    password_env: TRUST_P12_PASSWORD
+filters:
+  unique_by_fingerprint: true
+  not_expired_only: true
+  ca_certs_only: true
+metadata:
+  contact: security@bundlecraft.io
+  policy_version: 1.0
+```
+
+Notes on config headers and metadata
+
+- `apiVersion` and `kind` are optional but validated when present. They future‑proof configs for strict environments (e.g., Kubernetes-style controllers) without changing behavior.
+- `metadata.labels` is supported on source and environment configs to attach machine-readable key/value tags for internal automation. It’s not used for selection today (envs reference sources by name only) but provides a clean place for future selectors and CI policies.
+- Separation of concerns is enforced: environment configs compose sources by name and control build/distribution; source configs own repo/fetch definitions. Envs do not reference nested repo/fetch entries.
+
+#### Defaults (`config/defaults.yaml`)
+
+Baseline settings for verification, filters, output formats, and metadata.
+These can be overridden by environment or source configs.
+
+### Environment Variables
+
+BundleCraft supports the following environment variables for configuration:
+
+| Variable | Purpose | Default Value | Used By |
+|------------------------|-----------------------------------------------|----------------|------------------|
+| `TRUST_JKS_PASSWORD` | Password for Java KeyStore operations | `"changeit"` | Convert, Verify |
+| `TRUST_P12_PASSWORD` | Password for PKCS#12 operations | `"changeit"` | Convert, Verify |
+| `BUNDLECRAFT_WORKSPACE` | Override workspace directory for builds | Current directory | Builder |
+| `VAULT_TOKEN` | HashiCorp Vault authentication token | - | Vault Fetcher |
+| `VAULT_ADDR` | HashiCorp Vault server address | - | Vault Fetcher |
+| `KEYFACTOR_TOKEN` | Keyfactor API authentication token | - | API Fetcher |
+| `GPG_KEY_ID` | GPG key identifier for signing operations | - | Signing |
+| `GPG_PASSPHRASE` | GPG key passphrase for signing | `""` (empty) | Signing |
+
+**Note:**
+
+- Password variables are used as fallback values and can be overridden via CLI options or config files
+- Authentication tokens (`*_TOKEN`) are required when using their respective fetchers
+- Signing variables are only needed when using `--sign` option
+- Workspace variable is primarily used for development and testing environments
+
+______________________________________________________________________
+
+## 🔐 Security & Verification
+
+- **Strict Expiry Handling:** Build fails if any cert is expired (unless configured otherwise)
+- **Deduplication:** SHA256 fingerprint used for unique certs
+- **Subject Annotation:** PEM includes `# Subject:` comments for traceability
+- **Manifest & Checksums:** Every build records outputs with SHA256 in both JSON and text formats
+- **Cross-format Verification:** Cert counts and file integrity checked for PEM, P7B, JKS, P12
+- **Fetch provenance:** `provenance.fetch.json` recorded in staging and embedded into `manifest.json` under `fetched`
+- **Network trust controls:** HTTPS only (for APIs and URLs), optional custom CA, optional TLS leaf fingerprint pinning, and optional content `sha256` pinning
+- **GPG signing:** Sign all release artifacts with detached GPG signatures (.asc files)
+- **SBOM generation:** Automatic Software Bill of Materials in CycloneDX format
+- **Signature verification:** Built-in verification for signed releases with keyring support
+
+For more, see: [`SECURITY.md`](./SECURITY.md)
+
+______________________________________________________________________
+
+## ✍🏽 Signing Release Artifacts
+
+Optionally, sign all release artifacts with GPG during your build for verification later on:
+
+```bash
+# Generate or use existing GPG key
+gpg --full-generate-key
+
+# Build and sign artifacts
+export GPG_KEY_ID=ABCD1234EFGH5678
+bundlecraft build --env prod --bundle mozilla --sign
+
+# Verify signatures
+bundlecraft verify --target dist/Production/mozilla --verify-signatures
+```
+
+See [SIGNING-AND-SBOM.md](docs/SIGNING-AND-SBOM.md) for the complete guide on:
+
+- GPG key generation and management
+- CI/CD integration with GitHub Actions
+- SBOM usage and validation
+- Key management best practices
+
+______________________________________________________________________
+
+## 🧭 Troubleshooting & FAQ
+
+### Container Issues
+
+**Container volume mount issues?**
+Ensure volumes are mounted correctly:
+
+```bash
+podman run --rm \
+  -v $(pwd)/config:/config \
+  -v $(pwd)/cert_sources:/cert_sources \
+  -v $(pwd)/dist:/dist \
+  ghcr.io/bundlecraft-io/bundlecraft:latest \
+  build --env prod
+```
+
+- **Verifier says JKS=0?**
+  Ensure password is correct. The default password is `"changeit"`. Set `TRUST_JKS_PASSWORD` env var if using a different password.
+
+```bash
+podman run --user $(id -u):$(id -g) --rm \
+  -v $(pwd)/config:/config \
+  -v $(pwd)/cert_sources:/cert_sources \
+  -v $(pwd)/dist:/dist \
+  ghcr.io/bundlecraft-io/bundlecraft:latest \
+  build --env prod
+```
+
+### Format & Conversion Issues
+
+**Empty P7B files?**
+Ensure your PEM input files contain valid certificates. BundleCraft uses the Python `cryptography` module for all format conversions.
+
+**P12 only contains one certificate?**
+This has been fixed in the current version - all certificates from the bundle are included in the PKCS#12 output.
+
+**Duplicate JKS aliases?**
+The build process removes existing keystores before import to prevent conflicts. Ensure you're using the latest version.
+
+### Authentication & Secrets
+
+**Password issues with keystores?**
+Default passwords are `"changeit"` for both JKS and P12 formats. Override with environment variables:
+
+```bash
+export TRUST_JKS_PASSWORD="your-jks-password"
+export TRUST_P12_PASSWORD="your-p12-password"
+bundlecraft build --env prod
+```
+
+**Vault authentication failing?**
+Ensure both `VAULT_TOKEN` and `VAULT_ADDR` are set:
+
+```bash
+export VAULT_TOKEN="hvs.your-vault-token"
+export VAULT_ADDR="https://vault.example.com:8200"
+```
+
+**Keyfactor API authentication issues?**
+Set the `KEYFACTOR_TOKEN` environment variable:
+
+```bash
+export KEYFACTOR_TOKEN="your-keyfactor-api-token"
+```
+
+### Network & Fetch Issues
+
+**"Insecure HTTP rejected" errors?**
+BundleCraft only supports HTTPS for security. Use `https://` URLs or `file://` for local files. For APIs, configure proper CA verification:
+
+```yaml
+fetch:
+  - name: secure_source
+    type: api
+    endpoint: https://api.example.com/certificates
+    verify:
+      ca_file: config/certs/api-ca.pem
+      tls_fingerprint_sha256: "abc123..." # optional
+```
+
+**SHA256 content mismatch errors?**
+Update the expected `verify.sha256` value to match the current content, or investigate if the source has changed unexpectedly:
+
+```yaml
+verify:
+  sha256: "new-expected-sha256-hash"
+```
+
+**TLS fingerprint mismatch errors?**
+Re-check the server certificate fingerprint (leaf certificate). If it rotated legitimately, update the configuration:
+
+```yaml
+verify:
+  tls_fingerprint_sha256: "new-leaf-certificate-fingerprint"
+```
+
+**"hvac not installed" errors with Vault?**
+Install the optional fetcher dependencies:
+
+```bash
+pip install bundlecraft[fetchers]
+```
+
+When using containers, Vault support is included by default.
+
+### Build & Configuration Issues
+
+**Offline builds needed?**
+Use `bundlecraft build --skip-fetch` to avoid network access. If your config includes `fetch:` sections, pre-stage certificates:
+
+```bash
+# In connected environment
+bundlecraft fetch --env prod
+
+# Commit or package staged inputs
+# Then in offline environment
+bundlecraft build --env prod --skip-fetch
+```
+
+**Configuration validation errors?**
+Check YAML syntax and ensure all required fields are present. Use the `--verbose` flag for detailed error information:
+
+```bash
+bundlecraft build --env prod --verbose
+```
+
+**Certificate expiry warnings or failures?**
+Configure expiry handling in your environment config:
+
+```yaml
+verify:
+  fail_on_expired: false        # Don't fail builds on expired certs
+  warn_days_before_expiry: 30   # Warn 30 days before expiry
+```
+
+### Common Commands for Debugging
+
+```bash
+# Verbose output for detailed error information
+bundlecraft build --env prod --verbose
+
+# JSON output for structured error parsing
+bundlecraft build --env prod --json
+
+# Verify a specific bundle with detailed output
+bundlecraft verify --target dist/prod/internal --verify-all --verbose
+
+# Test fetch configuration without building
+bundlecraft fetch --env prod --bundle internal --verbose
+```
+
+### Additional Resources
+
+For more detailed troubleshooting information, see:
+
+- 📖 [Complete Troubleshooting Guide](docs/troubleshooting.md)
+- 🔧 [Configuration Specification](docs/CONFIG-SPEC.md)
+- 🚫 [Anti-Patterns Guide](docs/ANTI-PATTERNS.md)
+- 💬 [GitHub Discussions](https://github.com/bundlecraft-io/bundlecraft/discussions) for community support
+
+______________________________________________________________________
+
+## 🔮 Philosophy & Best Practices
+
+### Philosophy
+
+BundleCraft treats certificate trust management as a holistic engineering problem requiring reproducibility, auditability, and security at every layer. Rather than just being another certificate conversion tool, BundleCraft provides a complete configuration-as-code approach to trust store management.
+
+**Core Design Principles:**
+
+- **Declarative configuration:** Define what you want, not how to get it - BundleCraft handles the complexity
+- **Reproducible builds:** Same inputs always produce identical outputs across environments and time
+- **Defense in depth:** Multiple verification layers from source validation to output integrity checking
+- **Full provenance:** Every operation is tracked and auditable for compliance and debugging
+- **Environment awareness:** Support different trust requirements across dev, staging, and production
+- **Format agnostic:** Universal trust bundle that works across all platforms and technologies
+
+### Best Practices
+
+**Security:**
+
+- Always use HTTPS; never `http://`
+- Pin content (`verify.sha256`) for static/public bundles when possible (e.g., Mozilla)
+- For APIs/services, prefer TLS CA pinning and optionally leaf fingerprint pinning
+- Keep tokens in env vars (`*_TOKEN`) and never commit secrets in YAML
+
+**Configuration Management:**
+
+- Commit sample configs but not secrets; use CI secret stores for tokens
+- Treat `cert_sources/staged/` as ephemeral; do not rely on it as a cache
+- Use layered configs: defaults → environment → bundle for clean separation
+- Test configurations in non-production environments first
+
+**Operational:**
+
+- Use `--json` output for CI/CD automation and monitoring
+- Implement certificate expiry monitoring with configurable thresholds
+- Regularly verify bundle integrity across all environments
+- Document your certificate sources and approval processes
+
+______________________________________________________________________
+
+## 📝 Additional Documentation
+
+For topics not discussed in this README, or for topics that need their own page.
+
+**See: [`docs/README.md`](docs/README.md)**
 
 ______________________________________________________________________
 
@@ -833,7 +772,7 @@ ______________________________________________________________________
 
 ## 🏷️ Tags & Metadata
 
-- **Topics:** pki, x509, certificate-management, truststore, keystore, jks, pkcs12, pkcs7, pem, ca-certificates, cryptography, tls, cli, devsecops, sbom, cyclonedx, gpg, python, configuration-as-code, hashicorp-vault, certificates, pki-tools
+- **Topics:** python, tls, cli, security, cryptography, openssl, certificates, x509, pki, keystore, pem, cicd, bundles, devsecops, truststore, ca-certificates, certificate-management, pki-tools
 
 ______________________________________________________________________
 

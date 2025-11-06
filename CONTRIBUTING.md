@@ -13,30 +13,32 @@ Contributing code:
 git clone https://github.com/bundlecraft-io/bundlecraft.git
 cd bundlecraft
 
-# 2. Enable git hooks (prevents pushing tags without changelog entries)
-git config core.hooksPath .githooks
-
-# 3. Set up your environment
-python -m venv venv
+# 2. Set up your dev environment
+python3 -m venv venv
 source venv/bin/activate  # or: venv\Scripts\activate on Windows
-pip install -e ".[dev]"
+make setup-dev  # Installs dependencies + configures git hooks + pre-commit
 
-# 4. Create a feature branch
+# Alternative manual setup:
+# pip install -e ".[dev]" 
+# git config core.hooksPath .githooks
+# pre-commit install
+
+# 3. Create a feature branch
 git checkout -b feature/my-awesome-feature
 
-# 5. (Optional) Generate minimal sample configs for testing
+# 4. (Optional) Generate minimal sample configs for testing
 scripts/prepare_test_configs.sh
 
-# 6. Make changes, test locally
+# 5. Make changes, test locally
 bundlecraft build --env test-example-envconfig --verbose
 
-# 7. Test a pypi/container build with your changes:
+# 6. Test a pypi/container build with your changes:
 make test-image-build   # container, requires podman/docker
 make test-pypi-build    # pypi package
 
-# 8. Test and lint code
+# 7. Test and lint code
 pytest -v
-black . && ruff check . --fix
+make ci-lint  # runs: ruff check bundlecraft tests
 
 # 9. Commit and open PR to pre-release (address pre-commit findings too if any)
 git add .
@@ -215,7 +217,7 @@ BundleCraft uses Click's shell completion. To enable tab completion for commands
 # Bash - run in your current shell (or add to ~/.bashrc for persistence)
 eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
 
-# Zsh - run in your current shell (or add to ~/.zshrc for persistence)  
+# Zsh - run in your current shell (or add to ~/.zshrc for persistence)
 eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 ```
 
@@ -398,7 +400,7 @@ ______________________________________________________________________
 ## 🧾 Coding Standards
 
 Keep things simple and consistent, follow [PEP 8](https://peps.python.org/pep-0008/).
-  
+
 ______________________________________________________________________
 
 ## 🚀 Releases
@@ -498,7 +500,7 @@ docker run --rm -it \
 **Use pre-releases for:**
 
 - Testing new features before production
-- Verifying bug fixes work in your environment  
+- Verifying bug fixes work in your environment
 - Contributing feedback on upcoming changes
 - CI/CD pipeline testing with latest features
 

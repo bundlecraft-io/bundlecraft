@@ -115,6 +115,24 @@ Retrieves certificates from Azure Blob Storage, supporting multiple authenticati
 3. **SAS Token** - Storage account name with shared access signature
 4. **Managed Identity** - Azure Managed Identity for authentication
 5. **Default Credential** - Azure SDK default credential chain (environment, managed identity, Azure CLI)
+### 4. S3 Fetcher (`type: s3`)
+
+Retrieves certificates from AWS S3 storage buckets or S3-compatible object storage services.
+
+**Use cases:**
+
+- Certificate bundles stored in S3 for centralized distribution
+- Certificates managed through AWS infrastructure
+- Integration with existing S3-based artifact repositories
+- S3-compatible storage (MinIO, Ceph, etc.)
+
+**Security features:**
+
+- AWS credential chain (environment variables, IAM roles, profiles)
+- Support for IAM policies and bucket policies
+- Custom CA validation for S3-compatible endpoints
+- Regional deployment support
+- Content verification via SHA256
 
 ## Configuration
 
@@ -146,7 +164,7 @@ fetch:
     verify:
       # Content integrity verification
       sha256: "expected-sha256-hash-of-content"
-      
+
       # TLS validation options
       ca_file: config/certs/trusted-ca.pem          # optional custom CA
       tls_fingerprint_sha256: "leaf-cert-fp"        # optional leaf cert pinning
@@ -230,6 +248,36 @@ fetch:
     account_name: mystorageaccount
     # No explicit auth - uses DefaultAzureCredential
     # Tries: environment vars, managed identity, Azure CLI, etc.
+### S3 Fetcher Configuration
+
+```yaml
+fetch:
+  # Using s3:// URL format
+  - name: s3_bundle
+    type: s3
+    url: s3://my-bucket/certificates/bundle.pem
+    region: us-west-2           # optional, uses default AWS region if not specified
+    verify:
+      sha256: "expected-content-hash"  # optional content verification
+
+  # Using explicit bucket and key parameters
+  - name: s3_explicit
+    type: s3
+    bucket: my-certificate-bucket
+    key: production/root-ca.pem
+    region: us-east-1
+    verify:
+      sha256: "expected-content-hash"
+
+  # S3-compatible storage (MinIO, Ceph, etc.)
+  - name: minio_bundle
+    type: s3
+    bucket: certificates
+    key: bundles/internal-ca.pem
+    endpoint_url: https://minio.example.com:9000  # custom S3-compatible endpoint
+    region: us-east-1           # required for signature calculation
+    verify:
+      ca_file: config/certs/minio-ca.pem  # for self-signed certificates
 ```
 
 ## Security Features
@@ -282,6 +330,70 @@ All API and Vault fetchers use environment variables for authentication:
 ```yaml
 # Reference environment variable containing the token
 token_ref: MY_API_TOKEN
+```
+
+### AWS Credential Chain (S3 Fetcher)
+
+The S3 fetcher uses the standard AWS credential chain for authentication, checking credentials in this order:
+
+1. **Environment variables**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`
+2. **Shared credential file**: `~/.aws/credentials` (selected by `AWS_PROFILE` if set)
+3. **AWS config file**: `~/.aws/config`
+4. **IAM role for Amazon EC2**: When running on EC2 instances
+5. **IAM role for ECS tasks**: When running in ECS containers
+6. **IAM role for Lambda**: When running in AWS Lambda
+
+**Recommended approach for production:**
+- Use IAM roles when running on AWS infrastructure (EC2, ECS, Lambda)
+- Use dedicated IAM users or roles with least-privilege policies
+- Rotate access keys regularly if using long-term credentials
+
+**Required IAM Permissions:**
+
+Minimum IAM policy for S3 fetcher:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion"
+      ],
+      "Resource": [
+        "arn:aws:s3:::your-certificate-bucket/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::your-certificate-bucket"
+      ]
+    }
+  ]
+}
+```
+
+For cross-account access, add trust relationships to the IAM role:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::ACCOUNT-ID:role/BundleCraftRole"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
 ```
 
 ## Common Usage Patterns
@@ -363,6 +475,31 @@ fetch:
     use_managed_identity: true
     timeout: 45
     retries: 5
+### AWS S3 Bucket
+
+```yaml
+fetch:
+  - name: s3_certificates
+    type: s3
+    bucket: company-certificates
+    key: bundles/production/root-ca-bundle.pem
+    region: us-west-2
+    verify:
+      sha256: "expected-bundle-hash"
+```
+
+### S3-Compatible Storage (MinIO)
+
+```yaml
+fetch:
+  - name: minio_certs
+    type: s3
+    bucket: pki-bundles
+    key: certificates/internal-roots.pem
+    endpoint_url: https://minio.internal.company.com:9000
+    region: us-east-1  # required for AWS signature
+    verify:
+      ca_file: config/certs/minio-ca.pem  # for self-signed MinIO
 ```
 
 ## Environment Variables
@@ -380,6 +517,11 @@ fetch:
 | Azure Blob | `AZURE_SAS_TOKEN` | Azure Storage SAS token |
 
 **Note:** Azure Blob also supports managed identity and DefaultAzureCredential, which don't require environment variables when running in Azure environments (VMs, AKS, Functions, etc.).
+| S3 | `AWS_ACCESS_KEY_ID` | AWS access key (optional, see AWS credential chain) |
+| S3 | `AWS_SECRET_ACCESS_KEY` | AWS secret key (optional, see AWS credential chain) |
+| S3 | `AWS_SESSION_TOKEN` | AWS session token for temporary credentials (optional) |
+| S3 | `AWS_REGION` | Default AWS region (optional, can be in config) |
+| S3 | `AWS_PROFILE` | AWS credential profile to use (optional) |
 
 ### Setting Environment Variables
 
@@ -403,6 +545,13 @@ export AZURE_ACCOUNT_KEY="your-storage-account-key"
 
 # Option 3: SAS Token (requires account_name in config)
 export AZURE_SAS_TOKEN="sv=2021-06-08&ss=bfqt&srt=sco&sp=rwdlacupitfx&se=2024-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=..."
+# For S3 fetchers (if not using IAM roles)
+export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
+export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+export AWS_REGION="us-west-2"  # optional, can be specified in config
+
+# For S3 with AWS credential profiles
+export AWS_PROFILE="production"
 ```
 
 ## Troubleshooting
@@ -515,6 +664,56 @@ pip install bundlecraft[fetchers]
 ```
 
 Note: When using containers, Azure Blob support is included by default.
+#### "AWS credentials not found" Error
+
+**Problem:** S3 fetcher cannot locate AWS credentials
+
+**Solution:** Configure AWS credentials using one of these methods:
+
+```bash
+# Option 1: Environment variables
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_REGION="us-west-2"
+
+# Option 2: AWS credential file
+aws configure
+# Enter your credentials when prompted
+
+# Option 3: Use IAM role (when running on AWS)
+# No configuration needed - automatic
+```
+
+#### "S3 bucket not found" Error
+
+**Problem:** Specified S3 bucket does not exist or is in a different region
+
+**Solution:**
+1. Verify bucket name is correct
+2. Check that bucket exists: `aws s3 ls s3://your-bucket-name/`
+3. Ensure region is correctly specified in config if bucket is not in default region
+4. Verify IAM permissions allow ListBucket on the bucket
+
+#### "S3 object not found" Error
+
+**Problem:** Specified object key does not exist in the bucket
+
+**Solution:**
+1. Verify object key is correct (check for typos, extra slashes)
+2. List bucket contents: `aws s3 ls s3://your-bucket-name/path/`
+3. Check if object is in a different prefix/folder
+4. Ensure object hasn't been deleted or moved
+
+#### "Access denied to S3 bucket" Error
+
+**Problem:** IAM permissions do not allow access to bucket or object
+
+**Solution:**
+1. Verify IAM policy allows `s3:GetObject` on the specific bucket/key
+2. Check bucket policy allows access from your AWS account/role
+3. Review any S3 bucket ACLs that might restrict access
+4. For cross-account access, verify trust relationships are configured
+5. Test access: `aws s3 cp s3://your-bucket-name/key /tmp/test`
 
 ### Debugging Commands
 
@@ -555,7 +754,7 @@ bundlecraft fetch --env prod --bundle example --verbose
    ```bash
    # ✅ Use environment variables
    export VAULT_TOKEN="hvs.token"
-   
+
    # ❌ Never in YAML files
    # token: "hvs.token"  # DON'T DO THIS
    ```
