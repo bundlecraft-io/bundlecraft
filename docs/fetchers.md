@@ -90,6 +90,29 @@ Integrates with HashiCorp Vault for certificate retrieval from KV stores or PKI 
 - Address validation
 - Field-specific PEM extraction
 
+### 4. Google Cloud Storage Fetcher (`type: gcs`)
+
+Retrieves certificates from Google Cloud Storage buckets with native GCP authentication.
+
+**Use cases:**
+
+- Certificates stored in GCS buckets
+- Multi-region certificate distribution via GCS
+- Integration with GCP infrastructure
+- Cloud-native certificate management
+
+**Security features:**
+
+- Google Cloud SDK authentication (Application Default Credentials)
+- Service account authentication via JSON key files
+- IAM-based access control
+- Content integrity verification (SHA256)
+- Configurable retry and timeout behavior
+
+**Required GCS Permissions:**
+
+- `storage.objects.get` - Read objects from buckets
+- `storage.buckets.get` - (Optional) Verify bucket access
 ### 4. Azure Blob Fetcher (`type: azure_blob`)
 
 Retrieves certificates from Azure Blob Storage, supporting multiple authentication methods.
@@ -199,6 +222,23 @@ fetch:
       ca_file: config/certs/vault-ca.pem
 ```
 
+### Google Cloud Storage (GCS) Fetcher Configuration
+
+```yaml
+fetch:
+  - name: gcs_roots
+    type: gcs
+    bucket: my-certificates-bucket        # GCS bucket name
+    object_path: certs/root-ca.pem        # Path to object in bucket (also accepts 'object' or 'path')
+    project: my-gcp-project               # optional, GCP project ID
+    credentials_file: /path/to/creds.json # optional, defaults to GOOGLE_APPLICATION_CREDENTIALS
+    verify:
+      sha256: "expected-sha256-hash"      # optional content verification
+    # Optional: Override fetch retry/timeout settings
+    timeout: 60         # Request timeout in seconds (default: 30)
+    retries: 5          # Number of retry attempts (default: 3)
+    backoff_factor: 2.0 # Exponential backoff multiplier (default: 2.0)
+    retry_on_status: [429, 502, 503, 504]  # HTTP status codes to retry
 ### Azure Blob Fetcher Configuration
 
 ```yaml
@@ -438,6 +478,56 @@ fetch:
       ca_file: config/certs/vault-ca.pem
 ```
 
+### Google Cloud Storage Integration
+
+```yaml
+fetch:
+  - name: gcp_roots
+    type: gcs
+    bucket: company-pki-certificates
+    object_path: production/root-ca-bundle.pem
+    project: my-company-pki
+    verify:
+      sha256: "expected-sha256-of-bundle"
+    timeout: 60
+    retries: 5
+```
+
+**Authentication Options:**
+
+1. **Service Account Key File** (recommended for CI/CD):
+   ```yaml
+   fetch:
+     - name: gcp_certs
+       type: gcs
+       bucket: secure-certs
+       object_path: certs/root.pem
+       credentials_file: config/gcp-service-account.json
+   ```
+
+2. **Application Default Credentials** (for GCE/GKE/Cloud Run):
+   ```yaml
+   fetch:
+     - name: gcp_certs
+       type: gcs
+       bucket: secure-certs
+       object_path: certs/root.pem
+       # No credentials_file needed - uses ADC
+   ```
+
+3. **Environment Variable**:
+   ```bash
+   export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+   ```
+   ```yaml
+   fetch:
+     - name: gcp_certs
+       type: gcs
+       bucket: secure-certs
+       object_path: certs/root.pem
+       # Uses GOOGLE_APPLICATION_CREDENTIALS env var
+   ```
+
 ### Generic REST API
 
 ```yaml
@@ -512,6 +602,8 @@ fetch:
 | API (Generic) | `CUSTOM_API_TOKEN` | Custom API token (configurable name) |
 | Vault | `VAULT_TOKEN` | Vault authentication token |
 | Vault | `VAULT_ADDR` | Vault server address (optional, can be in config) |
+| GCS | `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON key file (optional, can use ADC) |
+| GCS | `GOOGLE_CLOUD_PROJECT` | Default GCP project ID (optional) |
 | Azure Blob | `AZURE_STORAGE_CONNECTION_STRING` | Full Azure Storage connection string |
 | Azure Blob | `AZURE_ACCOUNT_KEY` | Azure Storage account key |
 | Azure Blob | `AZURE_SAS_TOKEN` | Azure Storage SAS token |
@@ -536,6 +628,12 @@ export VAULT_ADDR="https://vault.example.com:8200"
 # For custom APIs
 export CUSTOM_API_TOKEN="your-custom-token"
 
+# For GCS fetcher
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+export GOOGLE_CLOUD_PROJECT="my-gcp-project"  # Optional
+
+# Alternatively, use gcloud CLI to configure Application Default Credentials
+gcloud auth application-default login
 # For Azure Blob Storage
 # Option 1: Connection String (includes account name and key)
 export AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=mykey;EndpointSuffix=core.windows.net"
@@ -622,6 +720,9 @@ pip install bundlecraft[fetchers]
 
 Note: When using containers, Vault support is included by default.
 
+#### "GCS: google-cloud-storage not installed" Error
+
+**Problem:** Missing GCS dependencies when using Python package installation
 #### "Azure Blob not found" Error
 
 **Problem:** Container or blob doesn't exist, or incorrect names specified
@@ -663,6 +764,73 @@ az vm identity show --resource-group myResourceGroup --name myVM
 pip install bundlecraft[fetchers]
 ```
 
+Note: When using containers, GCS support is included by default.
+
+#### "GCS: Access denied" or "403 Forbidden" Error
+
+**Problem:** Insufficient permissions to access GCS bucket or object
+
+**Solution:** 
+
+1. Verify service account has required IAM permissions:
+   ```bash
+   # Grant required permissions (run as GCP admin)
+   gcloud projects add-iam-policy-binding PROJECT_ID \
+     --member="serviceAccount:SERVICE_ACCOUNT_EMAIL" \
+     --role="roles/storage.objectViewer"
+   ```
+
+2. Ensure the bucket and object path are correct:
+   ```bash
+   # List objects in bucket to verify
+   gsutil ls gs://your-bucket-name/path/to/
+   ```
+
+3. Verify credentials are valid:
+   ```bash
+   # Test authentication
+   gcloud auth application-default print-access-token
+   ```
+
+#### "GCS: Object not found" or "404 Not Found" Error
+
+**Problem:** Bucket or object doesn't exist or path is incorrect
+
+**Solution:**
+
+1. Verify bucket exists and is accessible:
+   ```bash
+   gsutil ls gs://bucket-name
+   ```
+
+2. Check object path (case-sensitive):
+   ```bash
+   gsutil ls gs://bucket-name/path/to/object.pem
+   ```
+
+3. Ensure you have the correct bucket name and object path in your config
+
+#### "GCS: Authentication failed" or "401 Unauthorized" Error
+
+**Problem:** Invalid or expired credentials
+
+**Solution:**
+
+1. Refresh Application Default Credentials:
+   ```bash
+   gcloud auth application-default login
+   ```
+
+2. Verify service account key is valid and not expired:
+   ```bash
+   gcloud auth activate-service-account --key-file=/path/to/key.json
+   ```
+
+3. Check that GOOGLE_APPLICATION_CREDENTIALS points to a valid file:
+   ```bash
+   echo $GOOGLE_APPLICATION_CREDENTIALS
+   cat $GOOGLE_APPLICATION_CREDENTIALS | jq .type  # Should output "service_account"
+   ```
 Note: When using containers, Azure Blob support is included by default.
 #### "AWS credentials not found" Error
 

@@ -177,6 +177,18 @@ fetch:
     addr: http://127.0.0.1:8200
     token_ref: VAULT_TOKEN
 
+  - name: gcs_roots
+    type: gcs
+    bucket: my-certificates-bucket       # GCS bucket name
+    object_path: certs/root-ca.pem       # Path to object (also accepts 'object' or 'path')
+    project: my-gcp-project              # Optional GCP project ID
+    credentials_file: /path/to/creds.json # Optional, defaults to GOOGLE_APPLICATION_CREDENTIALS
+    verify:
+      sha256: <expected_sha256>          # Content pinning (recommended)
+    # Optional: Override fetch retry/timeout settings
+    timeout: 60
+    retries: 5
+```
   - name: azure_prod_certs
     type: azure_blob
     container: certificates              # Azure Blob container name (required)
@@ -815,6 +827,7 @@ For step-by-step guidance on interpreting and fixing validation errors (plus pyt
 - `fetch[].type: vault` → requires both `mount` and `path` fields
 - `fetch[].type: s3` → requires either `url` (s3://bucket/key format) OR both `bucket` and `key` fields
 - `fetch[].type: api` → requires `endpoint` field
+- `fetch[].type: gcs` → requires `bucket` and `object_path` (or `object`, or `path`) fields
 
 **Bundle Requirements:**
 

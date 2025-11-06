@@ -22,6 +22,7 @@ from typing import Any
 import click
 
 from bundlecraft.fetchers.api import fetch_api
+from bundlecraft.fetchers.gcs import fetch_gcs
 from bundlecraft.fetchers.azure_blob import fetch_azure_blob
 from bundlecraft.fetchers.http import fetch_url
 from bundlecraft.fetchers.s3 import fetch_s3
@@ -228,6 +229,37 @@ def _fetch_from_config(
                     token_ref=token_ref,
                     namespace=namespace,
                     verify=verify if isinstance(verify, dict) else None,
+                )
+            elif ftype == "gcs":
+                bucket = src.get("bucket")
+                if not bucket:
+                    raise click.ClickException("GCS fetch source requires 'bucket'")
+                object_path = src.get("object_path") or src.get("object") or src.get("path")
+                if not object_path:
+                    raise click.ClickException("GCS fetch source requires 'object_path' (or 'object')")
+                credentials_file = src.get("credentials_file")
+                project = src.get("project")
+                logger.info("  Fetching from Google Cloud Storage:")
+                logger.info(f"    Bucket: {bucket}")
+                logger.info(f"    Object: {object_path}")
+                if verbose:
+                    logger.debug(f"    Project: {project or 'default'}")
+                    logger.debug(
+                        f"    Credentials: {credentials_file or 'from GOOGLE_APPLICATION_CREDENTIALS env or ADC'}"
+                    )
+                out_path = fetch_gcs(
+                    dest_dir,
+                    name=name,
+                    bucket=bucket,
+                    object_path=object_path,
+                    credentials_file=credentials_file,
+                    project=project,
+                    verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
                 )
             elif ftype == "azure_blob":
                 container = src.get("container")
@@ -609,6 +641,10 @@ def _fetch_each_to_named_dirs(
                 )
                 path = src.get("path")
                 logger.info(f"[dry-run]   from Vault: {mount_point}/{path}")
+            elif ftype == "gcs":
+                bucket = src.get("bucket")
+                object_path = src.get("object_path") or src.get("object") or src.get("path")
+                logger.info(f"[dry-run]   from GCS: gs://{bucket}/{object_path}")
             elif ftype == "azure_blob":
                 container = src.get("container")
                 blob_name = src.get("blob_name")
