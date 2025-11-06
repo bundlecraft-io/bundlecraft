@@ -32,6 +32,7 @@ RELEASE_IMAGE_REF ?= localhost/$(IMAGE_NAME):$(GIT_TAG)
 	test-image-version test-image-build test-image-run \
 	test-pypi-version test-pypi-build test-pypi-run \
 	setup-dev ci-install-dev ci-test ci-lint \
+	deploy-pre-release deploy-main-release \
 	help
 
 help:
@@ -49,6 +50,9 @@ help:
 	@echo "  test-pypi-version       Create temp venv, install built wheel, print version"
 	@echo "  test-pypi-build         Prepare configs, install built wheel, build + verify, cleanup"
 	@echo "  test-pypi-run           Same setup, but runs your args: make test-pypi-run BUNDLECRAFT_ARGS='build --env dev'"
+	@echo "Git Tag Deployment helpers:"
+	@echo "  deploy-pre-release      Create and push a tag to Github based on the latest changelog entry in the pre-release section"
+	@echo "  deploy-main-release     Create and push a tag to Github based on the latest changelog entry in the stable releases section"
 	@echo "CI helpers:"
 	@echo "  ci-install-dev          Install dev dependencies for CI"
 	@echo "  ci-test                 Run pytest with coverage for CI"
@@ -221,6 +225,15 @@ setup-dev:
 	@echo "  - Pre-commit only: git config --unset-all core.hooksPath && pre-commit install"
 	@echo "  - Custom hooks only: pre-commit uninstall && git config core.hooksPath .githooks"
 	@echo "  - Both (recommended): git config core.hooksPath .githooks && pre-commit install --allow-missing-config"
+
+# ---- Git Tag helpers ----
+deploy-pre-release:
+	@echo "Deploying pre-release tag..."
+	@scripts/deploy_tag.sh pre-release
+
+deploy-main-release:
+	@echo "Deploying main release tag..."
+	@scripts/deploy_tag.sh main-release
 
 # ---- CI helpers ----
 ci-install-dev:
