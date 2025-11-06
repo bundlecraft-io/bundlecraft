@@ -51,6 +51,9 @@ class FetchType(str, Enum):
     API = "api"
     S3 = "s3"
     AZURE_BLOB = "azure_blob"
+    GCS = "gcs"
+    MOZILLA = "mozilla"
+
 
 
 class DistributionTargetType(str, Enum):
