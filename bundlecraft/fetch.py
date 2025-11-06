@@ -254,6 +254,13 @@ def _fetch_from_config(
                     object_path=object_path,
                     credentials_file=credentials_file,
                     project=project,
+                    verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
+                )
             elif ftype == "azure_blob":
                 container = src.get("container")
                 blob_name = src.get("blob_name")

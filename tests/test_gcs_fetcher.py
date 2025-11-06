@@ -97,7 +97,7 @@ class TestGCSFetcherBasic:
             mock_storage.Client.return_value = mock_client
             mock_import.return_value = mock_storage
 
-            with patch("bundlecraft.fetchers.gcs.service_account"):
+            with patch("google.oauth2.service_account.Credentials"):
                 result = fetch_gcs(
                     dest_dir=tmp_path,
                     name="test-cert",
