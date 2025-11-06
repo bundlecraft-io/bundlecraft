@@ -350,7 +350,19 @@ jobs:
           fi
 
           # Generate GCS test config
-          cat > ci-test-gcs.yaml <<YAML
+          if [ -n "${GCS_PROJECT:-}" ]; then
+            cat > ci-test-gcs.yaml <<YAML
+          source_name: ci-gcs-test
+          description: CI test bundle for GCS fetcher validation
+          fetch:
+            - name: from_gcs
+              type: gcs
+              bucket: ${GCS_BUCKET}
+              object_path: ${GCS_OBJECT_PATH}
+              project: ${GCS_PROJECT}
+          YAML
+          else
+            cat > ci-test-gcs.yaml <<YAML
           source_name: ci-gcs-test
           description: CI test bundle for GCS fetcher validation
           fetch:
@@ -359,10 +371,6 @@ jobs:
               bucket: ${GCS_BUCKET}
               object_path: ${GCS_OBJECT_PATH}
           YAML
-
-          # Add project if provided
-          if [ -n "${GCS_PROJECT:-}" ]; then
-            echo "              project: ${GCS_PROJECT}" >> ci-test-gcs.yaml
           fi
           echo "Generated ci-test-gcs.yaml:" && cat ci-test-gcs.yaml
       - name: Run GCS fetch
