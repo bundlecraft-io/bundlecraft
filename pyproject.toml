@@ -32,6 +32,9 @@ dependencies = [
   "python-gnupg>=0.5.0,<1.0",
   "cyclonedx-bom>=4.0.0,<8.0",
   "pyjks>=20.0.0",
+  "boto3>=1.26.0",
+  "azure-storage-blob>=12.0.0",
+  "azure-identity>=1.12.0",
 ]
 
 [project.optional-dependencies]
