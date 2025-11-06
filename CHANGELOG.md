@@ -63,6 +63,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Pre-Releases
 
+## [0.2.2-beta.5] - 2025-11-06
+
+### Added
+
+- Nada - just testing the new release testing workflow
+
+---
+
 ## [0.2.2-beta.4] - 2025-11-04
 
 ### Added
