@@ -5,8 +5,8 @@ on:
   workflow_dispatch:
     inputs:
       test_types:
-        description: Comma-separated list of test types to run (vault,http,api,s3,gcs,azure_blob). Leave
-          blank to run all.
+        description: Comma-separated list of test types to run (vault,http,api,s3,gcs,azure_blob).
+          Leave blank to run all.
         required: false
         default: ''
 jobs:
@@ -221,6 +221,7 @@ jobs:
   s3-fetch:
     name: 'Test: S3 Fetcher (AWS S3)'
     runs-on: ubuntu-latest
+    environment: cloud-tests
     permissions:
       contents: read
     if: >-
@@ -267,7 +268,6 @@ jobs:
           if [ -n "${S3_REGION:-}" ]; then
             echo "              region: ${S3_REGION}" >> ci-test-s3.yaml
           fi
-
           echo "Generated ci-test-s3.yaml:" && cat ci-test-s3.yaml
       - name: Run S3 fetch
         if: env.SKIP_TEST != 'true'
@@ -302,6 +302,7 @@ jobs:
   gcs-fetch:
     name: 'Test: GCS Fetcher (Google Cloud Storage)'
     runs-on: ubuntu-latest
+    environment: cloud-tests
     permissions:
       contents: read
     if: >-
@@ -363,7 +364,6 @@ jobs:
           if [ -n "${GCS_PROJECT:-}" ]; then
             echo "              project: ${GCS_PROJECT}" >> ci-test-gcs.yaml
           fi
-
           echo "Generated ci-test-gcs.yaml:" && cat ci-test-gcs.yaml
       - name: Run GCS fetch
         if: env.SKIP_TEST != 'true'
@@ -395,6 +395,7 @@ jobs:
   azure-blob-fetch:
     name: 'Test: Azure Blob Fetcher'
     runs-on: ubuntu-latest
+    environment: cloud-tests
     permissions:
       contents: read
     if: >-
@@ -451,7 +452,6 @@ jobs:
               use_managed_identity: true
           YAML
           fi
-
           echo "Generated ci-test-azure-blob.yaml:" && cat ci-test-azure-blob.yaml
       - name: Run Azure Blob fetch
         if: env.SKIP_TEST != 'true'
@@ -479,6 +479,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: azure-blob-fetch-artifacts
-          path: |
+          path: |-
             cert_sources/staged/ci-azure-blob-test/**
             ci-test-azure-blob.yaml
