@@ -245,7 +245,7 @@ jobs:
         run: |
           # Check if required environment variables are set
           if [ -z "${S3_BUCKET:-}" ] || [ -z "${S3_OBJECT_KEY:-}" ]; then
-            echo "::warning::S3 test skipped - S3_TEST_BUCKET or S3_TEST_OBJECT_KEY not configured"
+            echo "::warning::S3 test skipped - required secrets S3_TEST_BUCKET or S3_TEST_OBJECT_KEY not configured"
             echo "SKIP_TEST=true" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -320,7 +320,7 @@ jobs:
         run: |
           # Check if credentials are set
           if [ -z "${GCS_CREDENTIALS_JSON:-}" ]; then
-            echo "::warning::GCS test skipped - GCS_CREDENTIALS_JSON not configured"
+            echo "::warning::GCS test skipped - required secret GCS_CREDENTIALS_JSON not configured"
             echo "SKIP_TEST=true" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -339,7 +339,7 @@ jobs:
         run: |
           # Check if required environment variables are set
           if [ -z "${GCS_BUCKET:-}" ] || [ -z "${GCS_OBJECT_PATH:-}" ]; then
-            echo "::warning::GCS test skipped - GCS_TEST_BUCKET or GCS_TEST_OBJECT_PATH not configured"
+            echo "::warning::GCS test skipped - required secrets GCS_TEST_BUCKET or GCS_TEST_OBJECT_PATH not configured"
             echo "SKIP_TEST=true" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -414,7 +414,7 @@ jobs:
         run: |
           # Check if required environment variables are set
           if [ -z "${AZURE_STORAGE_ACCOUNT:-}" ] || [ -z "${AZURE_CONTAINER:-}" ] || [ -z "${AZURE_BLOB_NAME:-}" ]; then
-            echo "::warning::Azure Blob test skipped - required configuration not set"
+            echo "::warning::Azure Blob test skipped - required secrets AZURE_TEST_STORAGE_ACCOUNT, AZURE_TEST_CONTAINER, or AZURE_TEST_BLOB_NAME not configured"
             echo "SKIP_TEST=true" >> "$GITHUB_ENV"
             exit 0
           fi

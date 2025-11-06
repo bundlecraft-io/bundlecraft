@@ -53,10 +53,11 @@ Before running cloud fetcher tests, you need to:
 **Setup Steps:**
 ```bash
 # 1. Create S3 bucket (if not exists)
-aws s3 mb s3://bundlecraft-test-certs --region us-east-1
+# Note: S3 bucket names must be globally unique. Use your-org-bundlecraft-test-certs or similar
+aws s3 mb s3://your-org-bundlecraft-test-certs --region us-east-1
 
 # 2. Upload test certificate
-aws s3 cp test-ca.pem s3://bundlecraft-test-certs/certs/test-ca.pem
+aws s3 cp test-ca.pem s3://your-org-bundlecraft-test-certs/certs/test-ca.pem
 
 # 3. Create IAM user with read-only access (or use existing credentials)
 # 4. Add secrets to GitHub repository settings
@@ -79,17 +80,18 @@ The service account needs the following IAM roles:
 **Setup Steps:**
 ```bash
 # 1. Create GCS bucket (if not exists)
-gcloud storage buckets create gs://bundlecraft-test-certs --location=US
+# Note: GCS bucket names must be globally unique within Google Cloud
+gcloud storage buckets create gs://your-org-bundlecraft-test-certs --location=US
 
 # 2. Upload test certificate
-gcloud storage cp test-ca.pem gs://bundlecraft-test-certs/certs/test-ca.pem
+gcloud storage cp test-ca.pem gs://your-org-bundlecraft-test-certs/certs/test-ca.pem
 
 # 3. Create service account
 gcloud iam service-accounts create bundlecraft-ci-test \
   --display-name="BundleCraft CI Test"
 
 # 4. Grant read permissions to the bucket
-gcloud storage buckets add-iam-policy-binding gs://bundlecraft-test-certs \
+gcloud storage buckets add-iam-policy-binding gs://your-org-bundlecraft-test-certs \
   --member="serviceAccount:bundlecraft-ci-test@PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/storage.objectViewer"
 
@@ -118,8 +120,9 @@ If using managed identity instead of connection string, only configure:
 **Setup Steps:**
 ```bash
 # 1. Create storage account (if not exists)
+# Note: Storage account names must be globally unique and 3-24 characters (lowercase letters and numbers only)
 az storage account create \
-  --name bundlecrafttestcerts \
+  --name yourorgbundlecrafttest \
   --resource-group bundlecraft-ci \
   --location eastus \
   --sku Standard_LRS
@@ -127,18 +130,18 @@ az storage account create \
 # 2. Create container
 az storage container create \
   --name test-certificates \
-  --account-name bundlecrafttestcerts
+  --account-name yourorgbundlecrafttest
 
 # 3. Upload test certificate
 az storage blob upload \
-  --account-name bundlecrafttestcerts \
+  --account-name yourorgbundlecrafttest \
   --container-name test-certificates \
   --name certs/test-ca.pem \
   --file test-ca.pem
 
 # 4. Get connection string
 az storage account show-connection-string \
-  --name bundlecrafttestcerts \
+  --name yourorgbundlecrafttest \
   --resource-group bundlecraft-ci \
   --output tsv
 
