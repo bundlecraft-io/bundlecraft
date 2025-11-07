@@ -2,15 +2,126 @@
 
 ## Overview
 
-BundleCraft supports GPG/OpenPGP signing of release artifacts and automatic SBOM (Software Bill of Materials) generation in CycloneDX format. This enables supply chain integrity and production-grade trust verification for your CA trust bundles.
+BundleCraft supports multiple signing mechanisms for release artifacts and automatic SBOM (Software Bill of Materials) generation in CycloneDX format. This enables supply chain integrity and production-grade trust verification for your CA trust bundles.
+
+**Signing Options:**
+1. **Sigstore (Recommended for CI/CD)**: Keyless signing for container images and PyPI packages using OIDC identity
+2. **GPG/OpenPGP (Traditional)**: Sign bundle artifacts with your own GPG key for manual releases
 
 ## Key Features
 
+- ✅ **Sigstore Keyless Signing**: Automated signing for all official releases (container images and PyPI packages)
 - ✅ **GPG/OpenPGP Signatures**: Sign all release artifacts with detached ASCII-armored signatures (.asc files)
 - ✅ **SBOM Generation**: Automatic generation of CycloneDX JSON SBOMs with certificate metadata and provenance
-- ✅ **BYOK Model**: Bring Your Own Key - no embedded or auto-generated signing keys
+- ✅ **BYOK Model**: Bring Your Own Key - no embedded or auto-generated signing keys (for GPG)
 - ✅ **Verification Tooling**: Built-in verification commands for signed releases
 - ✅ **CI/CD Ready**: Environment variable support for secure key management in pipelines
+
+______________________________________________________________________
+
+## Sigstore Signing (Official Releases)
+
+### Overview
+
+All official BundleCraft releases (container images and PyPI packages) are automatically signed with [Sigstore](https://sigstore.dev) using keyless OIDC signing. This provides:
+
+- **Keyless signing**: No long-term private keys to manage
+- **Identity-based**: Tied to GitHub Actions OIDC identity
+- **Transparent**: All signatures recorded in public transparency log (Rekor)
+- **SLSA compliant**: Build provenance attestations included
+
+### What Gets Signed
+
+**Container Images:**
+- All production images: `ghcr.io/bundlecraft-io/bundlecraft:*`
+- All pre-release images: `ghcr.io/bundlecraft-io/bundlecraft-test:*`
+
+**PyPI Packages:**
+- Wheel distributions (`.whl`)
+- Source distributions (`.tar.gz`)
+- Build provenance attestations included
+
+### Verifying Sigstore Signatures
+
+#### Container Images
+
+Install [cosign](https://docs.sigstore.dev/cosign/installation/):
+
+```bash
+# macOS
+brew install cosign
+
+# Linux
+curl -LO https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+sudo install cosign-linux-amd64 /usr/local/bin/cosign
+```
+
+Verify a container image:
+
+```bash
+# Verify production image
+cosign verify ghcr.io/bundlecraft-io/bundlecraft:latest \
+  --certificate-identity-regexp="https://github.com/bundlecraft-io/bundlecraft" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+# Verify specific version
+cosign verify ghcr.io/bundlecraft-io/bundlecraft:1.2.3 \
+  --certificate-identity-regexp="https://github.com/bundlecraft-io/bundlecraft" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+# Verify using digest (most secure)
+cosign verify ghcr.io/bundlecraft-io/bundlecraft@sha256:abc123... \
+  --certificate-identity-regexp="https://github.com/bundlecraft-io/bundlecraft" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+# Or use the Makefile helper
+make verify-signatures
+```
+
+**What this verifies:**
+- Image was built and signed by GitHub Actions in bundlecraft-io/bundlecraft repository
+- Signature is stored in the public Rekor transparency log
+- Build identity is cryptographically tied to GitHub OIDC token
+- Image digest matches signed digest
+
+#### PyPI Packages
+
+PyPI packages include Sigstore attestations that can be verified:
+
+```bash
+# Install pip-audit (includes attestation verification)
+pip install pip-audit
+
+# Verify attestations for an installed package
+pip-audit --verify bundlecraft
+
+# Attestations are also available on PyPI at:
+# https://pypi.org/project/bundlecraft/#files
+# Each distribution file has an associated .attestation file
+```
+
+**What this verifies:**
+- Package was built in GitHub Actions with Trusted Publishing
+- Build provenance links package to specific source code and workflow
+- Attestations include SLSA build provenance information
+
+### How It Works
+
+1. **GitHub Actions Workflow**: On every tag push, the release workflow runs
+2. **OIDC Token**: GitHub Actions obtains a short-lived OIDC token from its identity provider
+3. **Signing**: 
+   - Container images: `cosign` signs images using the OIDC token
+   - PyPI packages: `actions/attest-build-provenance` generates attestations
+4. **Transparency Log**: Signatures are recorded in Rekor (public, immutable log)
+5. **Verification**: Anyone can verify using `cosign` or PyPI's verification tools
+
+### Benefits of Sigstore
+
+- **No Key Management**: No private keys to secure, rotate, or back up
+- **Identity-Based**: Signatures prove origin from GitHub Actions in this repository
+- **Transparent**: All signatures publicly auditable in Rekor
+- **Automated**: Happens automatically in CI/CD pipeline
+- **SLSA Compliant**: Meets supply chain security best practices
 
 ______________________________________________________________________
 
@@ -449,6 +560,10 @@ ______________________________________________________________________
 
 ## References
 
+- [Sigstore Project](https://sigstore.dev/)
+- [Cosign Documentation](https://docs.sigstore.dev/cosign/overview/)
+- [PyPI Attestations](https://docs.pypi.org/attestations/)
+- [SLSA Framework](https://slsa.dev/)
 - [GPG Documentation](https://www.gnupg.org/documentation/)
 - [CycloneDX Specification](https://cyclonedx.org/specification/overview/)
 - [Supply Chain Security Best Practices](https://slsa.dev/)

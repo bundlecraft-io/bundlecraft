@@ -1,6 +1,103 @@
 # BundleCraft CI/CD Workflows
 
-BundleCraft includes three GitHub Actions workflows for automated testing, building, and releasing CA trust bundles.
+BundleCraft includes four GitHub Actions workflows for automated testing, building, and releasing.
+
+______________________________________________________________________
+
+## 📦 BundleCraft Release Workflow
+
+**Workflow:** `.github/workflows/release.yaml`
+
+**Purpose:** Automated build, signing, and publishing of BundleCraft package releases to PyPI, TestPyPI, and GHCR.
+
+**Trigger:** Automatic on version tags (`v*`)
+
+**Release Channels:**
+
+- **Production** (`main` branch): Tags like `v1.2.3` → PyPI + GHCR
+- **Pre-release** (`pre-release` branch): Tags like `v1.2.3-beta.1` → TestPyPI + GHCR
+
+**Workflow Stages:**
+
+### 1. Branch Detection & Validation
+
+- Determines which branch the tag originated from
+- Validates tag format (semantic versioning)
+- Sets release channel (main or pre-release)
+
+### 2. Testing & Quality Checks
+
+- Runs full pytest suite with coverage
+- Executes ruff linting
+- Pre-release: Runs BundleCraft Fetch integration tests (non-blocking)
+
+### 3. Package Building
+
+- Builds Python wheel (`.whl`) and source distribution (`.tar.gz`)
+- Updates changelog URL in package metadata
+- Validates distributions with twine
+
+### 4. Container Image Building
+
+- Builds multi-platform container images
+- Tags images with version and semantic version tags
+- Production: `ghcr.io/bundlecraft-io/bundlecraft:X.Y.Z`, `:latest`
+- Pre-release: `ghcr.io/bundlecraft-io/bundlecraft-test:X.Y.Z-beta.N`, `:pre-release`
+
+### 5. Sigstore Signing & Attestations
+
+**Container Images:**
+- Signs images with [cosign](https://docs.sigstore.dev/cosign/) using keyless OIDC
+- Uses GitHub Actions identity for signing
+- Verifies signatures post-signing
+- Records signatures in Rekor transparency log
+
+**Python Packages:**
+- Generates build provenance attestations with `actions/attest-build-provenance`
+- Enables Sigstore attestations in PyPI publishing
+- Links packages to specific source code and workflow
+
+**Benefits:**
+- No private key management required
+- Identity-based signing tied to GitHub Actions
+- Transparent and auditable (Rekor log)
+- SLSA compliant build provenance
+
+### 6. Publishing
+
+**Production (main branch):**
+- PyPI: [https://pypi.org/project/bundlecraft/](https://pypi.org/project/bundlecraft/)
+- GHCR: [https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft](https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft)
+- GitHub Release with artifacts and release notes
+
+**Pre-release (pre-release branch):**
+- TestPyPI: [https://test.pypi.org/project/bundlecraft/](https://test.pypi.org/project/bundlecraft/)
+- GHCR: [https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft-test](https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft-test)
+- GitHub Pre-Release with installation instructions
+
+### 7. Post-Release Verification
+
+- Installs package from PyPI/TestPyPI
+- Runs smoke tests (`bundlecraft --version`, `bundlecraft --help`)
+- Confirms package availability and functionality
+
+**Verifying Signed Releases:**
+
+```bash
+# Verify container image signature
+cosign verify ghcr.io/bundlecraft-io/bundlecraft:latest \
+  --certificate-identity-regexp="https://github.com/bundlecraft-io/bundlecraft" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+# Or use the Makefile helper
+make verify-signatures
+
+# Verify PyPI package attestations
+pip install pip-audit
+pip-audit --verify bundlecraft
+```
+
+See [docs/SIGNING-AND-SBOM.md](SIGNING-AND-SBOM.md) for complete verification instructions.
 
 ______________________________________________________________________
 
