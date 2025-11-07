@@ -315,19 +315,23 @@ fetch:
   - name: mozilla_roots
     type: mozilla
     verify:
-      sha256: abc123
+      sha256: fcbd7560e0516ae7e2b15f4ba480cbada36b2934d01c05222f62605eed6342a9
         """
         (bundle_dir / "test-bundle.yaml").write_text(bundle_yaml, encoding="utf-8")
 
-        # Mock the fetch_mozilla to avoid actual network call
-        with patch("bundlecraft.fetch.fetch_mozilla") as mock_mozilla:
-            mock_mozilla.return_value = (
-                temp_workspace / "cert_sources" / "staged" / "test-bundle" / "fetch" / "mozilla_roots" / "mozilla_roots.pem"
-            )
-            mock_mozilla.return_value.parent.mkdir(parents=True, exist_ok=True)
-            mock_mozilla.return_value.write_text(
-                "-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----\n"
-            )
+        # Mock the underlying fetch_url function to avoid actual network call
+        with patch("bundlecraft.fetchers.mozilla.fetch_url") as mock_fetch_url:
+            # Mock the function to create and return a real file
+            def mock_fetch_url_impl(url, dest_dir, name, **kwargs):
+                # Create the actual expected output path based on the fetch logic
+                output_path = dest_dir / f"{name}.pem"
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_text(
+                    "-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----\n"
+                )
+                return output_path
+
+            mock_fetch_url.side_effect = mock_fetch_url_impl
 
             result = cli_runner.invoke(
                 fetch_main,
@@ -339,11 +343,15 @@ fetch:
                 ],
             )
 
-            # Verify fetch_mozilla was called
-            assert mock_mozilla.called
-            # Verify the call included the name and verify config
-            call_kwargs = mock_mozilla.call_args.kwargs
+            # Verify fetch_url was called by fetch_mozilla
+            assert mock_fetch_url.called
+            # Verify the call included the hardcoded Mozilla URL
+            call_kwargs = mock_fetch_url.call_args.kwargs
+            assert call_kwargs["url"] == "https://curl.se/ca/cacert.pem"
             assert call_kwargs["name"] == "mozilla_roots"
-            assert call_kwargs["verify"]["sha256"] == "abc123"
+            assert (
+                call_kwargs["verify"]["sha256"]
+                == "fcbd7560e0516ae7e2b15f4ba480cbada36b2934d01c05222f62605eed6342a9"  # pragma: allowlist secret
+            )
 
         assert result.exit_code == 0

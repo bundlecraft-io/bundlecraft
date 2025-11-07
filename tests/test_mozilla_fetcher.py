@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from bundlecraft.fetchers.mozilla import MOZILLA_CA_BUNDLE_URL, fetch_mozilla
 
 
@@ -44,7 +42,7 @@ class TestMozillaFetcher:
         with patch("bundlecraft.fetchers.mozilla.fetch_url") as mock_fetch:
             mock_fetch.return_value = dest_dir / "mozilla.pem"
 
-            result = fetch_mozilla(
+            _ = fetch_mozilla(
                 dest_dir=dest_dir,
                 verify=verify_config,
                 timeout=60,
@@ -120,7 +118,7 @@ class TestMozillaFetcher:
 
         # Test verification options
         verify_config = {
-            "sha256": "abc123def456",
+            "sha256": "abc123def456",  # pragma: allowlist secret
             "ca_file": "custom-ca.pem",
             "tls_fingerprint_sha256": "fingerprint123",
         }

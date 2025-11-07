@@ -662,7 +662,7 @@ def _fetch_each_to_named_dirs(
                 url = src.get("url")
                 logger.info(f"[dry-run]   from URL: {url}")
             elif ftype == "mozilla":
-                logger.info(f"[dry-run]   from Mozilla CA Bundle: https://curl.se/ca/cacert.pem")
+                logger.info("[dry-run]   from Mozilla CA Bundle: https://curl.se/ca/cacert.pem")
             elif ftype == "api":
                 endpoint = src.get("endpoint") or src.get("url")
                 provider = src.get("provider") or "generic"
