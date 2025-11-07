@@ -63,6 +63,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Pre-Releases
 
+## [0.2.2-beta.6] - 2025-11-06
+
+### Added
+
+- New fetch type! (sorta?): Mozilla
+  - Fetches the full Mozilla CA certificate store, defacto bundle for TLS certificate store
+  - Good for devices that need to traverse the general internet and do not have large cert store limitations
+  - Hardcoded to download certs from `https://curl.se/ca/cacert.pem`
+  - This is more or less a shortcut/wrapper using the `http` fetch type - no real core functionality added
+
+---
 ## [0.2.2-beta.5] - 2025-11-06
 
 ### Added
