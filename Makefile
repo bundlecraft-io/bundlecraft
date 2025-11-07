@@ -32,7 +32,7 @@ RELEASE_IMAGE_REF ?= localhost/$(IMAGE_NAME):$(GIT_TAG)
 	test-image-version test-image-build test-image-run \
 	test-pypi-version test-pypi-build test-pypi-run \
 	setup-dev ci-install-dev ci-test ci-lint \
-	deploy-pre-release deploy-main-release \
+	deploy-pre-release deploy-main-release verify-signatures \
 	help
 
 help:
@@ -53,6 +53,8 @@ help:
 	@echo "Git Tag Deployment helpers:"
 	@echo "  deploy-pre-release      Create and push a tag to Github based on the latest changelog entry in the pre-release section"
 	@echo "  deploy-main-release     Create and push a tag to Github based on the latest changelog entry in the stable releases section"
+	@echo "Sigstore verification:"
+	@echo "  verify-signatures       Verify Sigstore signatures for the latest release (requires cosign)"
 	@echo "CI helpers:"
 	@echo "  ci-install-dev          Install dev dependencies for CI"
 	@echo "  ci-test                 Run pytest with coverage for CI"
@@ -234,6 +236,36 @@ deploy-pre-release:
 deploy-main-release:
 	@echo "Deploying main release tag..."
 	@scripts/deploy_tag.sh main-release
+
+# ---- Sigstore signature verification ----
+verify-signatures:
+	@echo "Verifying Sigstore signatures for BundleCraft releases..."
+	@echo ""
+	@if ! command -v cosign &> /dev/null; then \
+		echo "❌ cosign not found. Please install it:"; \
+		echo "   macOS: brew install cosign"; \
+		echo "   Linux: https://docs.sigstore.dev/cosign/installation/"; \
+		exit 1; \
+	fi
+	@echo "✅ cosign is installed"
+	@echo ""
+	@echo "Fetching latest release tag..."
+	@LATEST_TAG=$$(git describe --tags --abbrev=0 2>/dev/null || echo ""); \
+	if [ -z "$$LATEST_TAG" ]; then \
+		echo "❌ No git tags found. Please create a release first."; \
+		exit 1; \
+	fi; \
+	echo "Latest release: $$LATEST_TAG"; \
+	echo ""; \
+	echo "Verifying container image signature..."; \
+	IMAGE="ghcr.io/bundlecraft-io/bundlecraft:$${LATEST_TAG#v}"; \
+	echo "Image: $$IMAGE"; \
+	cosign verify "$$IMAGE" \
+		--certificate-identity-regexp="https://github.com/bundlecraft-io/bundlecraft" \
+		--certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+		|| { echo "❌ Signature verification failed"; exit 1; }; \
+	echo ""; \
+	echo "✅ All signatures verified successfully!"
 
 # ---- CI helpers ----
 ci-install-dev:
