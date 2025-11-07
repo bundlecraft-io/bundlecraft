@@ -48,8 +48,8 @@ jobs:
         if: steps.check-placeholder.outputs.placeholder == 'false'
         run: |
           # Generate a temporary lock file to compare
-          pip-compile pyproject.toml --output-file=requirements-lock-check.txt --resolver=backtracking --quiet
-          
+          pip-compile pyproject.toml --output-file=requirements-lock-check.txt --resolver=backtracking --strip-extras --quiet
+
           # Compare with existing lock file (ignore comments and blank lines)
           if ! diff -u <(grep -v '^#' requirements-lock.txt | grep -v '^$' | sort) \
                        <(grep -v '^#' requirements-lock-check.txt | grep -v '^$' | sort) > lock-diff.txt; then
@@ -64,7 +64,6 @@ jobs:
             echo "  git commit -m 'chore: update requirements lock file'"
             exit 1
           fi
-          
           echo "✅ Lock file is up-to-date"
           rm requirements-lock-check.txt
       - name: ℹ️  Placeholder notice

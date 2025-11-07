@@ -13,41 +13,38 @@ Contributing code:
 git clone https://github.com/bundlecraft-io/bundlecraft.git
 cd bundlecraft
 
-# 2. Set up your dev environment
+# 2. Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate  # or: venv\Scripts\activate on Windows
-make setup-dev  # Installs dependencies + configures git hooks + pre-commit
 
-# Alternative manual setup:
-# pip install -e ".[dev]"
-# git config core.hooksPath .githooks
-# pre-commit install
+# 3. Set up complete dev environment (dependencies + git hooks + pre-commit)
+make setup-dev
 
-# 3. Create a feature branch
+# 4. Create a feature branch
 git checkout -b feature/my-awesome-feature
 
-# 4. (Optional) Generate minimal sample configs for testing
+# 5. (Optional) Generate minimal sample configs for testing
 scripts/prepare_test_configs.sh
 
-# 5. Make changes, test locally
+# 6. Make changes, test locally
 bundlecraft build --env test-example-envconfig --verbose
 
-# 6. Test a pypi/container build with your changes:
-make test-image-build   # container, requires podman/docker
-make test-pypi-build    # pypi package
+# 7. Test your changes thoroughly
+make ci-test    # runs: pytest -v --cov=bundlecraft
+make ci-lint    # runs: ruff check bundlecraft tests
 
-# 7. Test and lint code
-pytest -v
-make ci-lint  # runs: ruff check bundlecraft tests
+# 8. Test build packages (optional but recommended)
+make test-pypi-build    # Test PyPI package build
+make test-image-build   # Test container build (requires podman/docker)
 
-# 9. Commit and open PR to pre-release (address pre-commit findings too if any)
+# 9. Commit and open PR to pre-release
 git add .
 git commit -m "feat: describe your feature"
 git push origin feature/my-awesome-feature
 # Open PR on GitHub targeting pre-release branch
 ```
 
-**Releasing a new version?** Once your change has been merged to the pre-release branch, you can tag it as a new alpha/beta version and deploy a new pre-release. See ## TODO ## for more details.
+**Releasing a new version?** Once your change has been merged to the pre-release branch, you can tag it as a new alpha/beta version and deploy a new pre-release. See the [Release Workflow](#release-workflow---complete-runbook) section for step-by-step instructions.
 
 ______________________________________________________________________
 
@@ -186,22 +183,26 @@ sudo apt-get install openjdk-21-jdk-headless     # keytool for java stores
 Create a virtual environment and install everything you need:
 
 ```bash
+Create a virtual environment and install everything you need:
+
+```bash
 # Create and activate a virtual environment
 python -m venv venv
 source venv/bin/activate   # macOS/Linux
 venv\Scripts\activate      # Windows
 
-# Install with runtime dependencies
-pip install -e .
+# Recommended: Complete dev environment setup
+make setup-dev  # Installs dependencies + git hooks + pre-commit
 
-# Or install with dev/test tools
-pip install -e ".[dev]"
+# Alternative: Manual setup
+# pip install -e ".[dev]"
+# git config core.hooksPath .githooks
+# pre-commit install
 ```
 
 This installs:
 
 - The `bundlecraft` CLI in editable mode (your code changes take effect immediately)
-- Optional fetcher dependencies (i.e. hvac for HashiCorp Vault)
 - Optional development tools (black, ruff, pytest)
 
 > **Tip:** Keep your output directory named `dist/` (not `build/`) to avoid conflicts with Python's build tool.
@@ -295,28 +296,26 @@ black .
 ruff check . --fix
 ```
 
-### Step 6: Local build/test shortcuts
+### Step 6: Test your package builds (recommended)
 
-For a quick end-to-end smoke test of the built wheel and container, the Makefile provides a few simple helpers:
+Test that your changes work in both PyPI and container packages:
 
 ```bash
-# Build a local container image and smoke-test it
-make build-test-image
-make test-image-version  # runs 'bundlecraft --version' in the container
-make test-image-build    # builds + verifies using inline test configs
-make test-image-run      # run the image with your own args (i.e. BUNDLECRAFT_ARGS='build-all')
+# Test PyPI package build and functionality
+make test-pypi-build    # builds wheel, installs in temp venv, runs tests
 
-# Build a local wheel/sdist and smoke-test it in a temp venv
-make build-test-pypi
-make test-pypi-version   # prints installed version from the wheel
-make test-pypi-build     # builds + verifies using inline test configs
-make test-pypi-run       # run the package with your own args (i.e. BUNDLECRAFT_ARGS='build-all')
+# Test container image build and functionality (requires podman/docker)
+make test-image-build   # builds container, runs bundlecraft inside it
+
+# Optional: Test specific commands with your package
+make test-pypi-run BUNDLECRAFT_ARGS='build --env dev --verbose'
+make test-image-run BUNDLECRAFT_ARGS='build --env dev --verbose'
 ```
 
-Notes:
+**Notes:**
 
-- These targets do not publish anything; they're strictly local tests.
-- The inline configs are created/cleaned by `scripts/prepare_test_configs.sh`.
+- All commands use temporary environments and don't publish anything
+- Test configs are automatically created/cleaned by the make targets
 
 ### Step 8: Commit and push
 
@@ -362,33 +361,40 @@ bundlecraft --help
 bundlecraft build --help
 ```
 
-### Running PyTests
+### Running Tests
 
-Run the full test suite:
+Run the full test suite with coverage:
 
 ```bash
-pytest -v
+make ci-test  # runs: pytest -v --cov=bundlecraft --cov-report=term
 ```
 
-Run specific tests:
+Or run pytest directly for specific tests:
 
 ```bash
-pytest tests/test_builder.py -v
-pytest tests/test_fetch.py::test_http_fetcher -v
+pytest -v  # Basic test run
+pytest tests/test_builder.py -v  # Specific test file
+pytest tests/test_fetch.py::test_http_fetcher -v  # Specific test
 ```
 
 ### Code Quality Checks
 
-Format your code with Black:
+Use the Makefile for consistent linting:
 
 ```bash
-black .
+make ci-lint  # runs: ruff check bundlecraft tests
 ```
 
-Lint with Ruff:
+Format code with Black:
 
 ```bash
-ruff check .
+black .  # Format all Python files
+```
+
+Manual ruff commands (if needed):
+
+```bash
+ruff check .  # Check for issues
 ruff check . --fix  # Auto-fix what's possible
 ```
 
@@ -418,14 +424,18 @@ When you push a valid tag to GitHub, CI builds the package, publishes (after env
 
 BundleCraft uses `requirements-lock.txt` to pin exact dependency versions for production releases, ensuring deterministic and reproducible builds. This protects against supply chain attacks (see `SECURITY.md`).
 
-**Updating the lock file (before releases):**
-
 ```bash
 # Generate/update the lock file with current versions
 make lock-requirements
 
-# Or update all dependencies to their latest compatible versions
+# Update all dependencies to their latest compatible versions
 make update-lock
+
+# Regenerate lock file from scratch (when resolver gets confused)
+make regenerate-lock
+
+# Sync your environment with the lock file
+make sync-requirements
 
 # Validate the lock file is current
 make validate-lock
@@ -434,30 +444,43 @@ make validate-lock
 The lock file is automatically validated by CI. Production container builds use the lock file to ensure exact dependency versions.
 
 **When to update:**
-- Before creating a new release tag
-- After modifying dependencies in `pyproject.toml`
-- When applying security updates to dependencies
 
-### Pushing a New Release / Pre-Release Git Tag
+- Before creating a new release tag (run `make validate-lock` first)
+- After modifying dependencies in `pyproject.toml` (run `make lock-requirements`)
+- When applying security updates to dependencies (run `make update-lock`)
+
+### Release Workflow Guide
+
+**For Pre-releases (TestPyPI + GHCR-test):**
 
 ```bash
-# 1. Clone the repo
+# 1. Clone repo and set up environment
 git clone https://github.com/bundlecraft-io/bundlecraft.git
 cd bundlecraft
+python3 -m venv venv && source venv/bin/activate
+make setup-dev
 
-# 2. Checkout the proper branch
-git checkout -b pre-release     # For test/staging releases
-git checkout -b main            # For official releases
+# 2. Switch to the correct branch
+# For official releases, switch to the main branch and ensure it's current
+git checkout main
+git pull origin main
+# For Pre-Releases, switch to the pre-release branch and ensure it's current
+git checkout pre-release
+git pull origin pre-release
 
-# 3. Update CHANGELOG with the new upcoming version
+# 3. Ensure dependencies are locked and current
+make validate-lock
+# If validation fails: make lock-requirements && git add requirements-lock.txt
+
+# 4. Update CHANGELOG.md with new version in "Stable Releases" or "Pre-releases" section
 vi CHANGELOG.md
 
-# 4. Create a tag named after that version:
-git tag v1.2.3-beta.1     # For tags in pre-release
-git tag v1.2.3            # For tags in main
+# 5. Commit changelog if updated
+git add CHANGELOG.md && git commit -m "docs: update changelog for release"
 
-# 5. Push the tag to GitHub, trigger the release job
-git push origin --tags
+# 6. Deploy the release, depending on your release channel (creates tag and pushes automatically)
+make deploy-pre-release # for pre-releases
+make deploy-main-release # for stable releases
 ```
 
 Once the tag has been successfully pushed to either `main` or `pre-release`, the release workflow is kicked off.
@@ -505,17 +528,20 @@ For valid releases, container images are built and pushed:
 All BundleCraft releases are cryptographically signed using [Sigstore](https://sigstore.dev) for supply chain security:
 
 **Container Images:**
+
 - Signed with [cosign](https://docs.sigstore.dev/cosign/overview/) using keyless OIDC signing
 - Signatures are stored in the transparency log ([Rekor](https://docs.sigstore.dev/rekor/overview/))
 - Tied to GitHub's identity through OIDC tokens
 - Automatically verified post-signing in the workflow
 
 **Python Packages:**
+
 - Signed with [Sigstore attestations](https://docs.pypi.org/attestations/) via PyPI's Trusted Publishing
 - Build provenance attestations generated and stored
 - Verifiable through PyPI and GitHub
 
 **Benefits:**
+
 - No manual GPG key management required
 - Identity-based signing tied to GitHub Actions
 - Transparent and auditable signing process
@@ -723,20 +749,31 @@ Handy commands for common tasks:
 
 | Action | Command |
 | -------------------- | ------------------------------------------------------------- |
-| Install for dev | `pip install -e ".[dev]"` |
-| Install pre-release | `pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ bundlecraft` |
-| Test pre-release container | `docker run --rm ghcr.io/bundlecraft-io/bundlecraft:pre-release --version` |
+| **Setup & Development** | |
+| Setup dev environment | `make setup-dev` |
 | Format code | `black .` |
-| Lint code | `ruff check . --fix` |
-| Run tests | `pytest -v` |
-| Build bundle | `bundlecraft build --env test-example-envconfig --bundle internal` |
-| Verify bundle | `bundlecraft verify --target dist/.test-inline --verify-all` |
-| Fetch remote sources | `bundlecraft fetch --source-config-file config/cert_sources/*.yaml` |
+| Lint code | `make ci-lint` |
+| Run tests | `make ci-test` |
+| **Dependency Management** | |
 | Generate lock file | `make lock-requirements` |
 | Validate lock file | `make validate-lock` |
 | Update lock file | `make update-lock` |
-| Build Python package | `python -m build` |
-| Validate package | `twine check dist/*` |
+| Regenerate lock file | `make regenerate-lock` |
+| Sync environment | `make sync-requirements` |
+| **BundleCraft Commands** | |
+| Build bundle | `bundlecraft build --env test-example-envconfig --bundle internal` |
+| Verify bundle | `bundlecraft verify --target dist/.test-inline --verify-all` |
+| Fetch remote sources | `bundlecraft fetch --source-config-file config/cert_sources/*.yaml` |
+| **Package Testing** | |
+| Test PyPI package | `make test-pypi-build` |
+| Test container image | `make test-image-build` |
+| **Releases** | |
+| Deploy pre-release | `make deploy-pre-release` |
+| Deploy production release | `make deploy-main-release` |
+| Verify signatures | `make verify-signatures` |
+| **Manual Installs** | |
+| Install pre-release | `pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ bundlecraft` |
+| Test pre-release container | `docker run --rm ghcr.io/bundlecraft-io/bundlecraft:pre-release --version` |
 
 ______________________________________________________________________
 

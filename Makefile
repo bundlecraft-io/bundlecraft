@@ -292,9 +292,24 @@ lock-requirements:
 		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
 		exit 1; \
 	fi
-	pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
+	pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking --strip-extras
 	@echo "✅ requirements-lock.txt generated successfully"
 	@echo "📝 Review the changes and commit the updated file"
+
+sync-requirements:
+	@echo "🔄 Syncing environment with lock file..."
+	@if ! command -v pip-sync >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found."; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
+		exit 1; \
+	fi
+	@if [ ! -f requirements-lock.txt ]; then \
+		echo "❌ requirements-lock.txt not found. Run 'make lock-requirements' first."; \
+		exit 1; \
+	fi
+	pip-sync requirements-lock.txt
+	pip install -e ".[dev]"
+	@echo "✅ Environment synced with lock file"
 
 validate-lock:
 	@echo "🔍 Validating requirements lock file..."
@@ -315,17 +330,18 @@ validate-lock:
 	fi
 	@# Check if lock file is up to date by generating and comparing
 	@echo "Generating temporary lock file for comparison..."
-	@pip-compile --quiet pyproject.toml --output-file=requirements-lock-check.txt --resolver=backtracking 2>&1 | grep -v "^#" || true
-	@if diff -u <(grep -v '^#' requirements-lock.txt | grep -v '^$$' | sort) \
-	            <(grep -v '^#' requirements-lock-check.txt | grep -v '^$$' | sort) > /dev/null 2>&1; then \
+	@pip-compile --quiet pyproject.toml --output-file=requirements-lock-check.txt --resolver=backtracking --strip-extras 2>&1 | grep -v "^#" || true
+	@grep -v '^#' requirements-lock.txt | grep -v '^$$' | sort > requirements-lock-current.tmp
+	@grep -v '^#' requirements-lock-check.txt | grep -v '^$$' | sort > requirements-lock-new.tmp
+	@if diff -u requirements-lock-current.tmp requirements-lock-new.tmp > /dev/null 2>&1; then \
 		echo "✅ Lock file is up-to-date"; \
-		rm -f requirements-lock-check.txt; \
+		rm -f requirements-lock-check.txt requirements-lock-current.tmp requirements-lock-new.tmp; \
 	else \
 		echo "❌ Lock file is out of date!"; \
 		echo ""; \
 		echo "To fix this, run:"; \
 		echo "  make lock-requirements"; \
-		rm -f requirements-lock-check.txt; \
+		rm -f requirements-lock-check.txt requirements-lock-current.tmp requirements-lock-new.tmp; \
 		exit 1; \
 	fi
 
@@ -336,6 +352,18 @@ update-lock:
 		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
 		exit 1; \
 	fi
-	pip-compile --upgrade pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
+	pip-compile --upgrade pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking --strip-extras
 	@echo "✅ requirements-lock.txt updated with latest versions"
 	@echo "📝 Review the changes and test thoroughly before committing"
+
+# Regenerate lock file from scratch (useful when resolver gets confused)
+regenerate-lock:
+	@echo "♻️  Regenerating lock file from scratch..."
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found."; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
+		exit 1; \
+	fi
+	rm -f requirements-lock.txt
+	pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking --strip-extras
+	@echo "✅ Lock file regenerated from scratch"
