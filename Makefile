@@ -2,9 +2,15 @@
 CONTAINER_CMD := $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 CONTAINER ?= $(notdir $(CONTAINER_CMD))
 
-# Podman-specific flags for better compatibility
+# Container-specific flags for better compatibility
 ifeq ($(CONTAINER),podman)
-    CONTAINER_FLAGS := --cgroup-manager=cgroupfs
+    CONTAINER_BUILD_FLAGS := --cgroup-manager=cgroupfs
+    CONTAINER_RUN_FLAGS := --userns=keep-id
+    VOLUME_SUFFIX := :Z
+else
+    CONTAINER_BUILD_FLAGS :=
+    CONTAINER_RUN_FLAGS :=
+    VOLUME_SUFFIX :=
 endif
 
 HATCH_BUILD_VERSION ?= 0.0.0+local
@@ -67,14 +73,14 @@ help:
 	@echo "  update-lock             Update all dependencies in lock file"
 
 build-test-image:
-	$(CONTAINER) build $(CONTAINER_FLAGS) --build-arg HATCH_BUILD_VERSION=$(HATCH_BUILD_VERSION) -t $(IMAGE_REF) .
+	$(CONTAINER) build $(CONTAINER_BUILD_FLAGS) --build-arg HATCH_BUILD_VERSION=$(HATCH_BUILD_VERSION) -t $(IMAGE_REF) .
 
 # Build a release image tagged with the latest git tag.
 # - Uses $(GIT_TAG) for the image tag.
 # - Uses $(VERSION) (without leading 'v') for HATCH_BUILD_VERSION inside the wheel.
 build-image:
 	@test -n "$(GIT_TAG)" || (echo "No git tag found. Create a tag (e.g. v1.2.3) or call: make release-image GIT_TAG=v1.2.3" >&2; exit 1)
-	$(CONTAINER) build $(CONTAINER_FLAGS) \
+	$(CONTAINER) build $(CONTAINER_BUILD_FLAGS) \
 	  --build-arg HATCH_BUILD_VERSION=$(VERSION) \
 	  -t $(RELEASE_IMAGE_REF) \
 	  .
@@ -87,20 +93,20 @@ test-image-build: build-test-image
 	BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh; \
 	trap 'BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh --cleanup' EXIT; \
 	$(CONTAINER) run --rm \
-	  --userns=keep-id \
+	  $(CONTAINER_RUN_FLAGS) \
 	  -e BUNDLECRAFT_WORKSPACE=/workspace \
 	  -e TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" \
 	  -e TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
-	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace:Z" \
+	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace$(VOLUME_SUFFIX)" \
 	  -w /workspace \
 	  $(IMAGE_REF) \
 	  build --env test-example-envconfig --verbose --force; \
 	$(CONTAINER) run --rm \
-	  --userns=keep-id \
-	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace:Z" \
+	  $(CONTAINER_RUN_FLAGS) \
+	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace$(VOLUME_SUFFIX)" \
 	  -w /workspace \
 	  $(IMAGE_REF) \
-	  verify --target dist/.test-inline/test-inline --verify-all
+	  verify --target dist/.test-inline --verify-all
 
 test-image-run: build-test-image
 	@set -e; \
@@ -111,11 +117,11 @@ test-image-run: build-test-image
 	  exit 2; \
 	fi; \
 	$(CONTAINER) run --rm \
-	  --userns=keep-id \
+	  $(CONTAINER_RUN_FLAGS) \
 	  -e BUNDLECRAFT_WORKSPACE=/workspace \
 	  -e TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" \
 	  -e TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
-	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace:Z" \
+	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace$(VOLUME_SUFFIX)" \
 	  -w /workspace \
 	  $(IMAGE_REF) \
 	  $(BUNDLECRAFT_ARGS)
@@ -156,7 +162,7 @@ test-pypi-build: build-test-pypi
 	BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" \
 	TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
 	  bundlecraft build --env test-example-envconfig --verbose --force; \
-	bundlecraft verify --target dist/.test-inline/test-inline --verify-all; \
+	bundlecraft verify --target dist/.test-inline --verify-all; \
 	deactivate
 
 test-pypi-run: build-test-pypi
