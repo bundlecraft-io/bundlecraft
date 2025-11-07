@@ -184,6 +184,9 @@ class FetchEntry(BaseModel):
         elif self.type == FetchType.API:
             if not self.endpoint:
                 raise ValueError(f"'endpoint' is required for fetch type '{self.type.value}'")
+        elif self.type == FetchType.MOZILLA:
+            # No additional fields required for mozilla type - uses hardcoded URL
+            pass
         return self
 
 

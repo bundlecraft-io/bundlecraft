@@ -25,6 +25,7 @@ from bundlecraft.fetchers.api import fetch_api
 from bundlecraft.fetchers.azure_blob import fetch_azure_blob
 from bundlecraft.fetchers.gcs import fetch_gcs
 from bundlecraft.fetchers.http import fetch_url
+from bundlecraft.fetchers.mozilla import fetch_mozilla
 from bundlecraft.fetchers.s3 import fetch_s3
 from bundlecraft.fetchers.vault import fetch_vault
 from bundlecraft.helpers.config_schema import validate_source_config
@@ -195,6 +196,21 @@ def _fetch_from_config(
                     token_ref=token_ref,
                     headers=headers,
                     verify=verify if isinstance(verify, dict) else None,
+                    timeout=timeout,
+                    retries=retries,
+                    backoff_factor=backoff_factor,
+                    retry_on_status=retry_on_status,
+                    defaults=defaults,
+                )
+            elif ftype == "mozilla":
+                logger.info("  Fetching Mozilla CA Bundle from curl.se")
+                if verbose and verify:
+                    logger.debug(f"  Verification config: {json.dumps(verify, indent=2)}")
+                out_path = fetch_mozilla(
+                    dest_dir,
+                    name=name,
+                    verify=verify,
+                    root=root,
                     timeout=timeout,
                     retries=retries,
                     backoff_factor=backoff_factor,
@@ -645,6 +661,8 @@ def _fetch_each_to_named_dirs(
             if ftype == "url":
                 url = src.get("url")
                 logger.info(f"[dry-run]   from URL: {url}")
+            elif ftype == "mozilla":
+                logger.info("[dry-run]   from Mozilla CA Bundle: https://curl.se/ca/cacert.pem")
             elif ftype == "api":
                 endpoint = src.get("endpoint") or src.get("url")
                 provider = src.get("provider") or "generic"

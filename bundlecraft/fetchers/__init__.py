@@ -2,6 +2,9 @@
 
 Currently includes:
  - http: HTTPS and file path fetching
+ - mozilla: Mozilla CA Bundle from curl.se (shortcut to http fetcher)
+ - api: Generic REST API and Keyfactor fetching
+ - vault: HashiCorp Vault KV fetching
  - api: REST API fetching with bearer token auth
  - vault: HashiCorp Vault KV fetching
  - gcs: Google Cloud Storage fetching
