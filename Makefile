@@ -255,8 +255,9 @@ ci-lint:
 lock-requirements:
 	@echo "📦 Generating requirements lock file..."
 	@if ! command -v pip-compile >/dev/null 2>&1; then \
-		echo "❌ pip-tools not found. Installing..."; \
-		pip install pip-tools; \
+		echo "❌ pip-tools not found."; \
+		echo "Install with: pip install -e \".[dev]\" or pip install pip-tools"; \
+		exit 1; \
 	fi
 	pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
 	@echo "✅ requirements-lock.txt generated successfully"
@@ -269,8 +270,9 @@ validate-lock:
 		exit 1; \
 	fi
 	@if ! command -v pip-compile >/dev/null 2>&1; then \
-		echo "❌ pip-tools not found. Installing..."; \
-		pip install pip-tools; \
+		echo "❌ pip-tools not found."; \
+		echo "Install with: pip install -e \".[dev]\" or pip install pip-tools"; \
+		exit 1; \
 	fi
 	@# Check if lock file is a placeholder
 	@if grep -q "IMPORTANT: This file must be properly generated" requirements-lock.txt; then \
@@ -297,8 +299,9 @@ validate-lock:
 update-lock:
 	@echo "🔄 Updating all dependencies in lock file..."
 	@if ! command -v pip-compile >/dev/null 2>&1; then \
-		echo "❌ pip-tools not found. Installing..."; \
-		pip install pip-tools; \
+		echo "❌ pip-tools not found."; \
+		echo "Install with: pip install -e \".[dev]\" or pip install pip-tools"; \
+		exit 1; \
 	fi
 	pip-compile --upgrade pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
 	@echo "✅ requirements-lock.txt updated with latest versions"

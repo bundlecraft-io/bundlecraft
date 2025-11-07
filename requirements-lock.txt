@@ -7,15 +7,10 @@
 # To update this file, run:
 #    make lock-requirements
 #
-# Or manually:
-#    pip install pip-tools
+# Or manually with pip-tools:
 #    pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
 #
-# For more information, see docs/DEPENDENCY-LOCK.md
-#
-# This lock file ensures deterministic and reproducible production builds
-# by pinning exact dependency versions. It addresses supply chain security
-# concerns mentioned in SECURITY.md.
+# For more information, see CONTRIBUTING.md (Dependency Lock File section)
 #
 
 # ============================================================================
@@ -23,26 +18,15 @@
 # ============================================================================
 # 
 # To generate this lock file:
-#   1. Install pip-tools: pip install pip-tools
+#   1. Ensure dev dependencies are installed: pip install -e ".[dev]"
 #   2. Run: make lock-requirements
 #   3. Commit the generated file
 #
 # The lock file will contain all production dependencies from pyproject.toml
 # with exact versions and their transitive dependencies.
 #
-# Expected dependencies (from pyproject.toml):
-#   - click>=8.0,<9.0
-#   - cryptography>=42.0,<50.0
-#   - pyOpenSSL>=23.0,<26.0
-#   - PyYAML>=6.0,<7.0
-#   - pydantic>=2.0,<3.0
-#   - python-gnupg>=0.5.0,<1.0
-#   - cyclonedx-bom>=4.0.0,<8.0
-#   - pyjks>=20.0.0
-#   - boto3>=1.26.0
-#   - azure-storage-blob>=12.0.0
-#   - azure-identity>=1.12.0
-#   - google-cloud-storage>=2.0.0
-#   - hvac>=2.0.0
+# This ensures deterministic and reproducible production builds, addressing
+# supply chain security concerns mentioned in SECURITY.md.
 #
 # ============================================================================
+
