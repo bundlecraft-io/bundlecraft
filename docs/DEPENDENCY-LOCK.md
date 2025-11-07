@@ -23,7 +23,19 @@ pip install pip-tools
 
 To generate or update the lock file:
 
+**Using Make (recommended):**
 ```bash
+make lock-requirements
+```
+
+**Using the generation script:**
+```bash
+./scripts/generate_lock_file.sh
+```
+
+**Manually:**
+```bash
+pip install pip-tools
 pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
 ```
 
