@@ -115,12 +115,6 @@ Philosophy & best practices:
 
 ### 🔐 Vault fetcher
 
-Install optional dependency for Vault:
-
-```bash
-pip install -e .[fetchers]
-```
-
 Config example:
 
 ```yaml
@@ -173,7 +167,6 @@ Troubleshooting highlights:
 
 - Insecure HTTP rejected → use HTTPS or file URLs.
 - SHA256/TLS fingerprint mismatch → update pins after validating legitimate changes.
-- `hvac` missing → install extras `.[fetchers]`.
 - Offline builds → pre-stage inputs using `bundlecraft fetch` in a connected environment, commit or package them, then run `bundlecraft build --skip-fetch`.
 
 ______________________________________________________________________

@@ -27,10 +27,7 @@ except ImportError:
 def _import_boto3():
     """Import boto3 with helpful error message if not installed."""
     if boto3 is None:  # pragma: no cover
-        raise click.ClickException(
-            "S3 fetcher requires 'boto3' package. "
-            "Install with: pip install 'bundlecraft[fetchers]'"
-        )
+        raise click.ClickException("S3 fetcher requires 'boto3' package. ")
     return boto3
 
 

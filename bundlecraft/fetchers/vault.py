@@ -13,9 +13,7 @@ def _import_hvac():
 
         return hvac
     except Exception as e:  # pragma: no cover - tested via behavior
-        raise click.ClickException(
-            "Vault fetcher requires 'hvac' package. Install with: pip install 'bundlecraft[fetchers]'"
-        ) from e
+        raise click.ClickException("Vault fetcher requires 'hvac' package.") from e
 
 
 def fetch_vault(

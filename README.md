@@ -642,13 +642,6 @@ verify:
   tls_fingerprint_sha256: "new-leaf-certificate-fingerprint"
 ```
 
-**"hvac not installed" errors with Vault?**
-Install the optional fetcher dependencies:
-
-```bash
-pip install bundlecraft[fetchers]
-```
-
 When using containers, Vault support is included by default.
 
 ### Build & Configuration Issues

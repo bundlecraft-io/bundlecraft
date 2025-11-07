@@ -20,7 +20,6 @@ def _import_azure():
     except Exception as e:  # pragma: no cover - tested via behavior
         raise click.ClickException(
             "Azure Blob fetcher requires 'azure-storage-blob' and 'azure-identity' packages. "
-            "Install with: pip install 'bundlecraft[fetchers]'"
         ) from e
 
 

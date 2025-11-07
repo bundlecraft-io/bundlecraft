@@ -223,11 +223,11 @@ fetch:
   - name: mozilla_roots
     type: mozilla
     # No URL needed - automatically uses https://curl.se/ca/cacert.pem
-    
+
     # Optional: Content verification (recommended)
     verify:
       sha256: "expected-sha256-hash-of-mozilla-bundle"
-    
+
     # Optional: Retry/timeout overrides
     timeout: 60
     retries: 5
@@ -804,15 +804,6 @@ echo $KEYFACTOR_TOKEN
 export KEYFACTOR_TOKEN="your-actual-token"
 ```
 
-#### "Vault: hvac not installed" Error
-
-**Problem:** Missing Vault dependencies when using Python package installation
-
-**Solution:** Install with fetcher dependencies:
-```bash
-pip install bundlecraft[fetchers]
-```
-
 Note: When using containers, Vault support is included by default.
 
 #### "GCS: google-cloud-storage not installed" Error
@@ -849,17 +840,6 @@ az storage blob download --account-name mystorageaccount \
 # Check managed identity assignment (for Azure VMs)
 az vm identity show --resource-group myResourceGroup --name myVM
 ```
-
-#### "azure-storage-blob not installed" Error
-
-**Problem:** Missing Azure SDK when using Python package installation
-
-**Solution:** Install with fetcher dependencies:
-```bash
-pip install bundlecraft[fetchers]
-```
-
-Note: When using containers, GCS support is included by default.
 
 #### "GCS: Access denied" or "403 Forbidden" Error
 

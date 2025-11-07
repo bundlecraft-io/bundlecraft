@@ -30,10 +30,7 @@ def _import_gcs():
 
         return storage
     except ImportError as e:  # pragma: no cover - tested via behavior
-        raise click.ClickException(
-            "GCS fetcher requires 'google-cloud-storage' package. "
-            "Install with: pip install 'bundlecraft[fetchers]'"
-        ) from e
+        raise click.ClickException("GCS fetcher requires 'google-cloud-storage' package. ") from e
 
 
 def _import_service_account():
@@ -43,10 +40,7 @@ def _import_service_account():
 
         return service_account
     except ImportError as e:  # pragma: no cover - tested via behavior
-        raise click.ClickException(
-            "GCS fetcher requires 'google-auth' package. "
-            "Install with: pip install 'bundlecraft[fetchers]'"
-        ) from e
+        raise click.ClickException("GCS fetcher requires 'google-auth' package. ") from e
 
 
 def fetch_gcs(

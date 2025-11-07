@@ -194,9 +194,6 @@ venv\Scripts\activate      # Windows
 # Install with runtime dependencies
 pip install -e .
 
-# If needed, install with remote fetch dependencies
-pip install -e ".[fetchers]"
-
 # Or install with dev/test tools
 pip install -e ".[dev]"
 ```

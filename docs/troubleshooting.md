@@ -28,11 +28,6 @@ ______________________________________________________________________
   - Symptom: SSL certificate verify failed
   - Fix: Provide verify.ca_file pointing to a PEM bundle containing the issuing CA for the server.
 
-- Vault: hvac not installed
-
-  - Symptom: "Vault fetcher requires 'hvac' package"
-  - Fix: Install extras: `pip install -e .[fetchers]`.
-
 - Vault: missing token or addr
 
   - Symptom: "Vault token not found in environment variable" or "Vault address is required"
