@@ -53,7 +53,6 @@ class FetchType(str, Enum):
     AZURE_BLOB = "azure_blob"
     GCS = "gcs"
     MOZILLA = "mozilla"
-    MOZILLA = "mozilla"
 
 
 class DistributionTargetType(str, Enum):
