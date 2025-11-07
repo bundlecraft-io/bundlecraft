@@ -90,6 +90,73 @@ Integrates with HashiCorp Vault for certificate retrieval from KV stores or PKI 
 - Address validation
 - Field-specific PEM extraction
 
+### 4. Google Cloud Storage Fetcher (`type: gcs`)
+
+Retrieves certificates from Google Cloud Storage buckets with native GCP authentication.
+
+**Use cases:**
+
+- Certificates stored in GCS buckets
+- Multi-region certificate distribution via GCS
+- Integration with GCP infrastructure
+- Cloud-native certificate management
+
+**Security features:**
+
+- Google Cloud SDK authentication (Application Default Credentials)
+- Service account authentication via JSON key files
+- IAM-based access control
+- Content integrity verification (SHA256)
+- Configurable retry and timeout behavior
+
+**Required GCS Permissions:**
+
+- `storage.objects.get` - Read objects from buckets
+- `storage.buckets.get` - (Optional) Verify bucket access
+### 4. Azure Blob Fetcher (`type: azure_blob`)
+
+Retrieves certificates from Azure Blob Storage, supporting multiple authentication methods.
+
+**Use cases:**
+
+- Certificates stored in Azure Blob Storage
+- Enterprise certificate repositories in Azure
+- Cloud-native certificate distribution
+- Multi-region certificate management
+
+**Security features:**
+
+- Multiple authentication methods (connection string, account key, SAS token, managed identity)
+- HTTPS-only access
+- Azure RBAC integration
+- Content integrity verification
+
+**Authentication methods (in priority order):**
+
+1. **Connection String** - Full connection string including account credentials
+2. **Account Key** - Storage account name with account key
+3. **SAS Token** - Storage account name with shared access signature
+4. **Managed Identity** - Azure Managed Identity for authentication
+5. **Default Credential** - Azure SDK default credential chain (environment, managed identity, Azure CLI)
+### 4. S3 Fetcher (`type: s3`)
+
+Retrieves certificates from AWS S3 storage buckets or S3-compatible object storage services.
+
+**Use cases:**
+
+- Certificate bundles stored in S3 for centralized distribution
+- Certificates managed through AWS infrastructure
+- Integration with existing S3-based artifact repositories
+- S3-compatible storage (MinIO, Ceph, etc.)
+
+**Security features:**
+
+- AWS credential chain (environment variables, IAM roles, profiles)
+- Support for IAM policies and bucket policies
+- Custom CA validation for S3-compatible endpoints
+- Regional deployment support
+- Content verification via SHA256
+
 ## Configuration
 
 ### Basic Fetch Configuration
@@ -120,7 +187,7 @@ fetch:
     verify:
       # Content integrity verification
       sha256: "expected-sha256-hash-of-content"
-      
+
       # TLS validation options
       ca_file: config/certs/trusted-ca.pem          # optional custom CA
       tls_fingerprint_sha256: "leaf-cert-fp"        # optional leaf cert pinning
@@ -153,6 +220,104 @@ fetch:
     token_ref: VAULT_TOKEN      # environment variable name
     verify:
       ca_file: config/certs/vault-ca.pem
+```
+
+### Google Cloud Storage (GCS) Fetcher Configuration
+
+```yaml
+fetch:
+  - name: gcs_roots
+    type: gcs
+    bucket: my-certificates-bucket        # GCS bucket name
+    object_path: certs/root-ca.pem        # Path to object in bucket (also accepts 'object' or 'path')
+    project: my-gcp-project               # optional, GCP project ID
+    credentials_file: /path/to/creds.json # optional, defaults to GOOGLE_APPLICATION_CREDENTIALS
+    verify:
+      sha256: "expected-sha256-hash"      # optional content verification
+    # Optional: Override fetch retry/timeout settings
+    timeout: 60         # Request timeout in seconds (default: 30)
+    retries: 5          # Number of retry attempts (default: 3)
+    backoff_factor: 2.0 # Exponential backoff multiplier (default: 2.0)
+    retry_on_status: [429, 502, 503, 504]  # HTTP status codes to retry
+### Azure Blob Fetcher Configuration
+
+```yaml
+# Option 1: Using Connection String
+fetch:
+  - name: azure_certs
+    type: azure_blob
+    container: certificates           # Azure Blob container name
+    blob_name: production/roots.pem   # Blob path within container
+    connection_string_ref: AZURE_STORAGE_CONNECTION_STRING  # env var
+    verify:
+      sha256: "expected-content-hash"  # optional content verification
+
+# Option 2: Using Account Key
+fetch:
+  - name: azure_certs
+    type: azure_blob
+    container: certificates
+    blob_name: intermediate-ca.pem
+    account_name: mystorageaccount    # Storage account name
+    account_key_ref: AZURE_ACCOUNT_KEY  # env var with account key
+
+# Option 3: Using SAS Token
+fetch:
+  - name: azure_certs
+    type: azure_blob
+    container: certificates
+    blob_name: partner-ca.pem
+    account_name: mystorageaccount
+    sas_token_ref: AZURE_SAS_TOKEN    # env var with SAS token
+
+# Option 4: Using Managed Identity (Azure VMs, AKS, etc.)
+fetch:
+  - name: azure_certs
+    type: azure_blob
+    container: certificates
+    blob_name: internal-ca.pem
+    account_name: mystorageaccount
+    use_managed_identity: true        # Use Azure Managed Identity
+
+# Option 5: Using Default Credential Chain (recommended for Azure environments)
+fetch:
+  - name: azure_certs
+    type: azure_blob
+    container: certificates
+    blob_name: trusted-roots.pem
+    account_name: mystorageaccount
+    # No explicit auth - uses DefaultAzureCredential
+    # Tries: environment vars, managed identity, Azure CLI, etc.
+### S3 Fetcher Configuration
+
+```yaml
+fetch:
+  # Using s3:// URL format
+  - name: s3_bundle
+    type: s3
+    url: s3://my-bucket/certificates/bundle.pem
+    region: us-west-2           # optional, uses default AWS region if not specified
+    verify:
+      sha256: "expected-content-hash"  # optional content verification
+
+  # Using explicit bucket and key parameters
+  - name: s3_explicit
+    type: s3
+    bucket: my-certificate-bucket
+    key: production/root-ca.pem
+    region: us-east-1
+    verify:
+      sha256: "expected-content-hash"
+
+  # S3-compatible storage (MinIO, Ceph, etc.)
+  - name: minio_bundle
+    type: s3
+    bucket: certificates
+    key: bundles/internal-ca.pem
+    endpoint_url: https://minio.example.com:9000  # custom S3-compatible endpoint
+    region: us-east-1           # required for signature calculation
+    verify:
+      ca_file: config/certs/minio-ca.pem  # for self-signed certificates
 ```
 
 ## Security Features
@@ -207,6 +372,70 @@ All API and Vault fetchers use environment variables for authentication:
 token_ref: MY_API_TOKEN
 ```
 
+### AWS Credential Chain (S3 Fetcher)
+
+The S3 fetcher uses the standard AWS credential chain for authentication, checking credentials in this order:
+
+1. **Environment variables**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`
+2. **Shared credential file**: `~/.aws/credentials` (selected by `AWS_PROFILE` if set)
+3. **AWS config file**: `~/.aws/config`
+4. **IAM role for Amazon EC2**: When running on EC2 instances
+5. **IAM role for ECS tasks**: When running in ECS containers
+6. **IAM role for Lambda**: When running in AWS Lambda
+
+**Recommended approach for production:**
+- Use IAM roles when running on AWS infrastructure (EC2, ECS, Lambda)
+- Use dedicated IAM users or roles with least-privilege policies
+- Rotate access keys regularly if using long-term credentials
+
+**Required IAM Permissions:**
+
+Minimum IAM policy for S3 fetcher:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion"
+      ],
+      "Resource": [
+        "arn:aws:s3:::your-certificate-bucket/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::your-certificate-bucket"
+      ]
+    }
+  ]
+}
+```
+
+For cross-account access, add trust relationships to the IAM role:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::ACCOUNT-ID:role/BundleCraftRole"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
 ## Common Usage Patterns
 
 ### Mozilla CA Bundle (Public Roots)
@@ -249,6 +478,56 @@ fetch:
       ca_file: config/certs/vault-ca.pem
 ```
 
+### Google Cloud Storage Integration
+
+```yaml
+fetch:
+  - name: gcp_roots
+    type: gcs
+    bucket: company-pki-certificates
+    object_path: production/root-ca-bundle.pem
+    project: my-company-pki
+    verify:
+      sha256: "expected-sha256-of-bundle"
+    timeout: 60
+    retries: 5
+```
+
+**Authentication Options:**
+
+1. **Service Account Key File** (recommended for CI/CD):
+   ```yaml
+   fetch:
+     - name: gcp_certs
+       type: gcs
+       bucket: secure-certs
+       object_path: certs/root.pem
+       credentials_file: config/gcp-service-account.json
+   ```
+
+2. **Application Default Credentials** (for GCE/GKE/Cloud Run):
+   ```yaml
+   fetch:
+     - name: gcp_certs
+       type: gcs
+       bucket: secure-certs
+       object_path: certs/root.pem
+       # No credentials_file needed - uses ADC
+   ```
+
+3. **Environment Variable**:
+   ```bash
+   export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+   ```
+   ```yaml
+   fetch:
+     - name: gcp_certs
+       type: gcs
+       bucket: secure-certs
+       object_path: certs/root.pem
+       # Uses GOOGLE_APPLICATION_CREDENTIALS env var
+   ```
+
 ### Generic REST API
 
 ```yaml
@@ -262,6 +541,57 @@ fetch:
       ca_file: config/certs/api-ca.pem
 ```
 
+### Azure Blob Storage
+
+```yaml
+# Production certificates from Azure Blob
+fetch:
+  - name: azure_prod_roots
+    type: azure_blob
+    container: production-certificates
+    blob_name: trusted-roots/ca-bundle.pem
+    account_name: prodstorageaccount
+    sas_token_ref: AZURE_PROD_SAS_TOKEN
+    verify:
+      sha256: "production-bundle-sha256-hash"
+
+# Using managed identity in Azure Kubernetes Service (AKS)
+fetch:
+  - name: azure_internal_ca
+    type: azure_blob
+    container: internal-pki
+    blob_name: ca-certificates/root-ca.pem
+    account_name: internalstorage
+    use_managed_identity: true
+    timeout: 45
+    retries: 5
+### AWS S3 Bucket
+
+```yaml
+fetch:
+  - name: s3_certificates
+    type: s3
+    bucket: company-certificates
+    key: bundles/production/root-ca-bundle.pem
+    region: us-west-2
+    verify:
+      sha256: "expected-bundle-hash"
+```
+
+### S3-Compatible Storage (MinIO)
+
+```yaml
+fetch:
+  - name: minio_certs
+    type: s3
+    bucket: pki-bundles
+    key: certificates/internal-roots.pem
+    endpoint_url: https://minio.internal.company.com:9000
+    region: us-east-1  # required for AWS signature
+    verify:
+      ca_file: config/certs/minio-ca.pem  # for self-signed MinIO
+```
+
 ## Environment Variables
 
 ### Required for Authentication
@@ -272,6 +602,18 @@ fetch:
 | API (Generic) | `CUSTOM_API_TOKEN` | Custom API token (configurable name) |
 | Vault | `VAULT_TOKEN` | Vault authentication token |
 | Vault | `VAULT_ADDR` | Vault server address (optional, can be in config) |
+| GCS | `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON key file (optional, can use ADC) |
+| GCS | `GOOGLE_CLOUD_PROJECT` | Default GCP project ID (optional) |
+| Azure Blob | `AZURE_STORAGE_CONNECTION_STRING` | Full Azure Storage connection string |
+| Azure Blob | `AZURE_ACCOUNT_KEY` | Azure Storage account key |
+| Azure Blob | `AZURE_SAS_TOKEN` | Azure Storage SAS token |
+
+**Note:** Azure Blob also supports managed identity and DefaultAzureCredential, which don't require environment variables when running in Azure environments (VMs, AKS, Functions, etc.).
+| S3 | `AWS_ACCESS_KEY_ID` | AWS access key (optional, see AWS credential chain) |
+| S3 | `AWS_SECRET_ACCESS_KEY` | AWS secret key (optional, see AWS credential chain) |
+| S3 | `AWS_SESSION_TOKEN` | AWS session token for temporary credentials (optional) |
+| S3 | `AWS_REGION` | Default AWS region (optional, can be in config) |
+| S3 | `AWS_PROFILE` | AWS credential profile to use (optional) |
 
 ### Setting Environment Variables
 
@@ -285,6 +627,29 @@ export VAULT_ADDR="https://vault.example.com:8200"
 
 # For custom APIs
 export CUSTOM_API_TOKEN="your-custom-token"
+
+# For GCS fetcher
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+export GOOGLE_CLOUD_PROJECT="my-gcp-project"  # Optional
+
+# Alternatively, use gcloud CLI to configure Application Default Credentials
+gcloud auth application-default login
+# For Azure Blob Storage
+# Option 1: Connection String (includes account name and key)
+export AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=mykey;EndpointSuffix=core.windows.net"
+
+# Option 2: Account Key (requires account_name in config)
+export AZURE_ACCOUNT_KEY="your-storage-account-key"  #pragma: allowlist secret
+
+# Option 3: SAS Token (requires account_name in config)
+export AZURE_SAS_TOKEN="sv=2021-06-08&ss=bfqt&srt=sco&sp=rwdlacupitfx&se=2024-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=..."
+# For S3 fetchers (if not using IAM roles)
+export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
+export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  #pragma: allowlist secret
+export AWS_REGION="us-west-2"  # optional, can be specified in config
+
+# For S3 with AWS credential profiles
+export AWS_PROFILE="production"
 ```
 
 ## Troubleshooting
@@ -355,6 +720,169 @@ pip install bundlecraft[fetchers]
 
 Note: When using containers, Vault support is included by default.
 
+#### "GCS: google-cloud-storage not installed" Error
+
+**Problem:** Missing GCS dependencies when using Python package installation
+#### "Azure Blob not found" Error
+
+**Problem:** Container or blob doesn't exist, or incorrect names specified
+
+**Solution:** Verify the container and blob names:
+```bash
+# Using Azure CLI to list containers
+az storage container list --account-name mystorageaccount
+
+# List blobs in a container
+az storage blob list --container-name certificates --account-name mystorageaccount
+```
+
+#### "Azure authentication failed" Error
+
+**Problem:** Invalid credentials or insufficient permissions
+
+**Solution:**
+1. Verify credentials are correct and not expired
+2. Check that the storage account exists and is accessible
+3. Ensure proper RBAC roles are assigned (e.g., "Storage Blob Data Reader")
+4. For managed identity, verify the identity is assigned to the resource and has proper permissions
+
+```bash
+# Test connection using Azure CLI
+az storage blob download --account-name mystorageaccount \
+  --container-name certificates --name test.pem --file /tmp/test.pem
+
+# Check managed identity assignment (for Azure VMs)
+az vm identity show --resource-group myResourceGroup --name myVM
+```
+
+#### "azure-storage-blob not installed" Error
+
+**Problem:** Missing Azure SDK when using Python package installation
+
+**Solution:** Install with fetcher dependencies:
+```bash
+pip install bundlecraft[fetchers]
+```
+
+Note: When using containers, GCS support is included by default.
+
+#### "GCS: Access denied" or "403 Forbidden" Error
+
+**Problem:** Insufficient permissions to access GCS bucket or object
+
+**Solution:**
+
+1. Verify service account has required IAM permissions:
+   ```bash
+   # Grant required permissions (run as GCP admin)
+   gcloud projects add-iam-policy-binding PROJECT_ID \
+     --member="serviceAccount:SERVICE_ACCOUNT_EMAIL" \
+     --role="roles/storage.objectViewer"
+   ```
+
+2. Ensure the bucket and object path are correct:
+   ```bash
+   # List objects in bucket to verify
+   gsutil ls gs://your-bucket-name/path/to/
+   ```
+
+3. Verify credentials are valid:
+   ```bash
+   # Test authentication
+   gcloud auth application-default print-access-token
+   ```
+
+#### "GCS: Object not found" or "404 Not Found" Error
+
+**Problem:** Bucket or object doesn't exist or path is incorrect
+
+**Solution:**
+
+1. Verify bucket exists and is accessible:
+   ```bash
+   gsutil ls gs://bucket-name
+   ```
+
+2. Check object path (case-sensitive):
+   ```bash
+   gsutil ls gs://bucket-name/path/to/object.pem
+   ```
+
+3. Ensure you have the correct bucket name and object path in your config
+
+#### "GCS: Authentication failed" or "401 Unauthorized" Error
+
+**Problem:** Invalid or expired credentials
+
+**Solution:**
+
+1. Refresh Application Default Credentials:
+   ```bash
+   gcloud auth application-default login
+   ```
+
+2. Verify service account key is valid and not expired:
+   ```bash
+   gcloud auth activate-service-account --key-file=/path/to/key.json
+   ```
+
+3. Check that GOOGLE_APPLICATION_CREDENTIALS points to a valid file:
+   ```bash
+   echo $GOOGLE_APPLICATION_CREDENTIALS
+   cat $GOOGLE_APPLICATION_CREDENTIALS | jq .type  # Should output "service_account"
+   ```
+Note: When using containers, Azure Blob support is included by default.
+#### "AWS credentials not found" Error
+
+**Problem:** S3 fetcher cannot locate AWS credentials
+
+**Solution:** Configure AWS credentials using one of these methods:
+
+```bash
+# Option 1: Environment variables
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"  #pragma: allowlist secret
+export AWS_REGION="us-west-2"
+
+# Option 2: AWS credential file
+aws configure
+# Enter your credentials when prompted
+
+# Option 3: Use IAM role (when running on AWS)
+# No configuration needed - automatic
+```
+
+#### "S3 bucket not found" Error
+
+**Problem:** Specified S3 bucket does not exist or is in a different region
+
+**Solution:**
+1. Verify bucket name is correct
+2. Check that bucket exists: `aws s3 ls s3://your-bucket-name/`
+3. Ensure region is correctly specified in config if bucket is not in default region
+4. Verify IAM permissions allow ListBucket on the bucket
+
+#### "S3 object not found" Error
+
+**Problem:** Specified object key does not exist in the bucket
+
+**Solution:**
+1. Verify object key is correct (check for typos, extra slashes)
+2. List bucket contents: `aws s3 ls s3://your-bucket-name/path/`
+3. Check if object is in a different prefix/folder
+4. Ensure object hasn't been deleted or moved
+
+#### "Access denied to S3 bucket" Error
+
+**Problem:** IAM permissions do not allow access to bucket or object
+
+**Solution:**
+1. Verify IAM policy allows `s3:GetObject` on the specific bucket/key
+2. Check bucket policy allows access from your AWS account/role
+3. Review any S3 bucket ACLs that might restrict access
+4. For cross-account access, verify trust relationships are configured
+5. Test access: `aws s3 cp s3://your-bucket-name/key /tmp/test`
+
 ### Debugging Commands
 
 ```bash
@@ -394,7 +922,7 @@ bundlecraft fetch --env prod --bundle example --verbose
    ```bash
    # ✅ Use environment variables
    export VAULT_TOKEN="hvs.token"
-   
+
    # ❌ Never in YAML files
    # token: "hvs.token"  # DON'T DO THIS
    ```
@@ -424,6 +952,103 @@ bundlecraft fetch --env prod --bundle example --verbose
    ```
 
 4. **Monitor fetch operation duration in CI/CD pipelines**
+
+### Azure Blob-Specific Best Practices
+
+1. **Use SAS tokens with minimal permissions and time-bound access:**
+   - Generate SAS tokens with read-only permissions
+   - Set expiration dates appropriate to your rotation schedule
+   - Use account or service-level SAS, not container-level
+
+2. **Prefer managed identity in Azure environments:**
+   ```yaml
+   # Best practice for Azure VMs, AKS, Azure Functions
+   fetch:
+     - name: azure_certs
+       type: azure_blob
+       container: certificates
+       blob_name: ca-bundle.pem
+       account_name: mystorageaccount
+       use_managed_identity: true
+   ```
+
+3. **Implement proper RBAC:**
+   - Assign "Storage Blob Data Reader" role for read-only access
+   - Avoid using account keys when possible
+   - Use Azure AD authentication (managed identity or service principal)
+
+4. **Enable Azure Storage logging and monitoring:**
+   - Track certificate access patterns
+   - Monitor for authentication failures
+   - Set up alerts for unusual access
+
+5. **Use private endpoints for enhanced security:**
+   - Restrict storage account access to specific VNets
+   - Disable public access when running in Azure
+
+6. **Organize blobs with clear naming conventions:**
+   ```
+   certificates/
+     production/
+       roots/ca-bundle.pem
+       intermediate/issuing-ca.pem
+     staging/
+       roots/ca-bundle.pem
+   ```
+
+7. **Enable blob versioning for rollback capability:**
+   - Track certificate updates over time
+   - Quickly revert to previous versions if needed
+
+### Azure Access and Authentication Policies
+
+**Required Azure Permissions:**
+
+For connection string or account key auth:
+- Storage account key access (usually admin-level)
+
+For SAS token:
+- Read permission on blobs (`r`)
+- List permission on container (`l`) - optional but recommended
+
+For managed identity or DefaultAzureCredential:
+- Azure role assignment: `Storage Blob Data Reader` (or `Storage Blob Data Contributor` if write access needed)
+- Role assignment can be at storage account, container, or blob level
+
+**Setting up Managed Identity:**
+
+```bash
+# 1. Enable managed identity on your resource (VM, AKS, Function, etc.)
+az vm identity assign --resource-group myResourceGroup --name myVM
+
+# 2. Get the principal ID
+PRINCIPAL_ID=$(az vm identity show --resource-group myResourceGroup --name myVM --query principalId -o tsv)
+
+# 3. Assign Storage Blob Data Reader role
+az role assignment create \
+  --role "Storage Blob Data Reader" \
+  --assignee $PRINCIPAL_ID \
+  --scope /subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Storage/storageAccounts/{storage-account}
+```
+
+**Setting up SAS Token:**
+
+```bash
+# Generate a read-only SAS token with 90-day expiration
+az storage container generate-sas \
+  --account-name mystorageaccount \
+  --name certificates \
+  --permissions rl \
+  --expiry $(date -u -d "90 days" '+%Y-%m-%dT%H:%MZ') \
+  --https-only \
+  --output tsv
+```
+
+**Azure Blob Storage Documentation:**
+- [Authentication overview](https://learn.microsoft.com/en-us/azure/storage/common/storage-auth)
+- [Managed identities](https://learn.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview)
+- [SAS tokens](https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview)
+- [RBAC roles](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-reader)
 
 ---
 

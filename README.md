@@ -107,7 +107,7 @@ Every build produces a complete trust bundle in `dist/<environment>/<bundle>/`:
 ```text
 bundlecraft-ca-trust.pem     # Canonical PEM bundle
 bundlecraft-ca-trust.jks     # Java KeyStore
-bundlecraft-ca-trust.p12     # PKCS#12 bundle  
+bundlecraft-ca-trust.p12     # PKCS#12 bundle
 bundlecraft-ca-trust.p7b     # PKCS#7 bundle
 manifest.json                # Build metadata & provenance
 checksums.sha256             # Integrity verification
@@ -237,7 +237,7 @@ ______________________________________________________________________
 - Deterministic **manifest.json** and **checksums.sha256** (traceability)
 - **SBOM (Software Bill of Materials)** in CycloneDX format (optional, on by default)
 - **GPG signatures (.asc)** for all artifacts (optional, when `--sign`)
-  
+
 ______________________________________________________________________
 
 ## 🏗️ How It Works
@@ -591,8 +591,8 @@ The build process removes existing keystores before import to prevent conflicts.
 Default passwords are `"changeit"` for both JKS and P12 formats. Override with environment variables:
 
 ```bash
-export TRUST_JKS_PASSWORD="your-jks-password"
-export TRUST_P12_PASSWORD="your-p12-password"
+export TRUST_JKS_PASSWORD="your-jks-password"  #pragma: allowlist secret
+export TRUST_P12_PASSWORD="your-p12-password"  #pragma: allowlist secret
 bundlecraft build --env prod
 ```
 
@@ -718,7 +718,7 @@ BundleCraft treats certificate trust management as a holistic engineering proble
 
 - **Declarative configuration:** Define what you want, not how to get it - BundleCraft handles the complexity
 - **Reproducible builds:** Same inputs always produce identical outputs across environments and time
-- **Defense in depth:** Multiple verification layers from source validation to output integrity checking  
+- **Defense in depth:** Multiple verification layers from source validation to output integrity checking
 - **Full provenance:** Every operation is tracked and auditable for compliance and debugging
 - **Environment awareness:** Support different trust requirements across dev, staging, and production
 - **Format agnostic:** Universal trust bundle that works across all platforms and technologies

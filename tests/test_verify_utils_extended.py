@@ -459,7 +459,7 @@ class TestCountCertsInFile:
         cert3 = x509.load_pem_x509_certificate(cert3_pem.encode(), default_backend())
 
         # Create a real P12 file with the certificates
-        # The test_env fixture sets TRUST_P12_PASSWORD="test-password" by default
+        # The test_env fixture sets TRUST_P12_PASSWORD="test-password" by default  #pragma: allowlist secret
         # Use that password so _count_certs_in_file can read it back
         p12_file = tmp_path / "bundle.p12"
         password = b"test-password"

@@ -13,30 +13,32 @@ Contributing code:
 git clone https://github.com/bundlecraft-io/bundlecraft.git
 cd bundlecraft
 
-# 2. Enable git hooks (prevents pushing tags without changelog entries)
-git config core.hooksPath .githooks
-
-# 3. Set up your environment
-python -m venv venv
+# 2. Set up your dev environment
+python3 -m venv venv
 source venv/bin/activate  # or: venv\Scripts\activate on Windows
-pip install -e ".[dev]"
+make setup-dev  # Installs dependencies + configures git hooks + pre-commit
 
-# 4. Create a feature branch
+# Alternative manual setup:
+# pip install -e ".[dev]"
+# git config core.hooksPath .githooks
+# pre-commit install
+
+# 3. Create a feature branch
 git checkout -b feature/my-awesome-feature
 
-# 5. (Optional) Generate minimal sample configs for testing
+# 4. (Optional) Generate minimal sample configs for testing
 scripts/prepare_test_configs.sh
 
-# 6. Make changes, test locally
+# 5. Make changes, test locally
 bundlecraft build --env test-example-envconfig --verbose
 
-# 7. Test a pypi/container build with your changes:
+# 6. Test a pypi/container build with your changes:
 make test-image-build   # container, requires podman/docker
 make test-pypi-build    # pypi package
 
-# 8. Test and lint code
+# 7. Test and lint code
 pytest -v
-black . && ruff check . --fix
+make ci-lint  # runs: ruff check bundlecraft tests
 
 # 9. Commit and open PR to pre-release (address pre-commit findings too if any)
 git add .
@@ -215,7 +217,7 @@ BundleCraft uses Click's shell completion. To enable tab completion for commands
 # Bash - run in your current shell (or add to ~/.bashrc for persistence)
 eval "$(_BUNDLECRAFT_COMPLETE=bash_source bundlecraft)"
 
-# Zsh - run in your current shell (or add to ~/.zshrc for persistence)  
+# Zsh - run in your current shell (or add to ~/.zshrc for persistence)
 eval "$(_BUNDLECRAFT_COMPLETE=zsh_source bundlecraft)"
 ```
 
@@ -398,7 +400,7 @@ ______________________________________________________________________
 ## 🧾 Coding Standards
 
 Keep things simple and consistent, follow [PEP 8](https://peps.python.org/pep-0008/).
-  
+
 ______________________________________________________________________
 
 ## 🚀 Releases
@@ -415,7 +417,7 @@ Releases are driven by tags and handled by GitHub Actions:
 
 When you push a valid tag to GitHub, CI builds the package, publishes (after environment approval), builds/pushes the container image, and creates a GitHub Release. See `docs/CI-CD.md` for details.
 
-### Deploying a new Release / Pre-Release
+### Pushing a New Release / Pre-Release Git Tag
 
 ```bash
 # 1. Clone the repo
@@ -436,6 +438,84 @@ git tag v1.2.3            # For tags in main
 # 5. Push the tag to GitHub, trigger the release job
 git push origin --tags
 ```
+
+Once the tag has been successfully pushed to either `main` or `pre-release`, the release workflow is kicked off.
+
+### Release Workflow
+
+When you push a tag, the GitHub Actions release workflow (`.github/workflows/release.yaml`) automatically handles the complete release process. Here's exactly what happens:
+
+#### 1. Branch Detection & Validation
+
+The workflow first determines which branch the tag originated from:
+
+- **Production releases** (`main` branch): Tags like `v1.2.3` → PyPI + GHCR
+- **Pre-releases** (`pre-release` branch): Tags like `v1.2.3-beta.1` → TestPyPI + GHCR
+
+Tag format validation ensures proper semantic versioning.
+
+#### 2. Automated Testing & Quality Checks
+
+Every release and pre-release runs the complete test suite:
+
+- **Unit tests**: Full pytest suite (`pytest -v`)
+- **Code quality**: Linting with ruff (`make ci-lint`)
+
+Every **pre-release** (not main) will also run an **integration test** called [BundleCraft Fetch Test Suite](.github/workflows/test-bundlecraft-fetch.yaml) to test and validate all BundleCraft fetcher types (vault, http, s3, etc).
+
+It runs in parallel with package building mentioned below as it meant to be *non-blocking* in case of failures. Since external dependencies can sometimes fail or experience issues during a build/release, we don't want that to block said release of the core app. We do, however, want to be clued in to any potential issues with any BundleCraft fetcher module during the pre-release testing process.
+
+#### 3. Package Building
+
+The workflow builds both distribution formats:
+
+- **Wheel**: `bundlecraft-X.Y.Z-py3-none-any.whl`
+- **Source distribution**: `bundlecraft-X.Y.Z.tar.gz`
+
+#### 4. Container Image Building
+
+For valid releases, container images are built and pushed:
+
+- **Production**: `ghcr.io/bundlecraft-io/bundlecraft:X.Y.Z`, `ghcr.io/bundlecraft-io/bundlecraft:latest`
+- **Pre-release**: `ghcr.io/bundlecraft-io/bundlecraft-test:X.Y.Z-beta.N`, `ghcr.io/bundlecraft-io/bundlecraft-test:pre-release`
+
+#### 5. Publishing Destinations
+
+**Production Releases (main branch tags):**
+
+- **PyPI**: [https://pypi.org/project/bundlecraft/](https://pypi.org/project/bundlecraft/)
+- **GHCR**: [https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft](https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft)
+- **GitHub Releases**: Full release notes with artifacts
+
+**Pre-Releases (pre-release branch tags):**
+
+- **TestPyPI**: [https://test.pypi.org/project/bundlecraft/](https://test.pypi.org/project/bundlecraft/)
+- **GHCR**: [https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft-test](https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft-test)
+- **GitHub Pre-Releases**: Marked as pre-release with installation instructions
+
+#### 6. Post-Release Verification
+
+After publishing, the workflow automatically verifies the release:
+
+- Installs the package from PyPI/TestPyPI
+- Runs basic smoke tests (`bundlecraft --version`, `bundlecraft --help`)
+- Confirms the package is available and functional
+
+#### 7. Release Notes Generation
+
+GitHub releases are automatically created with:
+
+- **Manual changelog**: Extracted from `CHANGELOG.md` if a matching version section exists
+- **Commit log**: All commits since the previous release
+- **Installation instructions**: Platform-specific commands for PyPI and container images
+- **Artifacts**: Direct download links for wheel and source distributions
+
+#### Available Package Locations
+
+| Release Type | Python Package | Container Registry | GitHub Release |
+|--------------|---------------|-------------------|----------------|
+| **Production** | [PyPI](https://pypi.org/project/bundlecraft/) | [GHCR](https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft) | [Releases](https://github.com/bundlecraft-io/bundlecraft/releases) |
+| **Pre-release** | [TestPyPI](https://test.pypi.org/project/bundlecraft/) | [GHCR-Test](https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft-test) | [Pre-releases](https://github.com/bundlecraft-io/bundlecraft/releases) |
 
 Once the release workflow finishes successfully, your new version of BundleCraft is ready to be installed from PyPi/GCR 🎉 A GitHub release with the details of the change will also be published to this repository.
 
@@ -498,7 +578,7 @@ docker run --rm -it \
 **Use pre-releases for:**
 
 - Testing new features before production
-- Verifying bug fixes work in your environment  
+- Verifying bug fixes work in your environment
 - Contributing feedback on upcoming changes
 - CI/CD pipeline testing with latest features
 

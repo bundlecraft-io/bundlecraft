@@ -244,6 +244,14 @@ jobs:
             HATCH_BUILD_VERSION=${{ steps.version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+  # Fetch Integration Tests (Pre-release only)
+  fetch-integration-tests:
+    name: BundleCraft Fetch Test Suite
+    needs: [build, determine-channel]
+    if: needs.determine-channel.outputs.channel == 'pre-release' && startsWith(github.ref,
+      'refs/tags/v')
+    uses: ./.github/workflows/test-bundlecraft-fetch.yaml
+    secrets: inherit  # pragma: allowlist secret
   # The following jobs only run based on the determined release channel (main or pre-release branch)
   # AND if a semantic version tag (e.g., v1.2.3) is pushed  on those branches to mark an official release.
   publish-pypi:
@@ -270,9 +278,9 @@ jobs:
           print-hash: true
   publish-testpypi:
     name: Publish to Test PyPI
-    needs: [build, determine-channel]
-    if: needs.determine-channel.outputs.channel == 'pre-release' && startsWith(github.ref,
-      'refs/tags/v')
+    needs: [build, determine-channel, fetch-integration-tests]
+    if: always() && needs.determine-channel.outputs.channel == 'pre-release' && startsWith(github.ref,
+      'refs/tags/v') && needs.build.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: pre-release
@@ -280,6 +288,19 @@ jobs:
     permissions:
       id-token: write
     steps:
+      - name: Fetch Integration Test Results
+        run: |
+          echo "### 🥏 Fetch Integration Test Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.fetch-integration-tests.result }}" == "success" ]; then
+            echo "✅ All BundleCraft fetchers working correctly" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=Fetch Tests::All fetch integration tests passed"
+          elif [ "${{ needs.fetch-integration-tests.result }}" == "failure" ]; then
+            echo "⚠️ Some BundleCraft fetchers had issues (not blocking release)" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Fetch Tests::Some fetch integration tests failed - check logs"
+          else
+            echo "➖ Fetch tests were skipped or cancelled" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:

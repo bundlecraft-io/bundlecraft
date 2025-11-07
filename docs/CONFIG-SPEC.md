@@ -176,6 +176,50 @@ fetch:
     pem_field: pem
     addr: http://127.0.0.1:8200
     token_ref: VAULT_TOKEN
+
+  - name: gcs_roots
+    type: gcs
+    bucket: my-certificates-bucket       # GCS bucket name
+    object_path: certs/root-ca.pem       # Path to object (also accepts 'object' or 'path')
+    project: my-gcp-project              # Optional GCP project ID
+    credentials_file: /path/to/creds.json # Optional, defaults to GOOGLE_APPLICATION_CREDENTIALS
+    verify:
+      sha256: <expected_sha256>          # Content pinning (recommended)
+    # Optional: Override fetch retry/timeout settings
+    timeout: 60
+    retries: 5
+```
+  - name: azure_prod_certs
+    type: azure_blob
+    container: certificates              # Azure Blob container name (required)
+    blob_name: production/ca-bundle.pem  # Blob path within container (required)
+    account_name: prodstorageaccount     # Storage account name (required unless using connection string)
+    # Authentication options (choose one):
+    connection_string_ref: AZURE_STORAGE_CONNECTION_STRING  # Option 1: Connection string
+    # account_key_ref: AZURE_ACCOUNT_KEY                    # Option 2: Account key
+    # sas_token_ref: AZURE_SAS_TOKEN                        # Option 3: SAS token
+    # use_managed_identity: true                            # Option 4: Managed identity
+    # (default: DefaultAzureCredential if none specified)    # Option 5: Default credential chain
+    verify:
+      sha256: <expected_content_hash>
+    timeout: 45
+    retries: 4
+```
+  - name: s3_bundle
+    type: s3
+    # Option 1: Use s3:// URL
+    url: s3://my-bucket/certificates/bundle.pem
+    region: us-west-2
+    # Option 2: Use explicit bucket/key (alternative to url)
+    # bucket: my-bucket
+    # key: certificates/bundle.pem
+    # region: us-west-2
+    # For S3-compatible services (MinIO, Ceph, etc.)
+    # endpoint_url: https://minio.example.com:9000
+    verify:
+      sha256: <expected_sha256>
+      # For custom S3-compatible endpoints with self-signed certs
+      # ca_file: config/certs/custom-ca.pem
 ```yaml
 
 **Fetch Retry and Timeout Configuration:**
@@ -457,7 +501,7 @@ build_path: team/custom/dir
 **Validation:**
 
 - Must be a relative path (no leading `/`)
-- Cannot contain `..` (parent directory references)  
+- Cannot contain `..` (parent directory references)
 - Cannot start with `dist/` (automatically prefixed)
 - Path components can only contain alphanumeric characters, hyphens, underscores, and dots
 
@@ -781,7 +825,9 @@ For step-by-step guidance on interpreting and fixing validation errors (plus pyt
 
 - `fetch[].type: url` → requires `url` field
 - `fetch[].type: vault` → requires both `mount` and `path` fields
+- `fetch[].type: s3` → requires either `url` (s3://bucket/key format) OR both `bucket` and `key` fields
 - `fetch[].type: api` → requires `endpoint` field
+- `fetch[].type: gcs` → requires `bucket` and `object_path` (or `object`, or `path`) fields
 
 **Bundle Requirements:**
 

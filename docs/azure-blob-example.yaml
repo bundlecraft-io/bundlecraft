@@ -1,0 +1,76 @@
+---
+# Example BundleCraft Source Configuration with Azure Blob Fetcher
+# This demonstrates various ways to fetch certificates from Azure Blob Storage
+apiVersion: bundlecraft.io/v1alpha1
+kind: SourceConfig
+source_name: azure-certificates
+description: Certificate sources from Azure Blob Storage
+# Fetch certificates from Azure Blob Storage
+fetch:
+  # Example 1: Using Connection String (simplest for development/testing)
+  - name: dev_roots
+    type: azure_blob
+    container: dev-certificates
+    blob_name: ca-bundle.pem
+    connection_string_ref: AZURE_STORAGE_CONNECTION_STRING
+    verify:
+      sha256: expected-sha256-hash-of-dev-bundle
+    timeout: 30
+    retries: 3
+
+  # Example 2: Using Account Key (requires account name)
+  - name: staging_roots
+    type: azure_blob
+    container: staging-certificates
+    blob_name: trusted-roots/ca-bundle.pem
+    account_name: stagingstorageaccount
+    account_key_ref: AZURE_STAGING_ACCOUNT_KEY  # pragma: allowlist secret
+    verify:
+      sha256: expected-sha256-hash-of-staging-bundle  # pragma: allowlist secret
+
+  # Example 3: Using SAS Token (time-limited, read-only access)
+  - name: prod_roots
+    type: azure_blob
+    container: production-certificates
+    blob_name: trusted-roots/production-ca-bundle.pem
+    account_name: prodstorageaccount
+    sas_token_ref: AZURE_PROD_SAS_TOKEN
+    verify:
+      sha256: expected-sha256-hash-of-prod-bundle
+    timeout: 60
+    retries: 5
+    backoff_factor: 2.0
+    retry_on_status: [429, 502, 503, 504]
+
+  # Example 4: Using Managed Identity (recommended for Azure VMs, AKS, Functions)
+  - name: internal_ca
+    type: azure_blob
+    container: internal-pki
+    blob_name: ca-certificates/internal-root-ca.pem
+    account_name: internalstorage
+    use_managed_identity: true
+    timeout: 45
+    retries: 4
+
+  # Example 5: Using Default Credential Chain (tries multiple auth methods)
+  # Best for Azure environments - automatically tries:
+  # 1. Environment variables (AZURE_CLIENT_ID, AZURE_TENANT_ID, etc.)
+  # 2. Managed Identity
+  # 3. Azure CLI credentials
+  # 4. Visual Studio Code credentials
+  - name: partner_ca
+    type: azure_blob
+    container: partner-certificates
+    blob_name: partners/acme-corp/root-ca.pem
+    account_name: partnerstorage
+    # No explicit auth specified - uses DefaultAzureCredential
+    verify:
+      sha256: expected-sha256-hash-of-partner-bundle
+metadata:
+  owner: security@example.com
+  purpose: Fetch trusted certificates from Azure Blob Storage
+  tags: [azure, cloud, production]
+  labels:
+    environment: production
+    team: security
+    compliance: required
