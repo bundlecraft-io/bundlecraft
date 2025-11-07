@@ -414,6 +414,30 @@ Releases are driven by tags and handled by GitHub Actions:
 
 When you push a valid tag to GitHub, CI builds the package, publishes (after environment approval), builds/pushes the container image, and creates a GitHub Release. See `docs/CI-CD.md` for details.
 
+### Dependency Lock File
+
+BundleCraft uses `requirements-lock.txt` to pin exact dependency versions for production releases, ensuring deterministic and reproducible builds. This protects against supply chain attacks (see `SECURITY.md`).
+
+**Updating the lock file (before releases):**
+
+```bash
+# Generate/update the lock file with current versions
+make lock-requirements
+
+# Or update all dependencies to their latest compatible versions
+make update-lock
+
+# Validate the lock file is current
+make validate-lock
+```
+
+The lock file is automatically validated by CI. Production container builds use the lock file to ensure exact dependency versions.
+
+**When to update:**
+- Before creating a new release tag
+- After modifying dependencies in `pyproject.toml`
+- When applying security updates to dependencies
+
 ### Pushing a New Release / Pre-Release Git Tag
 
 ```bash
@@ -708,6 +732,9 @@ Handy commands for common tasks:
 | Build bundle | `bundlecraft build --env test-example-envconfig --bundle internal` |
 | Verify bundle | `bundlecraft verify --target dist/.test-inline --verify-all` |
 | Fetch remote sources | `bundlecraft fetch --source-config-file config/cert_sources/*.yaml` |
+| Generate lock file | `make lock-requirements` |
+| Validate lock file | `make validate-lock` |
+| Update lock file | `make update-lock` |
 | Build Python package | `python -m build` |
 | Validate package | `twine check dist/*` |
 

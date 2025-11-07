@@ -533,6 +533,7 @@ ______________________________________________________________________
 - **GPG signing:** Sign all release artifacts with detached GPG signatures (.asc files)
 - **SBOM generation:** Automatic Software Bill of Materials in CycloneDX format
 - **Signature verification:** Built-in verification for signed releases with keyring support
+- **Dependency lock file:** Production builds use exact dependency versions from `requirements-lock.txt` for reproducibility (see [CONTRIBUTING.md](./CONTRIBUTING.md#dependency-lock-file))
 
 For more, see: [`SECURITY.md`](./SECURITY.md)
 

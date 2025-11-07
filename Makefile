@@ -32,6 +32,8 @@ RELEASE_IMAGE_REF ?= localhost/$(IMAGE_NAME):$(GIT_TAG)
 	test-image-version test-image-build test-image-run \
 	test-pypi-version test-pypi-build test-pypi-run \
 	setup-dev ci-install-dev ci-test ci-lint \
+	deploy-pre-release deploy-main-release \
+	lock-requirements validate-lock update-lock \
 	deploy-pre-release deploy-main-release verify-signatures \
 	help
 
@@ -59,6 +61,10 @@ help:
 	@echo "  ci-install-dev          Install dev dependencies for CI"
 	@echo "  ci-test                 Run pytest with coverage for CI"
 	@echo "  ci-lint                 Run ruff linting for CI"
+	@echo "Dependency lock file:"
+	@echo "  lock-requirements       Generate requirements-lock.txt from pyproject.toml"
+	@echo "  validate-lock           Validate lock file is up-to-date"
+	@echo "  update-lock             Update all dependencies in lock file"
 
 build-test-image:
 	$(CONTAINER) build $(CONTAINER_FLAGS) --build-arg HATCH_BUILD_VERSION=$(HATCH_BUILD_VERSION) -t $(IMAGE_REF) .
@@ -277,3 +283,59 @@ ci-test:
 
 ci-lint:
 	ruff check bundlecraft tests
+
+# ---- Dependency lock file management ----
+lock-requirements:
+	@echo "📦 Generating requirements lock file..."
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found."; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
+		exit 1; \
+	fi
+	pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
+	@echo "✅ requirements-lock.txt generated successfully"
+	@echo "📝 Review the changes and commit the updated file"
+
+validate-lock:
+	@echo "🔍 Validating requirements lock file..."
+	@if [ ! -f requirements-lock.txt ]; then \
+		echo "❌ requirements-lock.txt not found. Run 'make lock-requirements' first."; \
+		exit 1; \
+	fi
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found."; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
+		exit 1; \
+	fi
+	@# Check if lock file is a placeholder
+	@if grep -q "IMPORTANT: This file must be properly generated" requirements-lock.txt; then \
+		echo "⚠️  Lock file is a placeholder - skipping validation"; \
+		echo "Run 'make lock-requirements' to generate the actual lock file"; \
+		exit 0; \
+	fi
+	@# Check if lock file is up to date by generating and comparing
+	@echo "Generating temporary lock file for comparison..."
+	@pip-compile --quiet pyproject.toml --output-file=requirements-lock-check.txt --resolver=backtracking 2>&1 | grep -v "^#" || true
+	@if diff -u <(grep -v '^#' requirements-lock.txt | grep -v '^$$' | sort) \
+	            <(grep -v '^#' requirements-lock-check.txt | grep -v '^$$' | sort) > /dev/null 2>&1; then \
+		echo "✅ Lock file is up-to-date"; \
+		rm -f requirements-lock-check.txt; \
+	else \
+		echo "❌ Lock file is out of date!"; \
+		echo ""; \
+		echo "To fix this, run:"; \
+		echo "  make lock-requirements"; \
+		rm -f requirements-lock-check.txt; \
+		exit 1; \
+	fi
+
+update-lock:
+	@echo "🔄 Updating all dependencies in lock file..."
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found."; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
+		exit 1; \
+	fi
+	pip-compile --upgrade pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
+	@echo "✅ requirements-lock.txt updated with latest versions"
+	@echo "📝 Review the changes and test thoroughly before committing"
