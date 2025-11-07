@@ -41,6 +41,7 @@ ______________________________________________________________________
 **Controls:**
 
 - Minimum version constraints for dependencies in `pyproject.toml`; lock files recommended for production deployments.
+- **Production releases use exact dependency versions** from `requirements-lock.txt` to prevent unexpected updates. See [`docs/DEPENDENCY-LOCK.md`](docs/DEPENDENCY-LOCK.md) for lock file management.
 - No dynamic runtime dependency fetching.
 - Dependency vulnerability scanning via automated tools (recommended: Dependabot, pip-audit).
 

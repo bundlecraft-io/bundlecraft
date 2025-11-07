@@ -7,22 +7,27 @@ ENV HATCH_BUILD_VERSION=${HATCH_BUILD_VERSION}
 # Fallbacks for setuptools-scm/hatch-vcs when .git is not available
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=${HATCH_BUILD_VERSION}
 ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BUNDLECRAFT=${HATCH_BUILD_VERSION}
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md requirements-lock.txt ./
 COPY bundlecraft/ ./bundlecraft/
+# Install dependencies from lock file first for better layer caching
+RUN pip install --no-cache-dir -r requirements-lock.txt
 RUN pip install --no-cache-dir build && python -m build --wheel
 
 FROM python:3.12-slim
 ENV VIRTUAL_ENV=/opt/venv
 RUN python -m venv "$VIRTUAL_ENV"
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+COPY --from=builder /build/requirements-lock.txt /tmp/
 COPY --from=builder /build/dist/*.whl /tmp/
-# Install temporary build dependencies, install wheels, then remove build deps to keep image small
+# Install temporary build dependencies, install exact versions from lock file, 
+# then install bundlecraft wheel, then remove build deps to keep image small
 # All in one RUN layer so build dependencies aren't in final image
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential python3-dev && \
+    pip install --no-cache-dir -r /tmp/requirements-lock.txt && \
     pip install --no-cache-dir /tmp/*.whl && \
     apt-get remove -y build-essential python3-dev && apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/* /tmp/*.whl
+    rm -rf /var/lib/apt/lists/* /tmp/*.whl /tmp/requirements-lock.txt
 RUN useradd -m -u 1000 bundlecraft
 USER bundlecraft
 ENTRYPOINT ["bundlecraft"]

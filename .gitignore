@@ -175,6 +175,10 @@ venv.bak/
 # pixi.lock
 .pixi
 
+# pip-tools temporary files
+requirements-lock-check.txt
+lock-diff.txt
+
 # PEP 582
 __pypackages__/
 

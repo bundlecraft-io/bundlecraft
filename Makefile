@@ -33,6 +33,7 @@ RELEASE_IMAGE_REF ?= localhost/$(IMAGE_NAME):$(GIT_TAG)
 	test-pypi-version test-pypi-build test-pypi-run \
 	setup-dev ci-install-dev ci-test ci-lint \
 	deploy-pre-release deploy-main-release \
+	lock-requirements validate-lock update-lock \
 	help
 
 help:
@@ -57,6 +58,10 @@ help:
 	@echo "  ci-install-dev          Install dev dependencies for CI"
 	@echo "  ci-test                 Run pytest with coverage for CI"
 	@echo "  ci-lint                 Run ruff linting for CI"
+	@echo "Dependency lock file:"
+	@echo "  lock-requirements       Generate requirements-lock.txt from pyproject.toml"
+	@echo "  validate-lock           Validate lock file is up-to-date"
+	@echo "  update-lock             Update all dependencies in lock file"
 
 build-test-image:
 	$(CONTAINER) build $(CONTAINER_FLAGS) --build-arg HATCH_BUILD_VERSION=$(HATCH_BUILD_VERSION) -t $(IMAGE_REF) .
@@ -245,3 +250,39 @@ ci-test:
 
 ci-lint:
 	ruff check bundlecraft tests
+
+# ---- Dependency lock file management ----
+lock-requirements:
+	@echo "📦 Generating requirements lock file..."
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found. Installing..."; \
+		pip install pip-tools; \
+	fi
+	pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
+	@echo "✅ requirements-lock.txt generated successfully"
+	@echo "📝 Review the changes and commit the updated file"
+
+validate-lock:
+	@echo "🔍 Validating requirements lock file..."
+	@if [ ! -f requirements-lock.txt ]; then \
+		echo "❌ requirements-lock.txt not found. Run 'make lock-requirements' first."; \
+		exit 1; \
+	fi
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found. Installing..."; \
+		pip install pip-tools; \
+	fi
+	@# Check if lock file is up to date by doing a dry-run compile
+	@pip-compile --dry-run --quiet pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking >/dev/null 2>&1 && \
+		echo "✅ Lock file is up-to-date" || \
+		(echo "❌ Lock file is out of date. Run 'make lock-requirements' to update it." && exit 1)
+
+update-lock:
+	@echo "🔄 Updating all dependencies in lock file..."
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found. Installing..."; \
+		pip install pip-tools; \
+	fi
+	pip-compile --upgrade pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
+	@echo "✅ requirements-lock.txt updated with latest versions"
+	@echo "📝 Review the changes and test thoroughly before committing"
