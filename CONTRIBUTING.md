@@ -476,7 +476,28 @@ For valid releases, container images are built and pushed:
 - **Production**: `ghcr.io/bundlecraft-io/bundlecraft:X.Y.Z`, `ghcr.io/bundlecraft-io/bundlecraft:latest`
 - **Pre-release**: `ghcr.io/bundlecraft-io/bundlecraft-test:X.Y.Z-beta.N`, `ghcr.io/bundlecraft-io/bundlecraft-test:pre-release`
 
-#### 5. Publishing Destinations
+#### 5. Sigstore Signing & Attestations
+
+All BundleCraft releases are cryptographically signed using [Sigstore](https://sigstore.dev) for supply chain security:
+
+**Container Images:**
+- Signed with [cosign](https://docs.sigstore.dev/cosign/overview/) using keyless OIDC signing
+- Signatures are stored in the transparency log ([Rekor](https://docs.sigstore.dev/rekor/overview/))
+- Tied to GitHub's identity through OIDC tokens
+- Automatically verified post-signing in the workflow
+
+**Python Packages:**
+- Signed with [Sigstore attestations](https://docs.pypi.org/attestations/) via PyPI's Trusted Publishing
+- Build provenance attestations generated and stored
+- Verifiable through PyPI and GitHub
+
+**Benefits:**
+- No manual GPG key management required
+- Identity-based signing tied to GitHub Actions
+- Transparent and auditable signing process
+- Compliant with SLSA provenance standards
+
+#### 6. Publishing Destinations
 
 **Production Releases (main branch tags):**
 
@@ -490,7 +511,7 @@ For valid releases, container images are built and pushed:
 - **GHCR**: [https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft-test](https://github.com/bundlecraft-io/bundlecraft/pkgs/container/bundlecraft-test)
 - **GitHub Pre-Releases**: Marked as pre-release with installation instructions
 
-#### 6. Post-Release Verification
+#### 7. Post-Release Verification
 
 After publishing, the workflow automatically verifies the release:
 
@@ -498,7 +519,7 @@ After publishing, the workflow automatically verifies the release:
 - Runs basic smoke tests (`bundlecraft --version`, `bundlecraft --help`)
 - Confirms the package is available and functional
 
-#### 7. Release Notes Generation
+#### 8. Release Notes Generation
 
 GitHub releases are automatically created with:
 
@@ -586,6 +607,76 @@ docker run --rm -it \
 - When stability is more important than features
 
 > **Note:** Pre-release versions are only published when tags are pushed to the `pre-release` branch. They become available on TestPyPI and GHCR within a few minutes of the tag push.
+
+### Verifying Sigstore Signatures
+
+All BundleCraft releases are cryptographically signed with Sigstore for supply chain security. You can verify the authenticity and provenance of any release.
+
+#### Verifying Container Image Signatures
+
+Install [cosign](https://docs.sigstore.dev/cosign/installation/) and verify container images:
+
+```bash
+# Install cosign (if not already installed)
+# macOS
+brew install cosign
+
+# Linux
+curl -LO https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+sudo install cosign-linux-amd64 /usr/local/bin/cosign
+
+# Verify a production image
+cosign verify ghcr.io/bundlecraft-io/bundlecraft:1.2.3 \
+  --certificate-identity-regexp="https://github.com/bundlecraft-io/bundlecraft" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+# Verify a pre-release image
+cosign verify ghcr.io/bundlecraft-io/bundlecraft-test:1.2.3-beta.1 \
+  --certificate-identity-regexp="https://github.com/bundlecraft-io/bundlecraft" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+# Verify using digest (most secure)
+cosign verify ghcr.io/bundlecraft-io/bundlecraft@sha256:... \
+  --certificate-identity-regexp="https://github.com/bundlecraft-io/bundlecraft" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+```
+
+**What this verifies:**
+- The image was built and signed by GitHub Actions in the bundlecraft-io/bundlecraft repository
+- The signature is stored in the public transparency log (Rekor)
+- The build identity is cryptographically tied to the GitHub OIDC token
+
+#### Verifying Python Package Attestations
+
+PyPI packages include Sigstore attestations that can be verified:
+
+```bash
+# Install pip-audit (includes attestation verification)
+pip install pip-audit
+
+# Verify attestations for an installed package
+pip-audit --verify bundlecraft
+
+# Or download and inspect attestations from PyPI
+# Attestations are available at: https://pypi.org/project/bundlecraft/#files
+# Each distribution file has an associated .attestation file
+```
+
+**What this verifies:**
+- The package was built in GitHub Actions with Trusted Publishing
+- Build provenance links the package to specific source code and workflow
+- Attestations include SLSA build provenance information
+
+#### Understanding Keyless Signing
+
+BundleCraft uses **keyless signing** via Sigstore, which means:
+
+- **No long-term keys to manage**: Signatures use short-lived certificates tied to GitHub's OIDC identity
+- **Transparency log**: All signatures are recorded in [Rekor](https://docs.sigstore.dev/rekor/overview/) for public audit
+- **Identity-based**: Signatures prove the release came from GitHub Actions in this repository
+- **Automated**: Signing happens automatically in CI/CD with no manual intervention
+
+This provides the same security guarantees as traditional GPG signing without the operational overhead of key management.
 
 ______________________________________________________________________
 

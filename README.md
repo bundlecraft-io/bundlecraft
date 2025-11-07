@@ -220,6 +220,7 @@ ______________________________________________________________________
 - **Portable tooling:** Pure Python, no system dependencies like OpenSSL or JDK needed
 - **Manifest and checksum generation:** for auditing and release integrity
 - **SBOM generation:** CycloneDX SBOM for supply chain transparency (enabled by default; can be disabled)
+- **Sigstore signing:** All releases (container images and PyPI packages) are cryptographically signed with Sigstore for supply chain security
 - **GPG signing integration:** Sign release artifacts with detached signatures (`--sign`)
 - **Signature verification:** Built-in verification for signed releases (see Verifier)
 - **CI/CD ready:** Designed for (but not exclusive to) GitHub Actions, supports concurrency and artifact management
@@ -237,6 +238,22 @@ ______________________________________________________________________
 - Deterministic **manifest.json** and **checksums.sha256** (traceability)
 - **SBOM (Software Bill of Materials)** in CycloneDX format (optional, on by default)
 - **GPG signatures (.asc)** for all artifacts (optional, when `--sign`)
+
+### 🔐 Sigstore-Signed Releases
+
+All official BundleCraft releases are signed with [Sigstore](https://sigstore.dev) for verifiable supply chain security:
+
+- **Container images**: Signed with [cosign](https://docs.sigstore.dev/cosign/overview/) using keyless OIDC signing
+- **PyPI packages**: Include Sigstore attestations via PyPI Trusted Publishing
+
+To verify a container image signature:
+```bash
+cosign verify ghcr.io/bundlecraft-io/bundlecraft:latest \
+  --certificate-identity-regexp="https://github.com/bundlecraft-io/bundlecraft" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#verifying-sigstore-signatures) for complete verification instructions.
 
 ______________________________________________________________________
 
