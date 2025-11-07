@@ -129,7 +129,7 @@ class TestP12Conversion:
 
     def test_single_cert_to_p12(self, test_certs, tmp_path, monkeypatch):
         """Convert single certificate to P12"""
-        overrides = {"password": "testpassword"}
+        overrides = {"password": "testpassword"}  # pragma: allowlist secret
         create_pkcs12(test_certs["single"], tmp_path, "single_bundle", overrides, force=True)
 
         p12_file = tmp_path / "single_bundle.p12"
@@ -143,7 +143,7 @@ class TestP12Conversion:
 
     def test_multi_cert_to_p12(self, test_certs, tmp_path, monkeypatch):
         """Convert multiple certificates to P12"""
-        overrides = {"password": "testpassword"}
+        overrides = {"password": "testpassword"}  # pragma: allowlist secret
         create_pkcs12(test_certs["multi"], tmp_path, "multi_bundle", overrides, force=True)
 
         p12_file = tmp_path / "multi_bundle.p12"
@@ -158,7 +158,7 @@ class TestP12Conversion:
     def test_p12_to_pem_roundtrip(self, test_certs, tmp_path):
         """Test P12 to PEM conversion roundtrip"""
         # Create P12
-        overrides = {"password": "testpassword"}
+        overrides = {"password": "testpassword"}  # pragma: allowlist secret
         create_pkcs12(test_certs["multi"], tmp_path, "roundtrip", overrides, force=True)
 
         p12_file = tmp_path / "roundtrip.p12"
@@ -166,7 +166,10 @@ class TestP12Conversion:
 
         # Normalize back to PEM
         result_pem, has_keys = normalize_to_pem(
-            p12_file, output_pem, input_format="p12", password="testpassword"
+            p12_file,
+            output_pem,
+            input_format="p12",
+            password="testpassword",  # pragma: allowlist secret
         )
 
         assert result_pem == output_pem
@@ -180,7 +183,7 @@ class TestP12Conversion:
 
     def test_p12_with_default_password(self, test_certs, tmp_path, monkeypatch):
         """Test P12 creation with default password"""
-        # The test_env fixture sets TRUST_P12_PASSWORD="test-password" by default
+        # The test_env fixture sets TRUST_P12_PASSWORD="test-password" by default  # pragma: allowlist secret
         # So we create with that password and verify we can read it back
         overrides = {}  # Use default password from environment
         create_pkcs12(test_certs["single"], tmp_path, "default_pw", overrides, force=True)
@@ -219,7 +222,7 @@ class TestForceOverwrite:
 
     def test_p12_force_overwrite(self, test_certs, tmp_path):
         """Test P12 force overwrite"""
-        overrides = {"password": "test"}
+        overrides = {"password": "test"}  # pragma: allowlist secret
 
         # Create first file
         create_pkcs12(test_certs["single"], tmp_path, "test", overrides, force=True)
@@ -235,7 +238,7 @@ class TestForceOverwrite:
 
     def test_p12_no_force_raises(self, test_certs, tmp_path):
         """Test P12 without force raises FileExistsError"""
-        overrides = {"password": "test"}
+        overrides = {"password": "test"}  # pragma: allowlist secret
         create_pkcs12(test_certs["single"], tmp_path, "test", overrides, force=True)
 
         with pytest.raises(FileExistsError, match="Use --force to overwrite"):
@@ -262,7 +265,7 @@ class TestEmptyInput:
         empty_pem = tmp_path / "empty.pem"
         empty_pem.write_text("")
 
-        overrides = {"password": "test"}
+        overrides = {"password": "test"}  # pragma: allowlist secret
         create_pkcs12(empty_pem, tmp_path, "empty", overrides, force=True)
 
         # Should print warning and not create P12
