@@ -51,7 +51,7 @@ if pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=bac
     
     # Show summary
     if [ -f "requirements-lock.txt" ]; then
-        NUM_PACKAGES=$(grep -c "^[a-z]" requirements-lock.txt || echo "0")
+        NUM_PACKAGES=$(grep -cE "^[a-zA-Z0-9]" requirements-lock.txt || echo "0")
         echo "📦 Number of pinned packages: $NUM_PACKAGES"
     fi
     
