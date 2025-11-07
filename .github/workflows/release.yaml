@@ -142,6 +142,7 @@ jobs:
       'refs/tags/v')
     permissions:
       packages: write
+      id-token: write  # For Sigstore keyless signing
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
       image-digest: ${{ steps.build.outputs.digest }}
@@ -189,6 +190,29 @@ jobs:
             HATCH_BUILD_VERSION=${{ steps.version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Sign container image with Cosign
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          echo "Signing image with digest: $DIGEST"
+          # Sign all tags associated with this image
+          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' ' '); do
+            echo "Signing: ${tag}@${DIGEST}"
+            cosign sign --yes "${tag}@${DIGEST}"
+          done
+      - name: Verify container image signatures
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          echo "Verifying signatures..."
+          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' ' '); do
+            echo "Verifying: ${tag}@${DIGEST}"
+            cosign verify "${tag}@${DIGEST}" \
+              --certificate-identity-regexp="https://github.com/${{ github.repository }}" \
+              --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+          done
   build-image-test:
     name: Build Container Image (Test)
     needs: [test, determine-channel]
@@ -197,6 +221,7 @@ jobs:
       'refs/tags/v')
     permissions:
       packages: write
+      id-token: write  # For Sigstore keyless signing
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
       image-digest: ${{ steps.build.outputs.digest }}
@@ -244,6 +269,29 @@ jobs:
             HATCH_BUILD_VERSION=${{ steps.version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Sign container image with Cosign
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          echo "Signing image with digest: $DIGEST"
+          # Sign all tags associated with this image
+          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' ' '); do
+            echo "Signing: ${tag}@${DIGEST}"
+            cosign sign --yes "${tag}@${DIGEST}"
+          done
+      - name: Verify container image signatures
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          echo "Verifying signatures..."
+          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' ' '); do
+            echo "Verifying: ${tag}@${DIGEST}"
+            cosign verify "${tag}@${DIGEST}" \
+              --certificate-identity-regexp="https://github.com/${{ github.repository }}" \
+              --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+          done
   # Fetch Integration Tests (Pre-release only)
   fetch-integration-tests:
     name: BundleCraft Fetch Test Suite
@@ -264,18 +312,25 @@ jobs:
       name: release
       url: https://pypi.org/p/bundlecraft
     permissions:
-      id-token: write
+      id-token: write  # For PyPI trusted publishing and Sigstore attestations
+      attestations: write  # For generating attestations
+      contents: read
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: python-package-distributions
           path: dist/
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'dist/*'
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verbose: true
           print-hash: true
+          attestations: true
   publish-testpypi:
     name: Publish to Test PyPI
     needs: [build, determine-channel, fetch-integration-tests]
@@ -286,7 +341,9 @@ jobs:
       name: pre-release
       url: https://test.pypi.org/p/bundlecraft
     permissions:
-      id-token: write
+      id-token: write  # For PyPI trusted publishing and Sigstore attestations
+      attestations: write  # For generating attestations
+      contents: read
     steps:
       - name: Fetch Integration Test Results
         run: |
@@ -306,12 +363,17 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'dist/*'
       - name: Publish to Test PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           verbose: true
           print-hash: true
+          attestations: true
   publish-gcr:
     name: Publish to GHCR
     needs: [build-image, determine-channel]
@@ -321,9 +383,18 @@ jobs:
     steps:
       - name: Image published
         run: |
-          echo "✅ Production image published to GHCR"
+          echo "✅ Production image published to GHCR and signed with Sigstore"
           echo "Image: ${{ needs.build-image.outputs.image-tag }}"
           echo "Digest: ${{ needs.build-image.outputs.image-digest }}"
+          echo ""
+          echo "### 🔐 Sigstore Signature Verification" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "To verify the image signature:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+          echo "cosign verify ${{ needs.build-image.outputs.image-tag }}@${{ needs.build-image.outputs.image-digest }} \\" >> "$GITHUB_STEP_SUMMARY"
+          echo '  --certificate-identity-regexp="https://github.com/${{ github.repository }}" \' >> "$GITHUB_STEP_SUMMARY"
+          echo '  --certificate-oidc-issuer=https://token.actions.githubusercontent.com' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
   publish-gcr-test:
     name: Publish to GHCR (Test)
     needs: [build-image-test, determine-channel]
@@ -333,9 +404,18 @@ jobs:
     steps:
       - name: Image published
         run: |
-          echo "✅ Test image published to GHCR"
+          echo "✅ Test image published to GHCR and signed with Sigstore"
           echo "Image: ${{ needs.build-image-test.outputs.image-tag }}"
           echo "Digest: ${{ needs.build-image-test.outputs.image-digest }}"
+          echo ""
+          echo "### 🔐 Sigstore Signature Verification (Pre-release)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "To verify the image signature:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+          echo "cosign verify ${{ needs.build-image-test.outputs.image-tag }}@${{ needs.build-image-test.outputs.image-digest }} \\" >> "$GITHUB_STEP_SUMMARY"
+          echo '  --certificate-identity-regexp="https://github.com/${{ github.repository }}" \' >> "$GITHUB_STEP_SUMMARY"
+          echo '  --certificate-oidc-issuer=https://token.actions.githubusercontent.com' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
   github-release:
     name: Create GitHub Release
     needs: [build, determine-channel]
