@@ -256,7 +256,7 @@ lock-requirements:
 	@echo "📦 Generating requirements lock file..."
 	@if ! command -v pip-compile >/dev/null 2>&1; then \
 		echo "❌ pip-tools not found."; \
-		echo "Install with: pip install -e \".[dev]\" or pip install pip-tools"; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
 		exit 1; \
 	fi
 	pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
@@ -271,7 +271,7 @@ validate-lock:
 	fi
 	@if ! command -v pip-compile >/dev/null 2>&1; then \
 		echo "❌ pip-tools not found."; \
-		echo "Install with: pip install -e \".[dev]\" or pip install pip-tools"; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
 		exit 1; \
 	fi
 	@# Check if lock file is a placeholder
@@ -300,7 +300,7 @@ update-lock:
 	@echo "🔄 Updating all dependencies in lock file..."
 	@if ! command -v pip-compile >/dev/null 2>&1; then \
 		echo "❌ pip-tools not found."; \
-		echo "Install with: pip install -e \".[dev]\" or pip install pip-tools"; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
 		exit 1; \
 	fi
 	pip-compile --upgrade pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking
