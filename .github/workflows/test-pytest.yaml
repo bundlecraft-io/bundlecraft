@@ -7,10 +7,14 @@ on:
   pull_request:
     branches: [main, pre-release]
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   validate-lock-file:
     name: 🔒 Validate Requirements Lock File
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
@@ -71,6 +75,8 @@ jobs:
     name: 🧪 PyTest Suite
     runs-on: ubuntu-latest
     needs: validate-lock-file
+    permissions:
+      contents: read
     # Only run on push if it's NOT a PR merge commit
     if: |
       github.event_name == 'pull_request' ||
