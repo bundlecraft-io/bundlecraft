@@ -89,15 +89,15 @@ make verify-signatures
 PyPI packages include Sigstore attestations that can be verified:
 
 ```bash
-# Install pip-audit (includes attestation verification)
-pip install pip-audit
+# Verify during installation (pip >= 24.2 required)
+pip install --require-attestations bundlecraft
 
-# Verify attestations for an installed package
-pip-audit --verify bundlecraft
+# Or verify an upgrade
+pip install --upgrade --require-attestations bundlecraft
 
-# Attestations are also available on PyPI at:
-# https://pypi.org/project/bundlecraft/#files
-# Each distribution file has an associated .attestation file
+# View attestations on PyPI
+# Attestations are available at: https://pypi.org/project/bundlecraft/#files
+# Each distribution file (.whl, .tar.gz) has an associated .attestation file
 ```
 
 **What this verifies:**

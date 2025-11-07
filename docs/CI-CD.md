@@ -92,9 +92,8 @@ cosign verify ghcr.io/bundlecraft-io/bundlecraft:latest \
 # Or use the Makefile helper
 make verify-signatures
 
-# Verify PyPI package attestations
-pip install pip-audit
-pip-audit --verify bundlecraft
+# Verify PyPI package attestations (pip >= 24.2 required)
+pip install --require-attestations bundlecraft
 ```
 
 See [docs/SIGNING-AND-SBOM.md](SIGNING-AND-SBOM.md) for complete verification instructions.
