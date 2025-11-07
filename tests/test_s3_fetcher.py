@@ -20,12 +20,12 @@ import pytest
 
 # Import botocore exceptions for testing
 try:
-    from botocore.exceptions import ClientError, EndpointConnectionError, NoCredentialsError
+    from botocore.exceptions import ClientError, NoCredentialsError
 except ImportError:
     # Mock these if botocore not available
     ClientError = type("ClientError", (Exception,), {})
     NoCredentialsError = type("NoCredentialsError", (Exception,), {})
-    EndpointConnectionError = type("EndpointConnectionError", (Exception,), {})
+    # EndpointConnectionError is not used
 
 from bundlecraft.fetchers.s3 import _parse_s3_url, _safe_filename_from_key, fetch_s3
 
