@@ -180,7 +180,7 @@ jobs:
             type=raw,value=latest,enable=${{ needs.determine-channel.outputs.channel == 'main' }}
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -259,7 +259,7 @@ jobs:
             type=raw,value=pre-release,enable=${{ needs.determine-channel.outputs.channel == 'pre-release' }}
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
