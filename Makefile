@@ -2,9 +2,15 @@
 CONTAINER_CMD := $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 CONTAINER ?= $(notdir $(CONTAINER_CMD))
 
-# Podman-specific flags for better compatibility
+# Container-specific flags for better compatibility
 ifeq ($(CONTAINER),podman)
-    CONTAINER_FLAGS := --cgroup-manager=cgroupfs
+    CONTAINER_BUILD_FLAGS := --cgroup-manager=cgroupfs
+    CONTAINER_RUN_FLAGS := --userns=keep-id
+    VOLUME_SUFFIX := :Z
+else
+    CONTAINER_BUILD_FLAGS :=
+    CONTAINER_RUN_FLAGS :=
+    VOLUME_SUFFIX :=
 endif
 
 HATCH_BUILD_VERSION ?= 0.0.0+local
@@ -33,6 +39,8 @@ RELEASE_IMAGE_REF ?= localhost/$(IMAGE_NAME):$(GIT_TAG)
 	test-pypi-version test-pypi-build test-pypi-run \
 	setup-dev ci-install-dev ci-test ci-lint \
 	deploy-pre-release deploy-main-release \
+	lock-requirements validate-lock update-lock \
+	deploy-pre-release deploy-main-release verify-signatures \
 	help
 
 help:
@@ -53,20 +61,26 @@ help:
 	@echo "Git Tag Deployment helpers:"
 	@echo "  deploy-pre-release      Create and push a tag to Github based on the latest changelog entry in the pre-release section"
 	@echo "  deploy-main-release     Create and push a tag to Github based on the latest changelog entry in the stable releases section"
+	@echo "Sigstore verification:"
+	@echo "  verify-signatures       Verify Sigstore signatures for the latest release (requires cosign)"
 	@echo "CI helpers:"
 	@echo "  ci-install-dev          Install dev dependencies for CI"
 	@echo "  ci-test                 Run pytest with coverage for CI"
 	@echo "  ci-lint                 Run ruff linting for CI"
+	@echo "Dependency lock file:"
+	@echo "  lock-requirements       Generate requirements-lock.txt from pyproject.toml"
+	@echo "  validate-lock           Validate lock file is up-to-date"
+	@echo "  update-lock             Update all dependencies in lock file"
 
 build-test-image:
-	$(CONTAINER) build $(CONTAINER_FLAGS) --build-arg HATCH_BUILD_VERSION=$(HATCH_BUILD_VERSION) -t $(IMAGE_REF) .
+	$(CONTAINER) build $(CONTAINER_BUILD_FLAGS) --build-arg HATCH_BUILD_VERSION=$(HATCH_BUILD_VERSION) -t $(IMAGE_REF) .
 
 # Build a release image tagged with the latest git tag.
 # - Uses $(GIT_TAG) for the image tag.
 # - Uses $(VERSION) (without leading 'v') for HATCH_BUILD_VERSION inside the wheel.
 build-image:
 	@test -n "$(GIT_TAG)" || (echo "No git tag found. Create a tag (e.g. v1.2.3) or call: make release-image GIT_TAG=v1.2.3" >&2; exit 1)
-	$(CONTAINER) build $(CONTAINER_FLAGS) \
+	$(CONTAINER) build $(CONTAINER_BUILD_FLAGS) \
 	  --build-arg HATCH_BUILD_VERSION=$(VERSION) \
 	  -t $(RELEASE_IMAGE_REF) \
 	  .
@@ -79,20 +93,20 @@ test-image-build: build-test-image
 	BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh; \
 	trap 'BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" scripts/prepare_test_configs.sh --cleanup' EXIT; \
 	$(CONTAINER) run --rm \
-	  --userns=keep-id \
+	  $(CONTAINER_RUN_FLAGS) \
 	  -e BUNDLECRAFT_WORKSPACE=/workspace \
 	  -e TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" \
 	  -e TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
-	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace:Z" \
+	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace$(VOLUME_SUFFIX)" \
 	  -w /workspace \
 	  $(IMAGE_REF) \
 	  build --env test-example-envconfig --verbose --force; \
 	$(CONTAINER) run --rm \
-	  --userns=keep-id \
-	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace:Z" \
+	  $(CONTAINER_RUN_FLAGS) \
+	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace$(VOLUME_SUFFIX)" \
 	  -w /workspace \
 	  $(IMAGE_REF) \
-	  verify --target dist/.test-inline/test-inline --verify-all
+	  verify --target dist/.test-inline --verify-all
 
 test-image-run: build-test-image
 	@set -e; \
@@ -103,11 +117,11 @@ test-image-run: build-test-image
 	  exit 2; \
 	fi; \
 	$(CONTAINER) run --rm \
-	  --userns=keep-id \
+	  $(CONTAINER_RUN_FLAGS) \
 	  -e BUNDLECRAFT_WORKSPACE=/workspace \
 	  -e TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" \
 	  -e TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
-	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace:Z" \
+	  -v "$(BUNDLECRAFT_WORKSPACE):/workspace$(VOLUME_SUFFIX)" \
 	  -w /workspace \
 	  $(IMAGE_REF) \
 	  $(BUNDLECRAFT_ARGS)
@@ -148,7 +162,7 @@ test-pypi-build: build-test-pypi
 	BUNDLECRAFT_WORKSPACE="$(BUNDLECRAFT_WORKSPACE)" \
 	TRUST_JKS_PASSWORD="$(TRUST_JKS_PASSWORD)" TRUST_P12_PASSWORD="$(TRUST_P12_PASSWORD)" \
 	  bundlecraft build --env test-example-envconfig --verbose --force; \
-	bundlecraft verify --target dist/.test-inline/test-inline --verify-all; \
+	bundlecraft verify --target dist/.test-inline --verify-all; \
 	deactivate
 
 test-pypi-run: build-test-pypi
@@ -235,6 +249,36 @@ deploy-main-release:
 	@echo "Deploying main release tag..."
 	@scripts/deploy_tag.sh main-release
 
+# ---- Sigstore signature verification ----
+verify-signatures:
+	@echo "Verifying Sigstore signatures for BundleCraft releases..."
+	@echo ""
+	@if ! command -v cosign &> /dev/null; then \
+		echo "❌ cosign not found. Please install it:"; \
+		echo "   macOS: brew install cosign"; \
+		echo "   Linux: https://docs.sigstore.dev/cosign/installation/"; \
+		exit 1; \
+	fi
+	@echo "✅ cosign is installed"
+	@echo ""
+	@echo "Fetching latest release tag..."
+	@LATEST_TAG=$$(git describe --tags --abbrev=0 2>/dev/null || echo ""); \
+	if [ -z "$$LATEST_TAG" ]; then \
+		echo "❌ No git tags found. Please create a release first."; \
+		exit 1; \
+	fi; \
+	echo "Latest release: $$LATEST_TAG"; \
+	echo ""; \
+	echo "Verifying container image signature..."; \
+	IMAGE="ghcr.io/bundlecraft-io/bundlecraft:$${LATEST_TAG#v}"; \
+	echo "Image: $$IMAGE"; \
+	cosign verify "$$IMAGE" \
+		--certificate-identity-regexp="https://github.com/bundlecraft-io/bundlecraft" \
+		--certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+		|| { echo "❌ Signature verification failed"; exit 1; }; \
+	echo ""; \
+	echo "✅ All signatures verified successfully!"
+
 # ---- CI helpers ----
 ci-install-dev:
 	python -m pip install --upgrade pip
@@ -245,3 +289,87 @@ ci-test:
 
 ci-lint:
 	ruff check bundlecraft tests
+
+# ---- Dependency lock file management ----
+lock-requirements:
+	@echo "📦 Generating requirements lock file..."
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found."; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
+		exit 1; \
+	fi
+	pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking --strip-extras
+	@echo "✅ requirements-lock.txt generated successfully"
+	@echo "📝 Review the changes and commit the updated file"
+
+sync-requirements:
+	@echo "🔄 Syncing environment with lock file..."
+	@if ! command -v pip-sync >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found."; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
+		exit 1; \
+	fi
+	@if [ ! -f requirements-lock.txt ]; then \
+		echo "❌ requirements-lock.txt not found. Run 'make lock-requirements' first."; \
+		exit 1; \
+	fi
+	pip-sync requirements-lock.txt
+	pip install -e ".[dev]"
+	@echo "✅ Environment synced with lock file"
+
+validate-lock:
+	@echo "🔍 Validating requirements lock file..."
+	@if [ ! -f requirements-lock.txt ]; then \
+		echo "❌ requirements-lock.txt not found. Run 'make lock-requirements' first."; \
+		exit 1; \
+	fi
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found."; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
+		exit 1; \
+	fi
+	@# Check if lock file is a placeholder
+	@if grep -q "IMPORTANT: This file must be properly generated" requirements-lock.txt; then \
+		echo "⚠️  Lock file is a placeholder - skipping validation"; \
+		echo "Run 'make lock-requirements' to generate the actual lock file"; \
+		exit 0; \
+	fi
+	@# Check if lock file is up to date by generating and comparing
+	@echo "Generating temporary lock file for comparison..."
+	@pip-compile --quiet pyproject.toml --output-file=requirements-lock-check.txt --resolver=backtracking --strip-extras 2>&1 | grep -v "^#" || true
+	@grep -v '^#' requirements-lock.txt | grep -v '^$$' | sort > requirements-lock-current.tmp
+	@grep -v '^#' requirements-lock-check.txt | grep -v '^$$' | sort > requirements-lock-new.tmp
+	@if diff -u requirements-lock-current.tmp requirements-lock-new.tmp > /dev/null 2>&1; then \
+		echo "✅ Lock file is up-to-date"; \
+		rm -f requirements-lock-check.txt requirements-lock-current.tmp requirements-lock-new.tmp; \
+	else \
+		echo "❌ Lock file is out of date!"; \
+		echo ""; \
+		echo "To fix this, run:"; \
+		echo "  make lock-requirements"; \
+		rm -f requirements-lock-check.txt requirements-lock-current.tmp requirements-lock-new.tmp; \
+		exit 1; \
+	fi
+
+update-lock:
+	@echo "🔄 Updating all dependencies in lock file..."
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found."; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
+		exit 1; \
+	fi
+	pip-compile --upgrade pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking --strip-extras
+	@echo "✅ requirements-lock.txt updated with latest versions"
+	@echo "📝 Review the changes and test thoroughly before committing"
+
+# Regenerate lock file from scratch (useful when resolver gets confused)
+regenerate-lock:
+	@echo "♻️  Regenerating lock file from scratch..."
+	@if ! command -v pip-compile >/dev/null 2>&1; then \
+		echo "❌ pip-tools not found."; \
+		echo "Run: pip install -e \".[dev]\" (or: make setup-dev)"; \
+		exit 1; \
+	fi
+	rm -f requirements-lock.txt
+	pip-compile pyproject.toml --output-file=requirements-lock.txt --resolver=backtracking --strip-extras
+	@echo "✅ Lock file regenerated from scratch"

@@ -455,10 +455,3 @@ ______________________________________________________________________
 - [NIST Guidelines for Key Management](https://csrc.nist.gov/publications/detail/sp/800-57-part-1/rev-5/final)
 
 ______________________________________________________________________
-
-## Support
-
-For questions or issues:
-
-- Open an [issue](https://github.com/bundlecraft-io/bundlecraft/issues)
-- Join [GitHub Discussions](https://github.com/bundlecraft-io/bundlecraft/discussions)

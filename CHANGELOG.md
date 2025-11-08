@@ -7,14 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- New fetcher support: AWS S3
-  - Retrieve certs from S3 buckets and S3-like storage
-
 ---
 
 ## Stable Releases
+
+## [0.3.0] - 2025-11-07
+<!-- markdownlint-disable MD024 -->
+
+### Added
+
+- **New Cloud Fetcher Support**: Comprehensive cloud storage integration!
+  - **AWS S3**: Retrieve certificates from S3 buckets and S3-compatible storage
+  - **Google Cloud Storage (GCS)**: Fetch certificates from GCS buckets with project support
+  - **Azure Blob Storage**: Integration with Azure blob storage accounts
+- **Mozilla CA Bundle**: Direct fetcher for Mozilla's trusted CA certificate store from `https://curl.se/ca/cacert.pem`
+  - Ideal for devices needing to traverse the general internet without cert store limitations
+  - Implemented as a convenience wrapper around the existing HTTP fetcher
+- **Sigstore Signing**: Complete integration for cryptographic supply chain security
+  - Automatic Sigstore signing for all PyPI package releases
+  - Container image signing with Sigstore for enhanced security verification
+  - Comprehensive documentation for Sigstore verification workflows
+
+### Changed
+
+- **Dependency Management**: Fetcher dependencies (boto3, azure-storage-blob, google-cloud-storage) moved from optional to core dependencies for simplified installation and usage
+- **Security Improvements**: Enhanced CI/CD workflows with explicit security permissions and better credential handling
+- **Container Build Process**: Significant performance improvements and optimizations to Docker build process
+- **Documentation**: Comprehensive updates to CI/CD workflows, fetcher documentation, and security verification procedures
+
+### Fixed
+
+- **Schema Validation**: Added proper schema validation for all new fetcher types (S3, GCS, Azure Blob, Mozilla)
+- **Test Reliability**: Improved test stability for cloud fetchers with better mocking and error handling
+- **Container Dependencies**: Optimized Docker build process eliminating redundant installations and improving build times
+
+---
 
 ## [0.2.1] - 2025-11-04
 <!-- markdownlint-disable MD024 -->
@@ -62,6 +89,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## Pre-Releases
+
+## [0.2.2-beta.8] - 2025-11-07
+
+### Added
+
+- Nada - just testing the new release workflow and security enhancements
+
+---
+
+## [0.2.2-beta.7] - 2025-11-07
+
+### Added
+
+- Nada - just testing the new release workflow and security enhancements
+
+---
+
+## [0.2.2-beta.6] - 2025-11-06
+
+### Added
+
+- New fetch type! (sorta?): Mozilla
+  - Fetches the full Mozilla CA certificate store, defacto bundle for TLS certificate store
+  - Good for devices that need to traverse the general internet and do not have large cert store limitations
+  - Hardcoded to download certs from `https://curl.se/ca/cacert.pem`
+  - This is more or less a shortcut/wrapper using the `http` fetch type - no real core functionality added
+
+---
 
 ## [0.2.2-beta.5] - 2025-11-06
 

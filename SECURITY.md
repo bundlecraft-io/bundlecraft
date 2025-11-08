@@ -29,8 +29,7 @@ ______________________________________________________________________
 **Risk:** Unauthorized code modification (e.g., compromised repository or release pipeline).
 **Controls:**
 
-- GPG-signed release artifacts (optional but available).
-- GPG-signed Git tags recommended for version releases.
+- Git tags recommended for version releases.
 - Immutable CI/CD release workflows.
 - Checksums generated per build (`checksums.sha256`).
 - Optional user-side signature verification with published keys.
@@ -41,6 +40,7 @@ ______________________________________________________________________
 **Controls:**
 
 - Minimum version constraints for dependencies in `pyproject.toml`; lock files recommended for production deployments.
+- **Production releases use exact dependency versions** from `requirements-lock.txt` to prevent unexpected updates. See [CONTRIBUTING.md](CONTRIBUTING.md#dependency-lock-file) for lock file management.
 - No dynamic runtime dependency fetching.
 - Dependency vulnerability scanning via automated tools (recommended: Dependabot, pip-audit).
 
@@ -116,7 +116,6 @@ ______________________________________________________________________
 
 Developers and contributors are expected to:
 
-- Sign commits with verified GPG keys (encouraged).
 - Follow dependency scanning and linting rules defined in CI workflows.
 - Avoid introducing runtime network calls or package downloads outside the explicit Fetch layer.
 - Treat all external configuration and source data as untrusted input.

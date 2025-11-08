@@ -147,9 +147,9 @@ include:
 
 ```yaml
 fetch:
+  # Mozilla CA Bundle (recommended for public web trust)
   - name: mozilla_roots
-    type: url
-    url: https://curl.se/ca/cacert.pem
+    type: mozilla
     verify:
       sha256: <expected_sha256>  # Content pinning (recommended)
     # Optional: Override fetch retry/timeout settings
@@ -158,6 +158,14 @@ fetch:
     backoff_factor: 2.0 # Exponential backoff multiplier (default: 2.0)
     retry_on_status: [429, 502, 503, 504]  # HTTP status codes to retry
 
+  # Custom URL fetch
+  - name: custom_bundle
+    type: url
+    url: https://example.com/ca-bundle.pem
+    verify:
+      sha256: <expected_sha256>
+
+  # API fetch (Keyfactor, etc.)
   - name: partner_roots
     type: api
     endpoint: https://api.partner.com/pki/roots
@@ -169,6 +177,7 @@ fetch:
     timeout: 120
     retries: 5
 
+  # Vault fetch
   - name: vault_roots
     type: vault
     mount: secret

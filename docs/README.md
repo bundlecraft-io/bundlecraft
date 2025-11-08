@@ -42,6 +42,6 @@ ______________________________________________________________________
 
 ### Other
 
-- **[public-gpg-key.asc](public-gpg-key.asc)** - Public GPG key for verifying signed releases
+- **[public-gpg-key.asc](public-gpg-key.asc)** - Public BundleCraft GPG key for verifying signed releases
 
 ______________________________________________________________________

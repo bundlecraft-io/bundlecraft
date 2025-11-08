@@ -13,6 +13,7 @@ The BundleCraft **Fetch layer** enables secure retrieval of certificates from ex
 - [Environment Variables](#environment-variables)
 - [Troubleshooting](#troubleshooting)
 - [Best Practices](#best-practices)
+- [Examples](#examples)
 
 ## Overview
 
@@ -34,15 +35,51 @@ The fetch layer is an optional component that runs during the `bundlecraft build
 
 ## Supported Fetchers
 
-### 1. URL Fetcher (`type: url`)
+### 1. Mozilla CA Bundle Fetcher (`type: mozilla`)
 
-Retrieves certificates from HTTPS URLs. Ideal for public certificate bundles like Mozilla's CA collection.
+Convenient shortcut to fetch the official Mozilla CA Bundle from curl.se. This is a curated list of Certificate Authorities included in Mozilla products (Firefox, Thunderbird, etc.), extracted from the Network Security Services (NSS) library.
 
 **Use cases:**
 
-- Mozilla CA bundle from curl.se
+- Quick setup for public web trust
+- Testing and development environments
+- Baseline trust bundle for internet-facing services
+- Reference bundle for CA comparison
+
+**Key features:**
+
+- Pre-configured URL to https://curl.se/ca/cacert.pem
+- No configuration required beyond specifying type
+- Supports all standard verification options (SHA256, TLS fingerprint)
+- Respects fetch retry and timeout configuration
+
+**Security features:**
+
+- HTTPS-only connection to curl.se
+- Optional SHA256 content verification (recommended)
+- Custom CA certificate validation
+- TLS leaf certificate fingerprint pinning
+
+**Note:** The Mozilla CA Bundle is updated regularly as CAs are added, removed, or modified. Always verify the bundle's SHA256 hash to ensure you're using an expected version.
+
+**Access Requirements:**
+- No authentication or API keys required (public resource)
+- HTTPS access to curl.se domain required
+- No rate limiting or access policies
+- Available globally without restrictions
+
+**Reference:** https://curl.se/docs/caextract.html
+
+### 2. URL Fetcher (`type: url`)
+
+Retrieves certificates from arbitrary HTTPS URLs. Use this for custom certificate bundles or when you need full URL control.
+
+**Use cases:**
+
+- Custom certificate bundles
 - Public certificate repositories
 - Static certificate files hosted on secure servers
+- Internal certificate distribution points
 
 **Security features:**
 
@@ -51,7 +88,7 @@ Retrieves certificates from HTTPS URLs. Ideal for public certificate bundles lik
 - Custom CA certificate validation
 - TLS leaf certificate fingerprint pinning
 
-### 2. API Fetcher (`type: api`)
+### 3. API Fetcher (`type: api`)
 
 Generic REST API client with support for various enterprise PKI systems.
 
@@ -73,7 +110,7 @@ Generic REST API client with support for various enterprise PKI systems.
 - TLS fingerprint pinning
 - Response content validation
 
-### 3. Vault Fetcher (`type: vault`)
+### 4. Vault Fetcher (`type: vault`)
 
 Integrates with HashiCorp Vault for certificate retrieval from KV stores or PKI secrets engines.
 
@@ -171,19 +208,63 @@ description: Example remote certificates
 
 fetch:
   - name: remote_certs
-    type: url  # or 'api', 'vault'
+    type: url  # or 'mozilla', 'api', 'vault'
     url: https://example.com/certificates.pem
     verify:
       sha256: "abc123..."  # optional content verification
 ```
 
-### URL Fetcher Configuration
+### Mozilla CA Bundle Configuration
+
+The simplest fetcher configuration - just specify the type:
 
 ```yaml
 fetch:
-  - name: mozilla_bundle
+  - name: mozilla_roots
+    type: mozilla
+    # No URL needed - automatically uses https://curl.se/ca/cacert.pem
+
+    # Optional: Content verification (recommended)
+    verify:
+      sha256: "expected-sha256-hash-of-mozilla-bundle"
+
+    # Optional: Retry/timeout overrides
+    timeout: 60
+    retries: 5
+```
+
+**Minimal example:**
+
+```yaml
+fetch:
+  - name: mozilla_roots
+    type: mozilla
+```
+
+**With verification (recommended):**
+
+```yaml
+fetch:
+  - name: mozilla_roots
+    type: mozilla
+    verify:
+      sha256: "your-actual-mozilla-bundle-sha256-hash-here"
+```
+
+**Access Requirements:**
+- No authentication required (public resource)
+- Requires HTTPS access to curl.se domain
+- No API keys or tokens needed
+
+### URL Fetcher Configuration
+
+For custom URLs or when you need more control:
+
+```yaml
+fetch:
+  - name: custom_bundle
     type: url
-    url: https://curl.se/ca/cacert.pem
+    url: https://example.com/certificates.pem
     verify:
       # Content integrity verification
       sha256: "expected-sha256-hash-of-content"
@@ -440,14 +521,28 @@ For cross-account access, add trust relationships to the IAM role:
 
 ### Mozilla CA Bundle (Public Roots)
 
+**Recommended - Using the mozilla fetcher type:**
+
+```yaml
+fetch:
+  - name: mozilla_roots
+    type: mozilla
+    verify:
+      sha256: "your-actual-mozilla-bundle-sha256-hash-here"
+```
+
+**Alternative - Using the url fetcher directly:**
+
 ```yaml
 fetch:
   - name: mozilla_roots
     type: url
     url: https://curl.se/ca/cacert.pem
     verify:
-      sha256: "current-mozilla-bundle-sha256-hash"
+      sha256: "your-actual-mozilla-bundle-sha256-hash-here"
 ```
+
+The `mozilla` type is preferred as it simplifies configuration and documents intent more clearly.
 
 ### Keyfactor Enterprise PKI
 
@@ -709,15 +804,6 @@ echo $KEYFACTOR_TOKEN
 export KEYFACTOR_TOKEN="your-actual-token"
 ```
 
-#### "Vault: hvac not installed" Error
-
-**Problem:** Missing Vault dependencies when using Python package installation
-
-**Solution:** Install with fetcher dependencies:
-```bash
-pip install bundlecraft[fetchers]
-```
-
 Note: When using containers, Vault support is included by default.
 
 #### "GCS: google-cloud-storage not installed" Error
@@ -754,17 +840,6 @@ az storage blob download --account-name mystorageaccount \
 # Check managed identity assignment (for Azure VMs)
 az vm identity show --resource-group myResourceGroup --name myVM
 ```
-
-#### "azure-storage-blob not installed" Error
-
-**Problem:** Missing Azure SDK when using Python package installation
-
-**Solution:** Install with fetcher dependencies:
-```bash
-pip install bundlecraft[fetchers]
-```
-
-Note: When using containers, GCS support is included by default.
 
 #### "GCS: Access denied" or "403 Forbidden" Error
 
@@ -953,6 +1028,27 @@ bundlecraft fetch --env prod --bundle example --verbose
 
 4. **Monitor fetch operation duration in CI/CD pipelines**
 
+## Examples
+
+Complete configuration examples are available in the `docs/examples/` directory:
+
+- **`mozilla-ca-bundle-source.yaml`** - Fetch Mozilla CA Bundle using the mozilla fetcher type
+  - Pre-configured for curl.se
+  - Includes SHA256 verification
+  - Documents all available options
+  - Ready to use or copy to your config directory
+
+To use an example:
+
+```bash
+# Use directly
+bundlecraft fetch --source-config-file docs/examples/mozilla-ca-bundle-source.yaml
+
+# Or copy to your config directory
+cp docs/examples/mozilla-ca-bundle-source.yaml config/sources/mozilla.yaml
+bundlecraft build --env production --bundle mozilla
+```
+
 ### Azure Blob-Specific Best Practices
 
 1. **Use SAS tokens with minimal permissions and time-bound access:**
@@ -1056,4 +1152,6 @@ For additional help, see:
 
 - [BundleCraft Troubleshooting Guide](troubleshooting.md)
 - [Configuration Specification](CONFIG-SPEC.md)
+- [Configuration Examples](examples/)
+- [GitHub Discussions](https://github.com/bundlecraft-io/bundlecraft/discussions)
 - [GitHub Discussions](https://github.com/bundlecraft-io/bundlecraft/discussions)
