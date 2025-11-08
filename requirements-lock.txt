@@ -24,7 +24,7 @@ boolean-py==5.0
     # via license-expression
 boto3==1.40.68
     # via bundlecraft (pyproject.toml)
-botocore==1.40.68
+botocore==1.40.69
     # via
     #   boto3
     #   s3transfer
