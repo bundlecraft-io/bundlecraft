@@ -25,9 +25,9 @@ jobs:
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 'vault') }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install BundleCraft (with Vault fetcher)
@@ -66,7 +66,7 @@ jobs:
           echo "✅ Vault fetch successful"
       - name: Upload Vault job artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: vault-fetch-artifacts
           path: |
@@ -81,9 +81,9 @@ jobs:
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 'http') }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install BundleCraft and test server deps
@@ -132,7 +132,7 @@ jobs:
           echo "- Used CA file: ci-http-test/ca.crt" >> "$GITHUB_STEP_SUMMARY"
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload HTTP job artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: http-fetch-artifacts
           path: |
@@ -150,9 +150,9 @@ jobs:
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 'api') }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install BundleCraft and test server deps
@@ -215,7 +215,7 @@ jobs:
           echo "- Used CA file: ci-api-test/api.crt" >> "$GITHUB_STEP_SUMMARY"
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload API job artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: api-fetch-artifacts
           path: |
@@ -236,9 +236,9 @@ jobs:
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 's3') }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install BundleCraft (with S3 fetcher)
@@ -309,7 +309,7 @@ jobs:
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload S3 job artifacts
         if: always() && env.SKIP_TEST != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: s3-fetch-artifacts
           path: |
@@ -325,9 +325,9 @@ jobs:
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 'gcs') }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install BundleCraft (with GCS fetcher)
@@ -410,7 +410,7 @@ jobs:
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload GCS job artifacts
         if: always() && env.SKIP_TEST != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: gcs-fetch-artifacts
           path: |
@@ -426,9 +426,9 @@ jobs:
       ${{ github.event.inputs.test_types == '' || contains(github.event.inputs.test_types, 'azure_blob') }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install BundleCraft (with Azure Blob fetcher)
@@ -500,7 +500,7 @@ jobs:
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload Azure Blob job artifacts
         if: always() && env.SKIP_TEST != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: azure-blob-fetch-artifacts
           path: |-
