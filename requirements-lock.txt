@@ -22,7 +22,7 @@ azure-storage-blob==12.27.1
     # via bundlecraft (pyproject.toml)
 boolean-py==5.0
     # via license-expression
-boto3==1.40.69
+boto3==1.40.74
     # via bundlecraft (pyproject.toml)
 botocore==1.40.69
     # via
