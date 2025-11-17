@@ -30,7 +30,7 @@ botocore==1.40.69
     #   s3transfer
 cachetools==6.2.1
     # via google-auth
-certifi==2025.10.5
+certifi==2025.11.12
     # via requests
 cffi==2.0.0
     # via cryptography
