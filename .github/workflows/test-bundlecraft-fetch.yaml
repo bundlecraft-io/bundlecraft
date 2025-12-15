@@ -66,7 +66,7 @@ jobs:
           echo "✅ Vault fetch successful"
       - name: Upload Vault job artifacts
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: vault-fetch-artifacts
           path: |
@@ -132,7 +132,7 @@ jobs:
           echo "- Used CA file: ci-http-test/ca.crt" >> "$GITHUB_STEP_SUMMARY"
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload HTTP job artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: http-fetch-artifacts
           path: |
@@ -215,7 +215,7 @@ jobs:
           echo "- Used CA file: ci-api-test/api.crt" >> "$GITHUB_STEP_SUMMARY"
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload API job artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: api-fetch-artifacts
           path: |
@@ -309,7 +309,7 @@ jobs:
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload S3 job artifacts
         if: always() && env.SKIP_TEST != 'true'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: s3-fetch-artifacts
           path: |
@@ -410,7 +410,7 @@ jobs:
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload GCS job artifacts
         if: always() && env.SKIP_TEST != 'true'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: gcs-fetch-artifacts
           path: |
@@ -500,7 +500,7 @@ jobs:
           echo "- Result: Success" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload Azure Blob job artifacts
         if: always() && env.SKIP_TEST != 'true'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: azure-blob-fetch-artifacts
           path: |-
