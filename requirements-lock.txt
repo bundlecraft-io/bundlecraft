@@ -12,7 +12,7 @@ attrs==25.4.0
     # via
     #   jsonschema
     #   referencing
-azure-core==1.36.0
+azure-core==1.38.0
     # via
     #   azure-identity
     #   azure-storage-blob
