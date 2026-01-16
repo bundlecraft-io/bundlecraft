@@ -130,7 +130,7 @@ protobuf==6.33.0
     #   proto-plus
 py-serializable==2.1.0
     # via cyclonedx-python-lib
-pyasn1==0.6.1
+pyasn1==0.6.2
     # via
     #   pyasn1-modules
     #   pyjks
