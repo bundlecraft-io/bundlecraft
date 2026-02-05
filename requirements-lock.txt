@@ -123,7 +123,7 @@ pip-requirements-parser==32.0.1
     # via cyclonedx-bom
 proto-plus==1.26.1
     # via google-api-core
-protobuf==6.33.0
+protobuf==6.33.5
     # via
     #   google-api-core
     #   googleapis-common-protos
